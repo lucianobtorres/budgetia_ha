@@ -1,0 +1,114 @@
+# pages/4_🎯_Meus_Orcamentos.py
+import pandas as pd
+import streamlit as st
+
+# Importar NomesAbas e PlanilhaManager
+from config import NomesAbas
+from finance.planilha_manager import PlanilhaManager
+
+# --- Verificação de Inicialização ---
+if "plan_manager" not in st.session_state:
+    st.error("Erro: O sistema financeiro não foi carregado. Volte à página principal.")
+    st.stop()
+
+plan_manager: PlanilhaManager = st.session_state.plan_manager
+aba_orcamentos = NomesAbas.ORCAMENTOS
+
+# --- Renderização da Página de Edição de Orçamentos ---
+st.header(f"🎯 Definir/Acompanhar: {aba_orcamentos}")
+st.write(
+    f"Defina seus orçamentos por categoria na aba '{aba_orcamentos}'. "
+    "O sistema irá monitorar seus gastos automaticamente."
+)
+
+try:
+    df_orcamentos = plan_manager.visualizar_dados(aba_nome=aba_orcamentos)
+    editor_key_orc = "editor_orcamentos"
+
+    # --- Conversão de Tipo Preventiva ---
+    if "Última Atualização Orçamento" in df_orcamentos.columns:
+        df_orcamentos["Última Atualização Orçamento"] = pd.to_datetime(
+            df_orcamentos["Última Atualização Orçamento"], errors="coerce"
+        )
+
+    # Verifica se há dados editados no estado da sessão (preservar entre reruns)
+    if f"{editor_key_orc}_edited_rows" in st.session_state:
+        edited_rows = st.session_state[f"{editor_key_orc}_edited_rows"]
+        # Potencialmente aplicar edições aqui se necessário antes de renderizar,
+        # mas o data_editor geralmente lida bem com isso.
+        pass
+
+    edited_df_orc = st.data_editor(
+        df_orcamentos,
+        num_rows="dynamic",
+        use_container_width=True,
+        column_config={  # Configurações para melhor edição
+            "ID Orcamento": st.column_config.NumberColumn(disabled=True),
+            "Categoria": st.column_config.TextColumn(
+                required=True, help="Nome da categoria (Ex: Alimentação)"
+            ),
+            "Valor Limite Mensal": st.column_config.NumberColumn(
+                format="R$ %.2f",
+                required=True,
+                min_value=0.0,
+                step=0.01,
+                help="O valor máximo que você planeja gastar nesta categoria por mês.",
+            ),
+            "Período Orçamento": st.column_config.SelectboxColumn(
+                options=["Mensal", "Anual", "Único"],
+                default="Mensal",
+                required=True,
+                help="Frequência do orçamento (geralmente Mensal).",
+            ),
+            "Observações": st.column_config.TextColumn(
+                help="Notas opcionais sobre este orçamento."
+            ),
+            # Colunas calculadas não devem ser editáveis diretamente
+            "Valor Gasto Atual": st.column_config.NumberColumn(
+                format="R$ %.2f", disabled=True
+            ),
+            "Porcentagem Gasta (%)": st.column_config.ProgressColumn(  # Usar barra de progresso!
+                format="%.1f%%",
+                min_value=0,
+                max_value=100,  # A barra vai até 100%, mesmo se exceder
+            ),
+            "Status Orçamento": st.column_config.TextColumn(disabled=True),
+            "Última Atualização Orçamento": st.column_config.DatetimeColumn(
+                disabled=True, format="YYYY-MM-DD HH:mm:ss"
+            ),
+        },
+        # Esconder colunas calculadas que não são tão úteis na edição direta
+        hide_index=True,
+        # column_order = [...] # Opcional: Definir ordem das colunas
+        key=editor_key_orc,
+    )
+
+    if not df_orcamentos.equals(edited_df_orc):
+        if st.button("Salvar Alterações nos Orçamentos"):
+            st.info("Salvando e recalculando...")
+            try:
+                # Validações antes de salvar
+                if (edited_df_orc["Valor Limite Mensal"] <= 0).any():
+                    st.warning(
+                        "Orçamentos devem ter um 'Valor Limite Mensal' positivo."
+                    )
+                    # Poderia impedir o salvamento ou apenas alertar
+                else:
+                    plan_manager.update_dataframe(aba_orcamentos, edited_df_orc)
+                    plan_manager.recalculate_budgets()  # Recalcula após editar
+                    plan_manager.save()
+                    st.success("Orçamentos atualizados com sucesso!")
+                    st.rerun()
+            except Exception as e:
+                st.error(f"Erro ao salvar alterações nos orçamentos: {e}")
+                st.exception(e)
+        else:
+            st.warning("Você tem alterações não salvas.")
+
+    st.caption(
+        "Preencha 'Categoria', 'Valor Limite Mensal' e 'Período'. As outras colunas são calculadas pelo sistema."
+    )
+
+except Exception as e:
+    st.error(f"Erro ao carregar ou editar orçamentos: {e}")
+    st.exception(e)
