@@ -53,7 +53,7 @@ class CustomJsonStrategy(BaseMappingStrategy):
 
         # 3. Garantir todas as colunas padrão (lógica da classe base)
         # Isso garante que colunas como 'ID Transacao', 'Status', etc., existam
-        df_final = self.map_other_sheet(df_mapeado, config.NomesAbas.TRANSOES)
+        df_final = self.map_other_sheet(df_mapeado, config.NomesAbas.TRANSACOES)
 
         return df_final
 
