@@ -3,6 +3,7 @@
 import pandas as pd
 import streamlit as st
 
+import config
 from config import NomesAbas
 from finance.planilha_manager import PlanilhaManager
 from web_app.utils import verificar_perfil_preenchido
@@ -56,7 +57,16 @@ try:
             ],
             ignore_index=True,
         )
+    if "Campo" in df_perfil.columns:
+        df_perfil["Campo"] = df_perfil["Campo"].astype(str).fillna("")
 
+    if "Valor" in df_perfil.columns:
+        # A coluna 'Valor' também é TextColumn, pois armazena números (Renda)
+        # e texto (Objetivo). Deve ser string.
+        df_perfil["Valor"] = df_perfil["Valor"].astype(str).fillna("")
+
+    if "Observações" in df_perfil.columns:
+        df_perfil["Observações"] = df_perfil["Observações"].astype(str).fillna("")
     editor_key_perfil = "editor_perfil"
 
     edited_df_perfil = st.data_editor(
