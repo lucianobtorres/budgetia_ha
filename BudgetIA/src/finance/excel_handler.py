@@ -1,10 +1,11 @@
 # Em: src/finance/excel_handler.py
 import os
-from typing import Any  # Importações atualizadas
 
 import pandas as pd
 
 import config  # Importar config para NomesAbas
+
+from .mapping_strategies.base_strategy import BaseMappingStrategy
 
 
 class ExcelHandler:
@@ -17,155 +18,141 @@ class ExcelHandler:
 
     def load_sheets(
         self,
-        layout_config: dict[str, list[str]],  # Renomeado 'schema' para 'layout_config'
-        mapeamento: dict[str, Any] | None = None,  # <-- NOVO ARGUMENTO
+        layout_config: dict[str, list[str]],
+        strategy: BaseMappingStrategy,  # <-- Agora recebe a ESTRATÉGIA
     ) -> tuple[dict[str, pd.DataFrame], bool]:
         """
-        Carrega as abas da planilha.
-        Se 'mapeamento' for None, usa o 'layout_config' padrão.
-        Se 'mapeamento' for fornecido, usa a lógica de mapeamento (Strategy Pattern).
-        Retorna os DataFrames e um booleano 'is_new_file'.
+        Carrega as abas da planilha usando a Estratégia de Mapeamento fornecida.
+        Removemos toda a lógica 'if mapeamento:' daqui.
         """
         dataframes: dict[str, pd.DataFrame] = {}
         is_new_file = self.is_new_file  # Pega o estado inicial
 
-        # --- NOVA LÓGICA DE MAPEAMENTO (Strategy Pattern) ---
-        if mapeamento:
+        if is_new_file:
             print(
-                f"LOG: Mapeamento de usuário detectado. Aplicando estratégia '{mapeamento.get('strategy_module', 'custom')}'..."
+                f"AVISO: Arquivo '{self.file_path}' não encontrado. Estrutura criada em memória."
             )
-
-            # (No futuro, aqui carregaria dinamicamente a estratégia)
-            # (Por agora, simulamos uma leitura mapeada simples)
-
+            # Cria DataFrames vazios para todas as abas do layout
+            for sheet_name, columns in layout_config.items():
+                dataframes[sheet_name] = pd.DataFrame(columns=columns)
+        else:
+            print(f"LOG: Carregando planilha existente de '{self.file_path}'.")
             try:
-                # 1. Carregar aba de transações mapeada
-                aba_usuario_transacoes = mapeamento.get(
-                    "aba_transacoes", config.NomesAbas.TRANSACOES
+                xls = pd.ExcelFile(self.file_path)
+                abas_existentes = xls.sheet_names
+
+                # 1. Carrega a aba de TRANSAÇÕES usando a estratégia
+                # A estratégia nos diz qual o nome real da aba
+                nome_aba_transacoes = strategy.get_sheet_name_to_save(
+                    config.NomesAbas.TRANSACOES
                 )
 
-                # TODO: Implementar lógica de estratégia real (ex: pd.concat para múltiplas abas)
-                df_transacoes = pd.read_excel(
-                    self.file_path, sheet_name=aba_usuario_transacoes
+                df_bruto_transacoes: pd.DataFrame
+                if nome_aba_transacoes in abas_existentes:
+                    df_bruto_transacoes = pd.read_excel(
+                        xls, sheet_name=nome_aba_transacoes
+                    )
+                else:
+                    # Se a aba principal falta, trata como arquivo incompleto
+                    print(
+                        f"AVISO: Aba de transações '{nome_aba_transacoes}' não encontrada."
+                    )
+                    df_bruto_transacoes = pd.DataFrame(
+                        columns=strategy.colunas_transacoes
+                    )
+                    is_new_file = True
+
+                # Delega a tradução (mágica acontece aqui)
+                dataframes[config.NomesAbas.TRANSACOES] = strategy.map_transactions(
+                    df_bruto_transacoes
                 )
 
-                # 2. Renomear colunas
-                mapa_colunas = mapeamento.get("colunas", {})
-                df_transacoes.rename(columns=mapa_colunas, inplace=True)
+                # 2. Carrega as OUTRAS abas (Orçamentos, Dívidas, etc.)
+                for sheet_name_padrao, columns in layout_config.items():
+                    # Pula a aba de transações que já carregamos
+                    if sheet_name_padrao == config.NomesAbas.TRANSACOES:
+                        continue
 
-                # 3. Aplicar transformações (Ex: Valores Negativos)
-                if mapeamento.get("transform_valor_negativo", False):
-                    if "Valor" in df_transacoes.columns:
-                        df_transacoes["Tipo (Receita/Despesa)"] = df_transacoes[
-                            "Valor"
-                        ].apply(lambda x: "Receita" if x > 0 else "Despesa")
-                        df_transacoes["Valor"] = df_transacoes["Valor"].abs()
+                    df_bruto_outra: pd.DataFrame
+                    if sheet_name_padrao in abas_existentes:
+                        df_bruto_outra = pd.read_excel(
+                            xls, sheet_name=sheet_name_padrao
+                        )
+                    else:
+                        print(
+                            f"AVISO: Aba do sistema '{sheet_name_padrao}' não encontrada. Criando vazia."
+                        )
+                        df_bruto_outra = pd.DataFrame(columns=columns)
+                        is_new_file = True  # Marca para salvar
 
-                # Salva o DF traduzido em nossa chave interna padrão
-                dataframes[config.NomesAbas.TRANSACOES] = df_transacoes
-                print(
-                    f"LOG: Aba '{aba_usuario_transacoes}' carregada e mapeada para '{config.NomesAbas.TRANSACOES}'."
-                )
+                    # Delega a garantia das colunas (map_other_sheet)
+                    dataframes[sheet_name_padrao] = strategy.map_other_sheet(
+                        df_bruto_outra, sheet_name_padrao
+                    )
 
-            except FileNotFoundError:
-                print(
-                    f"ERRO: Arquivo '{self.file_path}' não encontrado durante o mapeamento."
-                )
-                is_new_file = True
-                dataframes[config.NomesAbas.TRANSACOES] = pd.DataFrame(
-                    columns=layout_config[config.NomesAbas.TRANSACOES]
-                )
             except Exception as e:
                 print(
-                    f"ERRO ao carregar aba mapeada '{aba_usuario_transacoes}': {e}. Criando aba vazia."
+                    f"ERRO CRÍTICO ao ler o arquivo Excel: {e}. Criando estrutura do zero em memória."
                 )
                 is_new_file = True
-                dataframes[config.NomesAbas.TRANSACOES] = pd.DataFrame(
-                    columns=layout_config[config.NomesAbas.TRANSACOES]
-                )
-
-            # 4. Carregar as *outras* abas (Orçamentos, Dívidas, Perfil)
-            #    (Assumimos que elas *devem* existir ou serão criadas por nós)
-            for aba_nome, colunas in layout_config.items():
-                if (
-                    aba_nome not in dataframes
-                ):  # Se ainda não foi carregada (ex: TRANSACOES já foi)
-                    try:
-                        dataframes[aba_nome] = pd.read_excel(
-                            self.file_path, sheet_name=aba_nome
-                        )
-                        # Garantir que as colunas esperadas existam
-                        for col in colunas:
-                            if col not in dataframes[aba_nome].columns:
-                                dataframes[aba_nome][col] = pd.NA
-                    except Exception:
-                        print(
-                            f"AVISO: Aba '{aba_nome}' (padrão do sistema) não encontrada. Criando vazia."
-                        )
-                        dataframes[aba_nome] = pd.DataFrame(columns=colunas)
-                        is_new_file = (
-                            True  # Se abas do sistema faltam, precisamos salvar
-                        )
-
-        # --- LÓGICA PADRÃO (O que tínhamos antes, agora no 'else') ---
-        else:
-            print("LOG: Nenhum mapeamento detectado. Carregando layout padrão...")
-            if is_new_file:
-                print(
-                    f"AVISO: Arquivo '{self.file_path}' não encontrado. Estrutura criada em memória."
-                )
                 for sheet_name, columns in layout_config.items():
                     dataframes[sheet_name] = pd.DataFrame(columns=columns)
-            else:
-                print(f"LOG: Carregando planilha existente de '{self.file_path}'.")
-                try:
-                    xls = pd.ExcelFile(self.file_path)
-                    abas_existentes = xls.sheet_names
 
-                    for sheet_name, columns in layout_config.items():
-                        if sheet_name in abas_existentes:
-                            dataframes[sheet_name] = pd.read_excel(
-                                xls, sheet_name=sheet_name
-                            )
-                            # Garantir colunas (para planilhas antigas)
-                            for col in columns:
-                                if col not in dataframes[sheet_name].columns:
-                                    dataframes[sheet_name][col] = pd.NA
-                        else:
-                            print(
-                                f"AVISO: Aba '{sheet_name}' não encontrada no arquivo. Criando aba vazia."
-                            )
-                            is_new_file = (
-                                True  # Se *qualquer* aba faltar, é novo/incompleto
-                            )
-                            dataframes[sheet_name] = pd.DataFrame(columns=columns)
-                except Exception as e:
-                    print(
-                        f"ERRO CRÍTICO ao ler o arquivo Excel: {e}. Criando estrutura do zero em memória."
-                    )
-                    is_new_file = True  # Trata como novo se a leitura falhar
-                    for sheet_name, columns in layout_config.items():
-                        dataframes[sheet_name] = pd.DataFrame(columns=columns)
-
-        self.is_new_file = is_new_file  # Armazena o estado final
+        self.is_new_file = is_new_file
         return dataframes, is_new_file
 
     def save_sheets(
-        self, dataframes: dict[str, pd.DataFrame], add_intelligence: bool = False
+        self,
+        dataframes: dict[str, pd.DataFrame],
+        strategy: BaseMappingStrategy,  # <-- Agora recebe a ESTRATÉGIA
+        add_intelligence: bool = False,
     ) -> None:
-        """Salva um dicionário de DataFrames em um arquivo Excel com abas."""
-        # NOTA: Esta função ainda salva com a NOSSA estrutura.
-        # A "tradução inversa" para planilhas mapeadas não está implementada (Fase 3).
+        """
+        Salva os DataFrames em um arquivo Excel, usando a Estratégia
+        para "traduzir de volta" os dados para o formato do usuário.
+        """
         try:
             with pd.ExcelWriter(self.file_path, engine="xlsxwriter") as writer:
-                for sheet_name, df in dataframes.items():
-                    # Tratar NaT (Not a Time) antes de salvar, que xlsxwriter não suporta
-                    for col in df.select_dtypes(include=["datetime64[ns]"]).columns:
-                        df[col] = df[col].astype(object).where(df[col].notna(), None)
-                    df.to_excel(writer, sheet_name=sheet_name, index=False)
-                    if add_intelligence:
-                        self._apply_formatting(writer, sheet_name, df)
+                for internal_sheet_name, df_interno in dataframes.items():
+                    # 1. Pergunta à estratégia qual o nome "real" da aba para salvar
+                    sheet_name_to_save = strategy.get_sheet_name_to_save(
+                        internal_sheet_name
+                    )
+
+                    df_para_salvar: pd.DataFrame
+
+                    # 2. Pergunta à estratégia para "traduzir de volta" o DataFrame
+                    if internal_sheet_name == config.NomesAbas.TRANSACOES:
+                        df_para_salvar = strategy.unmap_transactions(df_interno)
+                    else:
+                        # Outras abas (Orçamento, Dívidas) são salvas como estão
+                        df_para_salvar = strategy.map_other_sheet(
+                            df_interno, internal_sheet_name
+                        )
+
+                    # 3. Tratar NaT (Not a Time) antes de salvar
+                    for col in df_para_salvar.select_dtypes(
+                        include=["datetime64[ns]"]
+                    ).columns:
+                        df_para_salvar[col] = (
+                            df_para_salvar[col]
+                            .astype(object)
+                            .where(df_para_salvar[col].notna(), None)
+                        )
+
+                    # 4. Salva o DataFrame traduzido na aba correta
+                    df_para_salvar.to_excel(
+                        writer, sheet_name=sheet_name_to_save, index=False
+                    )
+
+                    # 5. Aplica formatação (apenas se for nosso layout padrão)
+                    if add_intelligence and internal_sheet_name == sheet_name_to_save:
+                        self._apply_formatting(
+                            writer, sheet_name_to_save, df_para_salvar
+                        )
+
             print(f"Planilha salva com sucesso em {self.file_path}")
+
         except Exception as e:
             print(f"ERRO CRÍTICO ao salvar a planilha: {e}")
 
