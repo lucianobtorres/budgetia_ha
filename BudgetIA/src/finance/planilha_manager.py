@@ -8,6 +8,9 @@ import config
 
 from .excel_handler import ExcelHandler
 from .financial_calculator import FinancialCalculator
+from .mapping_strategies.base_strategy import BaseMappingStrategy
+from .mapping_strategies.custom_json_strategy import CustomJsonStrategy
+from .mapping_strategies.default_strategy import DefaultStrategy
 
 
 class PlanilhaManager:
@@ -31,9 +34,17 @@ class PlanilhaManager:
         self.calculator = FinancialCalculator()
         self.mapeamento = mapeamento  # <-- Armazena o mapa
 
+        self.strategy: BaseMappingStrategy
+        if self.mapeamento:
+            # Se temos um mapa, usamos a estratégia JSON
+            self.strategy = CustomJsonStrategy(config.LAYOUT_PLANILHA, self.mapeamento)
+        else:
+            # Senão, usamos a estratégia Padrão
+            self.strategy = DefaultStrategy(config.LAYOUT_PLANILHA, self.mapeamento)
+
         # Passa o mapeamento (ou None) para o ExcelHandler
         self.dfs, is_new_file = self.excel_handler.load_sheets(
-            config.LAYOUT_PLANILHA, self.mapeamento
+            config.LAYOUT_PLANILHA, self.strategy
         )
 
         self.is_new_file = is_new_file  # Armazena a flag
@@ -62,8 +73,12 @@ class PlanilhaManager:
 
     # --- MÉTODOS DE PERSISTÊNCIA ---
     def save(self, add_intelligence: bool = False) -> None:
-        """Delega a tarefa de salvar todos os DataFrames para o ExcelHandler."""
-        self.excel_handler.save_sheets(self.dfs, add_intelligence)
+        """
+        Delega a tarefa de salvar todos os DataFrames para o ExcelHandler,
+        passando a estratégia de mapeamento correta.
+        """
+        # Passa self.strategy para o handler saber como salvar "de volta"
+        self.excel_handler.save_sheets(self.dfs, self.strategy, add_intelligence)
 
     # --- MÉTODOS DE ACESSO E MANIPULAÇÃO (CRUD) ---
     def visualizar_dados(self, aba_nome: str) -> pd.DataFrame:
