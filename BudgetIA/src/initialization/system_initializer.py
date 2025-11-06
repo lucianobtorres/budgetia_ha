@@ -2,31 +2,27 @@
 
 import json
 import os
-
-# --- CORREÇÃO DE IMPORTS ---
-# Adicionar o 'src' ao path para encontrar web_app.utils
 import sys
-from typing import Any  # Imports atualizados
+from typing import Any
 
 import config
 
+# Adicionar o 'src' ao path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 try:
     from web_app.utils import PLANILHA_KEY, load_persistent_config
-except ImportError as e:
-    print(f"ERRO CRÍTICO: Não foi possível importar 'web_app.utils': {e}.")
+except ImportError:
+    print("AVISO: web_app.utils não encontrado (normal em alguns testes).")
 
-    # Define funções dummy para evitar que o app quebre
     def load_persistent_config() -> dict:
         return {}
 
     PLANILHA_KEY = "planilha_path"
-# --- FIM CORREÇÃO IMPORTS ---
 
+# Imports de componentes do sistema
 from agent_implementations.langchain_agent import IADeFinancas
 from core.agent_runner_interface import AgentRunner
-from core.llm_manager import LLMOrchestrator
-from core.llm_providers.gemini_provider import GeminiProvider
+from core.llm_manager import LLMOrchestrator  # Importar o Type Hint
 from finance.excel_handler import ExcelHandler
 from finance.planilha_manager import PlanilhaManager
 
@@ -46,22 +42,21 @@ def _carregar_dados_exemplo(file_path: str) -> list[dict[str, Any]]:
 # --- ASSINATURA DA FUNÇÃO MODIFICADA ---
 def initialize_financial_system(
     planilha_path: str,
+    llm_orchestrator: LLMOrchestrator,  # <-- NOVO ARGUMENTO RECEBIDO
 ) -> tuple[PlanilhaManager | None, AgentRunner | None, LLMOrchestrator | None, bool]:
     """
     Inicializa e conecta todos os componentes do sistema financeiro.
     """
     print(f"\n--- DEBUG INITIALIZER: Iniciando para '{planilha_path}' ---")
 
-    plan_manager = None  # Inicializa como None
+    plan_manager = None
     agent_runner = None
-    llm_orchestrator = None
     dados_de_exemplo_foram_adicionados = False
 
     try:
-        # --- ALTERAÇÃO 1: Carregar o config persistente e buscar o mapa ---
+        # --- LÓGICA DE MAPEAMENTO (permanece igual) ---
         config_persistente = load_persistent_config()
-        mapeamento = config_persistente.get("mapeamento")  # Será None se não existir
-
+        mapeamento = config_persistente.get("mapeamento")
         if mapeamento:
             print("--- DEBUG INITIALIZER: Mapeamento de usuário encontrado! ---")
         else:
@@ -73,35 +68,27 @@ def initialize_financial_system(
 
         # --- 1. Inicialização do Gerenciador da Planilha ---
         print("--- DEBUG INITIALIZER: Criando PlanilhaManager... ---")
-        # --- ALTERAÇÃO 2: Passar o 'mapeamento' para o construtor ---
         plan_manager = PlanilhaManager(
             excel_handler=excel_handler,
-            mapeamento=mapeamento,  # Passa o mapa (ou None)
+            mapeamento=mapeamento,
         )
         print(
             f"--- DEBUG INITIALIZER: PlanilhaManager criado: {type(plan_manager)} ---"
         )
-
-        # --- ALTERAÇÃO 3: Usar o atributo do plan_manager ---
         is_new_file = plan_manager.is_new_file
 
-        # A lógica de popular dados já está no __init__ do PlanilhaManager
-        # Precisamos apenas saber se foi populado para o app.py
         if is_new_file and mapeamento is None:
             if not plan_manager.visualizar_dados(config.NomesAbas.TRANSACOES).empty:
                 dados_de_exemplo_foram_adicionados = True
                 print("--- DEBUG INITIALIZER: Dados de exemplo foram adicionados. ---")
 
-        # A lógica de recalcular já está no __init__ do PlanilhaManager se não for novo
-        # (Não precisamos chamar de novo)
-
         # --- 4. Inicialização da IA e do Agente ---
-        print("--- DEBUG INITIALIZER: Configurando LLM e Agente... ---")
-        primary_provider = GeminiProvider(default_model=config.DEFAULT_GEMINI_MODEL)
-        llm_orchestrator = LLMOrchestrator(primary_provider=primary_provider)
-        llm_orchestrator.get_configured_llm()
+        print(
+            "--- DEBUG INITIALIZER: Configurando Agente (LLM já foi fornecido)... ---"
+        )
 
-        # --- ALTERAÇÃO 4: Injetar contexto do perfil no Agente ---
+        # (A criação do LLMOrchestrator foi removida daqui)
+
         contexto_perfil = plan_manager.get_perfil_como_texto()
         print(
             f"--- DEBUG INITIALIZER: Contexto do Perfil injetado no Agente: {contexto_perfil[:50]}... ---"
@@ -109,20 +96,20 @@ def initialize_financial_system(
 
         agent_runner = IADeFinancas(
             planilha_manager=plan_manager,
-            llm_orchestrator=llm_orchestrator,
-            contexto_perfil=contexto_perfil,  # Passa o contexto para o Agente
+            llm_orchestrator=llm_orchestrator,  # <-- Usa o orquestrador recebido
+            contexto_perfil=contexto_perfil,
         )
 
         print("--- DEBUG INITIALIZER: Inicialização BEM SUCEDIDA. ---")
         return (
             plan_manager,
             agent_runner,
-            llm_orchestrator,
+            llm_orchestrator,  # Retorna o mesmo orquestrador
             dados_de_exemplo_foram_adicionados,
         )
     except Exception as e:
         print(f"--- DEBUG INITIALIZER ERROR: Erro durante a inicialização: {e} ---")
         import traceback
 
-        traceback.print_exc()  # Imprime o traceback completo no terminal
+        traceback.print_exc()
         return None, None, None, False

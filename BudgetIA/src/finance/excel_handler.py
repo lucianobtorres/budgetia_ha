@@ -5,7 +5,7 @@ import pandas as pd
 
 import config  # Importar config para NomesAbas
 
-from .mapping_strategies.base_strategy import BaseMappingStrategy
+from .strategies.base_strategy import BaseMappingStrategy
 
 
 class ExcelHandler:

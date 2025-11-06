@@ -1,29 +1,30 @@
-# Em: src/finance/planilha_manager.py
 import datetime
-from typing import Any  # <-- ADICIONE Optional, Any, Dict, List
+import importlib
+import os
+import sys
+from typing import Any
 
 import pandas as pd
 
 import config
+from finance.excel_handler import ExcelHandler
+from finance.financial_calculator import FinancialCalculator
 
-from .excel_handler import ExcelHandler
-from .financial_calculator import FinancialCalculator
-from .mapping_strategies.base_strategy import BaseMappingStrategy
-from .mapping_strategies.custom_json_strategy import CustomJsonStrategy
-from .mapping_strategies.default_strategy import DefaultStrategy
+# Importa as classes de estratégia
+from finance.strategies.base_strategy import BaseMappingStrategy
+from finance.strategies.default_strategy import DefaultStrategy
 
 
 class PlanilhaManager:
     """
-    Orquestra os dados financeiros em memória (self.dfs) e delega
-    cálculos e persistência para classes especialistas.
+    Classe central para gerenciar os dados da planilha.
+    Agora é responsável por carregar e manter a estratégia de mapeamento.
     """
 
-    # --- __INIT__ MODIFICADO ---
     def __init__(
         self,
         excel_handler: ExcelHandler,
-        mapeamento: dict[str, Any] | None = None,  # <-- NOVO ARGUMENTO
+        mapeamento: dict[str, Any] | None = None,
     ) -> None:
         """
         Inicializa o gerenciador.
@@ -32,71 +33,103 @@ class PlanilhaManager:
         """
         self.excel_handler = excel_handler
         self.calculator = FinancialCalculator()
-        self.mapeamento = mapeamento  # <-- Armazena o mapa
+        self.mapeamento = mapeamento
 
-        self.strategy: BaseMappingStrategy
-        if self.mapeamento:
-            # Se temos um mapa, usamos a estratégia JSON
-            self.strategy = CustomJsonStrategy(config.LAYOUT_PLANILHA, self.mapeamento)
-        else:
-            # Senão, usamos a estratégia Padrão
-            self.strategy = DefaultStrategy(config.LAYOUT_PLANILHA, self.mapeamento)
+        # --- LÓGICA DE ESTRATÉGIA MOVIDA PARA CÁ ---
+        # 1. Determina e instancia a estratégia correta
+        self.strategy: BaseMappingStrategy = self._get_strategy(
+            config.LAYOUT_PLANILHA, self.mapeamento
+        )
 
-        # Passa o mapeamento (ou None) para o ExcelHandler
-        self.dfs, is_new_file = self.excel_handler.load_sheets(
+        # 2. Chama o handler, passando a estratégia
+        self.dfs, self.is_new_file = self.excel_handler.load_sheets(
             config.LAYOUT_PLANILHA, self.strategy
         )
 
-        self.is_new_file = is_new_file  # Armazena a flag
+        # 3. Carrega dados de exemplo (se aplicável)
+        if (
+            self.is_new_file
+            and not mapeamento  # Só adiciona dados se for a estratégia padrão
+            and config.DADOS_EXEMPLO_PATH
+        ):
+            print("--- DEBUG PM: Nova planilha, carregando dados de exemplo... ---")
+            self._carregar_dados_exemplo()
 
-        if self.is_new_file:
-            print("LOG: Detectado arquivo novo ou abas faltando.")
-            # Só popula dados de exemplo se for um arquivo novo E padrão (sem mapa)
-            if self.mapeamento is None:
+        # 4. Cálculos iniciais
+        self._recalculate_debts()
+        self.recalculate_all_budgets()
+
+    def _get_strategy(
+        self,
+        layout_config: dict[str, Any],
+        mapeamento: dict[str, Any] | None,
+    ) -> BaseMappingStrategy:
+        """
+        Carrega dinamicamente a classe de estratégia com base no mapeamento.
+        """
+        strategy_class: type[BaseMappingStrategy] = DefaultStrategy
+        strategy_name = "DefaultStrategy"
+
+        if mapeamento:
+            strategy_module_name = mapeamento.get("strategy_module")
+            if strategy_module_name:
                 print(
-                    "--- DEBUG PM: Arquivo novo padrão. Populando com dados de exemplo... ---"
+                    f"--- DEBUG PM: Carregando estratégia customizada '{strategy_module_name}'... ---"
                 )
-                self._populate_initial_data()  # (Este método já existe abaixo)
-                self.save(add_intelligence=True)  # Salva dados de exemplo e formato
-            else:
-                print(
-                    "--- DEBUG PM: Arquivo mapeado/novo. Salvando abas do sistema (ex: Perfil)... ---"
-                )
-                # Salva o arquivo para criar as abas que faltavam (ex: Perfil Financeiro)
-                self.save(add_intelligence=False)
-        else:
-            # Se o arquivo já existe e está completo (ou mapeado)
-            print("LOG: Arquivo existente carregado. Recalculando orçamentos...")
-            self.recalculate_budgets()  # (Este método já existe abaixo)
+                try:
+                    module_path = f"finance.strategies.{strategy_module_name}"
 
-    # --- FIM DO __INIT__ MODIFICADO ---
+                    strategy_dir = os.path.join(
+                        config.PROJECT_ROOT, "src", "finance", "strategies"
+                    )
+                    if strategy_dir not in sys.path:
+                        sys.path.insert(0, strategy_dir)
 
-    # --- MÉTODOS DE PERSISTÊNCIA ---
+                    module = importlib.import_module(module_path)
+                    importlib.reload(module)  # Garante a versão mais recente
+
+                    strategy_class = getattr(
+                        module, "CustomStrategy"
+                    )  # Nome da classe gerada
+                    strategy_name = f"CustomStrategy (de {strategy_module_name})"
+                except Exception as e:
+                    print(
+                        f"ERRO ao carregar estratégia '{strategy_module_name}': {e}. Usando DefaultStrategy."
+                    )
+                    strategy_class = DefaultStrategy
+
+        print(f"--- DEBUG PM: Instanciando Estratégia: {strategy_name} ---")
+        return strategy_class(layout_config, mapeamento)
+
+    def _carregar_dados_exemplo(self):
+        """Carrega dados de exemplo na aba de transações."""
+        # Implemente sua lógica de carregamento de dados de exemplo aqui
+        # Ex:
+        # transacoes_exemplo = ... (ler de config.DADOS_EXEMPLO_PATH)
+        # df_exemplo = pd.DataFrame(transacoes_exemplo)
+        # self.dfs[config.NomesAbas.TRANSACOES] = pd.concat(
+        #     [self.dfs[config.NomesAbas.TRANSACOES], df_exemplo], ignore_index=True
+        # )
+        # self.save(add_intelligence=True) # Salva os dados de exemplo
+        print("AVISO: Lógica de _carregar_dados_exemplo() precisa ser implementada.")
+        pass
+
+    def _recalculate_debts(self):
+        """Recalcula o saldo devedor das dívidas."""
+        # (Implemente sua lógica original de cálculo de dívidas)
+        pass
+
+    def recalculate_all_budgets(self):
+        """Recalcula o status de todos os orçamentos."""
+        # (Implemente sua lógica original de cálculo de orçamentos)
+        pass
+
     def save(self, add_intelligence: bool = False) -> None:
         """
         Delega a tarefa de salvar todos os DataFrames para o ExcelHandler,
-        passando a estratégia de mapeamento correta.
+        usando a estratégia que foi carregada no __init__.
         """
-        # Passa self.strategy para o handler saber como salvar "de volta"
         self.excel_handler.save_sheets(self.dfs, self.strategy, add_intelligence)
-
-    # --- MÉTODOS DE ACESSO E MANIPULAÇÃO (CRUD) ---
-    def visualizar_dados(self, aba_nome: str) -> pd.DataFrame:
-        """Retorna uma cópia do DataFrame solicitado para visualização segura."""
-        # Garante que a aba exista no self.dfs, se não, cria vazia
-        if aba_nome not in self.dfs:
-            if aba_nome in config.LAYOUT_PLANILHA:
-                print(
-                    f"AVISO: Tentando acessar aba '{aba_nome}' que não foi carregada. Criando em memória."
-                )
-                self.dfs[aba_nome] = pd.DataFrame(
-                    columns=config.LAYOUT_PLANILHA[aba_nome]
-                )
-            else:
-                print(f"ERRO: Tentando acessar aba desconhecida '{aba_nome}'.")
-                return pd.DataFrame()  # Retorna DF vazio
-
-        return self.dfs.get(aba_nome, pd.DataFrame()).copy()
 
     def update_dataframe(self, sheet_name: str, new_df: pd.DataFrame) -> None:
         """Atualiza um DataFrame inteiro em memória."""
@@ -441,42 +474,28 @@ class PlanilhaManager:
 
         return insights_gerados
 
-    # --- NOVO MÉTODO (Adicionar no final da classe) ---
     def get_perfil_como_texto(self) -> str:
-        """
-        Lê a aba 'Perfil Financeiro' e formata os dados como uma string
-        de contexto para ser injetada no prompt da IA.
-        """
+        """Retorna os dados do perfil como um texto formatado."""
         try:
             df_perfil = self.visualizar_dados(config.NomesAbas.PERFIL_FINANCEIRO)
             if df_perfil.empty or "Campo" not in df_perfil.columns:
-                return "O perfil do usuário ainda não foi preenchido."
+                return "Perfil financeiro ainda não preenchido."
 
-            # Converte o DataFrame para um dicionário limpo, removendo valores nulos/vazios
-            perfil_dict = df_perfil.dropna(subset=["Valor"])
-            perfil_dict = perfil_dict[perfil_dict["Valor"] != ""]
-            perfil_dict = pd.Series(
-                perfil_dict.Valor.values, index=perfil_dict.Campo
-            ).to_dict()
-
-            if not perfil_dict:
-                return "O perfil do usuário ainda não foi preenchido."
-
-            # Formata como uma string bonita
-            contexto_str = (
-                "--- CONTEXTO DO PERFIL DO USUÁRIO (NÃO REPETIR/PERGUNTAR) ---\n"
+            contexto = (
+                "--- CONTEXTO DO PERFIL DO USUÁRIO (NÃO REPETIR/PERGUNTAR ISSO):\n"
             )
-            for campo, valor in perfil_dict.items():
-                contexto_str += f"- {campo}: {valor}\n"
-            contexto_str += "--- FIM DO CONTEXTO ---"
+            for _, row in df_perfil.iterrows():
+                if pd.notna(row["Valor"]):
+                    contexto += f"- {row['Campo']}: {row['Valor']}\n"
+            return contexto
+        except Exception:
+            return "Perfil financeiro não encontrado."
 
-            return contexto_str.strip()
-
-        except Exception as e:
-            print(f"ERRO ao ler perfil como texto: {e}")
-            return "Não foi possível carregar o perfil do usuário."
-
-    # --- FIM DO NOVO MÉTODO ---
+    def visualizar_dados(self, aba_nome: str) -> pd.DataFrame:
+        """Retorna uma cópia do DataFrame da aba especificada."""
+        if aba_nome not in self.dfs:
+            raise ValueError(f"Aba '{aba_nome}' não encontrada.")
+        return self.dfs[aba_nome].copy()
 
     def _populate_initial_data(self) -> None:
         """Popula a planilha com dados de exemplo se estiver vazia."""

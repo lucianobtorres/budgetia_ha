@@ -11,7 +11,7 @@ import config
 
 # Importa as classes que vamos testar
 from finance.excel_handler import ExcelHandler
-from finance.mapping_strategies.custom_json_strategy import CustomJsonStrategy
+from finance.strategies.custom_json_strategy import CustomJsonStrategy
 
 
 @pytest.fixture

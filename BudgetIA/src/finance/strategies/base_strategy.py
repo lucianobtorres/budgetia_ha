@@ -1,4 +1,4 @@
-# Em: src/finance/mapping_strategies/base_strategy.py
+# Em: src/finance/strategies/base_strategy.py
 
 from abc import ABC, abstractmethod
 from typing import Any

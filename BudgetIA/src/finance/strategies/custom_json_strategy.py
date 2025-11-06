@@ -1,4 +1,4 @@
-# Em: src/finance/mapping_strategies/custom_json_strategy.py
+# Em: src/finance/strategies/custom_json_strategy.py
 
 from typing import Any
 
