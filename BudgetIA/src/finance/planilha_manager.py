@@ -183,7 +183,10 @@ class PlanilhaManager:
             columns=config.LAYOUT_PLANILHA[aba_transacoes],
         )
 
-        self.dfs[aba_transacoes] = pd.concat([df, novo_registro], ignore_index=True)
+        if df.empty:
+            self.dfs[aba_transacoes] = novo_registro
+        else:
+            self.dfs[aba_transacoes] = pd.concat([df, novo_registro], ignore_index=True)
         self.recalculate_budgets()
 
     def adicionar_ou_atualizar_orcamento(
@@ -246,11 +249,17 @@ class PlanilhaManager:
                 ],
                 columns=config.LAYOUT_PLANILHA[aba_orcamentos],
             )
-            df = pd.concat([df, novo_orcamento], ignore_index=True).fillna(
+
+            if df.empty:
+                df = novo_orcamento
+            else:
+                df = pd.concat([df, novo_orcamento], ignore_index=True)
+
+            df = df.fillna(
                 {
                     "Valor Gasto Atual": 0,
                     "Porcentagem Gasta (%)": 0,
-                }  # fillna mais específico
+                }
             )
             mensagem = f"Novo orçamento para '{categoria}' criado."
 
@@ -342,7 +351,12 @@ class PlanilhaManager:
                 ],
                 columns=config.LAYOUT_PLANILHA[aba_dividas],  # Usa o config
             )
-            dividas_df = pd.concat([dividas_df, nova_divida], ignore_index=True)
+
+            if dividas_df.empty:
+                dividas_df = nova_divida
+            else:
+                dividas_df = pd.concat([dividas_df, nova_divida], ignore_index=True)
+
             self.dfs[aba_dividas] = dividas_df
             mensagem = f"Nova dívida '{nome_divida}' registrada com saldo inicial de R$ {saldo_devedor_atual:,.2f}."
 
@@ -421,7 +435,12 @@ class PlanilhaManager:
                 [{"Campo": campo, "Valor": valor, "Observações": ""}],
                 columns=config.LAYOUT_PLANILHA[aba_nome],
             )
-            df_perfil = pd.concat([df_perfil, novo_dado], ignore_index=True)
+
+            if df_perfil.empty:
+                df_perfil = novo_dado
+            else:
+                df_perfil = pd.concat([df_perfil, novo_dado], ignore_index=True)
+
             mensagem = f"Perfil criado: '{campo}' definido como '{valor}'."
 
         self.dfs[aba_nome] = df_perfil

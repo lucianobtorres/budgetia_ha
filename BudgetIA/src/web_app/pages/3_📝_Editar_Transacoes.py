@@ -3,22 +3,22 @@ import pandas as pd
 import streamlit as st
 
 from config import NomesAbas
-from finance.planilha_manager import PlanilhaManager
 
-# --- Verificação de Inicialização ---
-if "plan_manager" not in st.session_state:
-    st.error("Erro: O sistema financeiro não foi carregado. Volte à página principal.")
-    st.stop()
+try:
+    from ..ui_components.common_ui import setup_page
+except ImportError:
+    from web_app.ui_components.common_ui import setup_page
 
-plan_manager: PlanilhaManager = st.session_state.plan_manager
-aba_transacoes = NomesAbas.TRANSACOES  # Usar o nome correto da sua aba
+plan_manager, agent_runner = setup_page(
+    title="Editar Transações",
+    icon="📝",
+)
 
-# --- Renderização da Página de Edição de Transações ---
-st.header(f"📝 Visualizar/Editar: {aba_transacoes}")
-st.write(f"Gerencie diretamente as transações da sua aba '{aba_transacoes}'.")
+aba_transacoes = NomesAbas.TRANSACOES
 
 try:
     df_transacoes = plan_manager.visualizar_dados(aba_nome=aba_transacoes)
+    st.info("Gerencie diretamente as transações")
     if "Data" in df_transacoes.columns:
         df_transacoes["Data"] = pd.to_datetime(df_transacoes["Data"], errors="coerce")
 

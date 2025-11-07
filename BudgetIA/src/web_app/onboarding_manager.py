@@ -36,7 +36,7 @@ class OnboardingManager:
         self._determine_initial_state()
         print("--- DEBUG OnboardingManager: Instanciado com LLMOrchestrator. ---")
 
-    def _determine_initial_state(self):
+    def _determine_initial_state(self) -> None:
         # (Estado salvo de fallback)
         if self.config_data.get("onboarding_state") == "STRATEGY_FAILED_FALLBACK":
             self.current_state = "STRATEGY_FAILED_FALLBACK"
@@ -84,6 +84,7 @@ class OnboardingManager:
         self.config_data[PLANILHA_KEY] = path_str
         # Limpa o estado de fallback se salvarmos com sucesso
         self.config_data.pop("onboarding_state", None)
+        self.config_data.pop("pending_planilha_path", None)
         self._save_persistent_config()
         self.planilha_path = path_str
 
@@ -142,9 +143,11 @@ class OnboardingManager:
         except Exception as e:
             return False, f"Erro ao criar ou inicializar planilha: {e}"
 
-    def _processar_planilha_customizada(self, path_str: str) -> tuple[bool, str]:
+    def _processar_planilha_customizada(self) -> tuple[bool, str]:
         """Tenta o Plano A (IA) e muda o estado para Fallback (B/C) se falhar."""
-        self.set_state("GENERATING_STRATEGY")
+        path_str = self.config_data.get("pending_planilha_path")
+        if not path_str:
+            return False, "Erro: Caminho da planilha pendente não encontrado."
 
         try:
             generator = StrategyGenerator(self.llm_orchestrator, self.max_retries)
@@ -184,37 +187,54 @@ class OnboardingManager:
             return False, f"Um erro inesperado ocorreu: {e}"
 
     def set_planilha_from_path(self, path_str: str) -> tuple[bool, str]:
-        """Lógica para usar uma planilha por caminho existente (Inicia Plano A)."""
+        """
+        Lógica para usar uma planilha por caminho existente.
+        APENAS valida o caminho e define o estado de GERAÇÃO.
+        """
         path_obj = Path(path_str)
         if not path_obj.is_file():
             return False, f"Arquivo não encontrado: {path_str}"
         if not path_obj.name.endswith(".xlsx"):
             return False, "O arquivo deve ser .xlsx"
 
-        # Inicia o processo de geração de estratégia
-        return self._processar_planilha_customizada(path_str)
+        # Salva o caminho que a IA precisa processar
+        self.config_data["pending_planilha_path"] = path_str
+        self._save_persistent_config()
+
+        # Apenas define o estado. NÃO chama _processar_planilha_customizada.
+        self.set_state("GENERATING_STRATEGY")
+        return True, "Caminho válido. Iniciando geração de estratégia..."
 
     def handle_uploaded_planilha(
         self,
         uploaded_file: Any,
         save_dir: str,
     ) -> tuple[bool, str]:
-        """Lógica para salvar e validar um arquivo carregado (Inicia Plano A)."""
+        """
+        Lógica para salvar um arquivo carregado.
+        APENAS salva o arquivo e define o estado de GERAÇÃO.
+        """
         save_path = Path(save_dir) / uploaded_file.name
         try:
             with open(save_path, "wb") as f:
                 f.write(uploaded_file.getbuffer())
 
-            # Inicia o processo de geração de estratégia
-            return self._processar_planilha_customizada(str(save_path))
+            # Salva o caminho que a IA precisa processar
+            self.config_data["pending_planilha_path"] = str(save_path)
+            self._save_persistent_config()
+
+            # Apenas define o estado. NÃO chama _processar_planilha_customizada.
+            self.set_state("GENERATING_STRATEGY")
+            return True, "Upload concluído. Iniciando geração de estratégia..."
 
         except Exception as e:
+            # (Limpeza em caso de falha no salvamento)
             if save_path.exists():
                 try:
                     os.remove(save_path)
                 except OSError:
                     pass
-            return False, f"Erro ao processar planilha: {e}"
+            return False, f"Erro ao salvar planilha: {e}"
 
     # --- Fase 2: Lógica de Setup do Perfil (permanece a mesma) ---
 

@@ -33,7 +33,7 @@ def fake_excel_user_buffer() -> bytes:
 
 @pytest.fixture
 def user_map() -> dict:
-    """Simula o JSON de mapeamento que o app.py salvaria."""
+    """Simula o JSON de mapeamento que o 💰_BudgetIA.py salvaria."""
     return {
         "aba_transacoes": "Extrato_Banco",
         "colunas": {

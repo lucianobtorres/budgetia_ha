@@ -4,25 +4,22 @@ import streamlit as st
 
 # Importar NomesAbas e PlanilhaManager
 from config import NomesAbas
-from finance.planilha_manager import PlanilhaManager
 
-# --- Verificação de Inicialização ---
-if "plan_manager" not in st.session_state:
-    st.error("Erro: O sistema financeiro não foi carregado. Volte à página principal.")
-    st.stop()
+try:
+    from ..ui_components.common_ui import setup_page
+except ImportError:
+    from web_app.ui_components.common_ui import setup_page
 
-plan_manager: PlanilhaManager = st.session_state.plan_manager
-aba_orcamentos = NomesAbas.ORCAMENTOS
-
-# --- Renderização da Página de Edição de Orçamentos ---
-st.header(f"🎯 Definir/Acompanhar: {aba_orcamentos}")
-st.write(
-    f"Defina seus orçamentos por categoria na aba '{aba_orcamentos}'. "
-    "O sistema irá monitorar seus gastos automaticamente."
+plan_manager, agent_runner = setup_page(
+    title="Meus Orçamentos",
+    icon="🎯",
 )
+
+aba_orcamentos = NomesAbas.ORCAMENTOS
 
 try:
     df_orcamentos = plan_manager.visualizar_dados(aba_nome=aba_orcamentos)
+    st.info("O sistema irá monitorar seus gastos automaticamente.")
     editor_key_orc = "editor_orcamentos"
 
     # --- Conversão de Tipo Preventiva ---

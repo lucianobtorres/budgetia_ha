@@ -1,26 +1,33 @@
 # Em: src/web_app/pages/5_👤_Perfil_Financeiro.py
 
+import time
+
 import pandas as pd
 import streamlit as st
 
 import config
 from config import NomesAbas
-from finance.planilha_manager import PlanilhaManager
+from web_app.onboarding_manager import OnboardingManager
 from web_app.utils import verificar_perfil_preenchido
 
-# --- Verificação de Inicialização ---
-if "plan_manager" not in st.session_state:
-    st.error("Erro: O sistema financeiro não foi carregado. Volte à página principal.")
-    st.stop()
+try:
+    from ..ui_components.common_ui import setup_page
+except ImportError:
+    from web_app.ui_components.common_ui import setup_page
 
-plan_manager: PlanilhaManager = st.session_state.plan_manager
+plan_manager, agent_runner = setup_page(
+    title="Perfil Financeiro",
+    icon="👤",
+    subtitle="Defina seus orçamentos por categoria ",
+)
+
+manager: OnboardingManager = st.session_state.onboarding_manager
+
 aba_perfil = NomesAbas.PERFIL_FINANCEIRO
-
-# --- Renderização da Página ---
-st.header(f"👤 Editar: {aba_perfil}")  # Corrigido: sem .value
 
 try:
     df_perfil = plan_manager.visualizar_dados(aba_nome=aba_perfil)
+    st.info("Aqui estão os dados do seu perfil. O Chat com IA usa essas informações.")
 
     # Adiciona linhas padrão se estiver vazio ou faltando
     campos_essenciais = ["Renda Mensal Média", "Principal Objetivo"]
@@ -116,3 +123,44 @@ try:
 except Exception as e:
     st.error(f"Erro ao carregar o Perfil Financeiro: {e}")
     st.exception(e)
+
+# --- NOVA SEÇÃO: ZONA DE PERIGO ---
+st.divider()
+st.subheader("Configurações Avançadas")
+
+with st.expander("Zona de Perigo"):
+    st.warning(
+        "Atenção: A ação abaixo irá desconfigurar sua planilha atual e reiniciar o BudgetIA, pedindo uma nova planilha na próxima vez que você abrir o app."
+    )
+
+    if st.button(
+        "Trocar de Planilha / Reiniciar Onboarding",
+        type="primary",
+        use_container_width=True,
+    ):
+        # 1. Chama o reset do OnboardingManager
+        # (Isso apaga o user_config.json)
+        manager.reset_config()
+
+        # 2. Limpa todos os objetos cacheados do Streamlit
+        # (Isso força o load_financial_system e get_llm_orchestrator a recarregarem)
+        st.cache_resource.clear()
+
+        # 3. Limpa o session_state (opcional, mas recomendado)
+        # (Isso remove plan_manager, agent_runner, etc.)
+        keys_to_clear = [
+            "plan_manager",
+            "agent_runner",
+            "llm_orchestrator",
+            "current_planilha_path",
+        ]
+        for key in keys_to_clear:
+            if key in st.session_state:
+                del st.session_state[key]
+
+        st.success("Configuração reiniciada! O BudgetIA pedirá uma nova planilha.")
+        st.balloons()
+        time.sleep(2)
+
+        # 4. Navega de volta para a Home (que agora é o 🏠_Home.py)
+        st.switch_page("🏠_Home.py")  # (Ajuste se você usou outro nome)
