@@ -10,16 +10,19 @@ load_dotenv()
 # Define o diretório raiz do projeto de forma robusta
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 DATA_DIR = os.path.join(PROJECT_ROOT, "data")
+PROMPTS_DIR = os.path.join(PROJECT_ROOT, "src", "prompts")
 os.makedirs(DATA_DIR, exist_ok=True)
+os.makedirs(PROMPTS_DIR, exist_ok=True)
 
 # Nomes dos arquivos centralizados aqui
 PLANILHA_FILENAME = "planilha_mestra.xlsx"
 DADOS_EXEMPLO_FILENAME = "dados_exemplo.json"
+SYSTEM_PROMPT_FILENAME = "system_prompt.txt"
 
 # Caminhos completos para serem usados em toda a aplicação
 PLANILHA_PATH = os.path.join(DATA_DIR, PLANILHA_FILENAME)
 DADOS_EXEMPLO_PATH = os.path.join(DATA_DIR, DADOS_EXEMPLO_FILENAME)
-
+SYSTEM_PROMPT_PATH = os.path.join(PROMPTS_DIR, SYSTEM_PROMPT_FILENAME)
 
 # --- 2. Configurações de Modelos de IA ---
 # O os.getenv busca a variável de ambiente, se não encontrar, usa o valor padrão.
@@ -28,7 +31,6 @@ DEFAULT_GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 DEFAULT_GEMINI_MODEL2 = "gemini-1.5-flash"
 DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
 
-SYSTEM_PROMPT_PATH = "system_prompt.txt"
 # --- 3. Constantes da Aplicação (Nossas "Strings Centralizadas") ---
 
 

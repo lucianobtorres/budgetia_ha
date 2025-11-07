@@ -2,27 +2,16 @@
 
 import streamlit as st
 
-# Importar AgentRunner (ajuste o caminho conforme sua estrutura)
-# Assumindo que AgentRunner está em core ou agent_implementations
-from core.agent_runner_interface import (
-    AgentRunner,  # Ou importe a implementação específica IADeFinancas
+try:
+    from ..ui_components.common_ui import setup_page
+except ImportError:
+    from web_app.ui_components.common_ui import setup_page
+
+plan_manager, agent_runner = setup_page(
+    title="Converse com seu Mentor Financeiro", icon="💬"
 )
 
-# --- Verificação de Inicialização ---
-if "agent_runner" not in st.session_state or "llm_orchestrator" not in st.session_state:
-    st.error(
-        "Erro: O sistema de IA não foi carregado corretamente. Por favor, volte à página principal (app.py)."
-    )
-    st.stop()
-
-# Recupera os objetos do estado da sessão
-agent_runner: AgentRunner = st.session_state.agent_runner
-llm_orchestrator = (
-    st.session_state.llm_orchestrator
-)  # Pode ser útil para mostrar status
-
-# --- Renderização da Página de Chat ---
-st.header("💬 Converse com seu Mentor Financeiro")
+llm_orchestrator = st.session_state.llm_orchestrator
 
 # Inicializa o histórico de chat específico desta página no session_state
 if "chat_messages" not in st.session_state:

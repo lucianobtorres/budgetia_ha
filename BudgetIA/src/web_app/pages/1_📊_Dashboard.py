@@ -1,30 +1,24 @@
 # pages/1_📊_Dashboard.py
 
-import pandas as pd  # Necessário para a verificação e formatação
+import pandas as pd
 import streamlit as st
 
-# Importar NomesAbas e PlanilhaManager (ajuste o caminho se necessário)
 from config import NomesAbas
-from finance.planilha_manager import PlanilhaManager
 
-# --- Verificação de Inicialização ---
-# Garante que o PlanilhaManager foi carregado pelo app.py principal
-if "plan_manager" not in st.session_state:
-    st.error(
-        "Erro: O sistema financeiro não foi carregado corretamente. Por favor, volte à página principal (app.py)."
-    )
-    st.stop()  # Interrompe a execução desta página
+try:
+    from ..ui_components.common_ui import setup_page
+except ImportError:
+    from web_app.ui_components.common_ui import setup_page
 
-# Recupera o PlanilhaManager do estado da sessão
-plan_manager: PlanilhaManager = st.session_state.plan_manager
-
-# --- Renderização da Página do Dashboard ---
-st.header("📊 Dashboard Financeiro")
-st.write("Aqui você verá um resumo visual dos seus dados financeiros.")
+plan_manager, agent_runner = setup_page(
+    title="Dashboard Financeiro",
+    icon="📊",
+)
 
 try:
     summary = plan_manager.get_summary()
 
+    st.info("Aqui você verá um resumo visual dos seus dados financeiros.")
     if summary and (summary.get("receitas", 0) > 0 or summary.get("despesas", 0) > 0):
         col1, col2, col3 = st.columns(3)
 

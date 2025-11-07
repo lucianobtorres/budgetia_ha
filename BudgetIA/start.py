@@ -5,7 +5,7 @@ import sys
 
 def main() -> None:
     # Caminho para seu app Streamlit
-    app_path = os.path.join("src", "web_app", "app.py")
+    app_path = os.path.join("src", "web_app", "💰_BudgetIA.py")
 
     # Executa o streamlit via subprocesso
     subprocess.run([sys.executable, "-m", "streamlit", "run", app_path])

@@ -9,12 +9,12 @@ import pytest
 import config
 from finance.excel_handler import ExcelHandler
 from finance.financial_calculator import FinancialCalculator
+from finance.planilha_manager import PlanilhaManager
 
 # --- NOVA IMPORTAÇÃO ---
 # Precisamos das estratégias para criar um mock real
-from finance.mapping_strategies.base_strategy import BaseMappingStrategy
-from finance.mapping_strategies.default_strategy import DefaultStrategy
-from finance.planilha_manager import PlanilhaManager
+from finance.strategies.base_strategy import BaseMappingStrategy
+from finance.strategies.default_strategy import DefaultStrategy
 
 # --- FIM DA NOVA IMPORTAÇÃO ---
 

@@ -10,7 +10,7 @@ O projeto possui duas interfaces principais:
 
 1.  **Aplicação Web (Recomendado):**
     *   Inicia uma interface gráfica no navegador.
-    *   Comando para executar: `poetry run streamlit run src/app.py`
+    *   Comando para executar: `poetry run streamlit run src/💰_BudgetIA.py`
 
 2.  **Interface de Linha de Comando (CLI):**
     *   Permite interagir com a IA diretamente no terminal.
@@ -18,7 +18,7 @@ O projeto possui duas interfaces principais:
 
 ## Estrutura do Projeto e Arquivos
 
-*   `src/app.py`:
+*   `src/💰_BudgetIA.py`:
     *   **Propósito**: Ponto de entrada da aplicação web com Streamlit.
     *   **Funcionalidades**:
         *   Cria a interface do usuário com abas para "Visão Geral", "Chat com a IA", "Planilha Mestra" e "Meus Orçamentos".

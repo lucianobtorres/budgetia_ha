@@ -1,4 +1,4 @@
-# Em: src/finance/mapping_strategies/default_strategy.py
+# Em: src/finance/strategies/default_strategy.py
 
 from typing import Any
 
