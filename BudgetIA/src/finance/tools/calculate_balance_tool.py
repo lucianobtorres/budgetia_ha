@@ -1,9 +1,10 @@
+# src/finance/tools/calculate_balance_tool.py
+from collections.abc import Callable  # Importar Callable
+
 from pydantic import BaseModel
 
 from core.base_tool import BaseTool
-from finance.planilha_manager import PlanilhaManager
-
-from ..schemas import CalcularSaldoTotalInput
+from finance.schemas import CalcularSaldoTotalInput
 
 
 class CalcularSaldoTotalTool(BaseTool):  # type: ignore[misc]
@@ -14,35 +15,28 @@ class CalcularSaldoTotalTool(BaseTool):  # type: ignore[misc]
     )
     args_schema: type[BaseModel] = CalcularSaldoTotalInput
 
-    def __init__(self, planilha_manager: PlanilhaManager) -> None:
-        self.planilha_manager = planilha_manager
+    # --- DIP: Depende de Callables ---
+    def __init__(self, get_summary_func: Callable[[], dict[str, float]]) -> None:
+        self.get_summary = get_summary_func
+
+    # --- FIM DA MUDANÇA ---
 
     def run(self) -> str:
         """
-        Calcula o saldo chamando o método centralizado get_summary()
-        do PlanilhaManager e formata a saída para o padrão BRL (R$ 4.200,00).
+        Calcula o saldo chamando a função injetada e formata a saída.
         """
         print(f"LOG: Ferramenta '{self.name}' foi chamada.")
         try:
-            # Pedimos o resumo completo ao maestro
-            resumo = self.planilha_manager.get_summary()
-
-            # Pegamos apenas o valor do saldo que a ferramenta precisa
+            # --- DIP: Chama a função injetada ---
+            resumo = self.get_summary()
             saldo = resumo.get("saldo", 0.0)
 
-            # --- INÍCIO DA CORREÇÃO DE FORMATO ---
-            # 1. Formata no padrão "inglês" (ex: 4,200.00)
+            # Formatação BRL
             saldo_str_en = f"{saldo:,.2f}"
-
-            # 2. Converte para o padrão BRL (ex: 4.200,00)
-            # Trocamos vírgula por "X" temporário, ponto por vírgula, "X" por ponto.
             saldo_str_br = (
                 saldo_str_en.replace(",", "X").replace(".", ",").replace("X", ".")
             )
 
             return f"O saldo financeiro total atual é de R$ {saldo_str_br}."
-            # --- FIM DA CORREÇÃO DE FORMATO ---
-
         except Exception as e:
-            # Captura qualquer erro que possa ocorrer no cálculo
             return f"Erro ao calcular o saldo: {e}"

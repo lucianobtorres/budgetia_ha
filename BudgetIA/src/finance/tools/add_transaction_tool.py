@@ -1,8 +1,8 @@
 # src/finance/tools/add_transaction_tool.py
 import datetime
+from collections.abc import Callable  # Importar Callable
 
-from core.base_tool import BaseTool  # Importa a classe pai limpa
-from finance.planilha_manager import PlanilhaManager
+from core.base_tool import BaseTool
 from finance.schemas import AddTransactionInput
 
 
@@ -11,12 +11,19 @@ class AddTransactionTool(BaseTool):  # type: ignore[misc]
     description: str = "Adiciona uma nova transação (receita ou despesa)."
     args_schema = AddTransactionInput
 
-    # O __init__ é responsabilidade da classe filha
-    def __init__(self, planilha_manager: PlanilhaManager) -> None:
-        self.planilha_manager = planilha_manager
+    # --- DIP: Depende de Callables (funções), não de uma classe concreta ---
+    def __init__(
+        self,
+        add_transaction_func: Callable[..., None],
+        save_func: Callable[[], None],
+        get_summary_func: Callable[[], dict[str, float]],
+    ) -> None:
+        self.adicionar_registro = add_transaction_func
+        self.save = save_func
+        self.get_summary = get_summary_func
 
-    # Em src/finance/tools/add_transaction_tool.py
-    # Não esqueça de adicionar 'import datetime' no topo do arquivo.
+    # --- FIM DA MUDANÇA ---
+
     def run(
         self,
         tipo: str,
@@ -26,10 +33,7 @@ class AddTransactionTool(BaseTool):  # type: ignore[misc]
         status: str = "Concluído",
         data: str | None = None,
     ) -> str:
-        if not self.planilha_manager:
-            return "Erro: O PlanilhaManager não foi inicializado corretamente."
-
-        # --- NOVA LÓGICA DE INTELIGÊNCIA DA FERRAMENTA ---
+        # Lógica de inteligência da ferramenta (processamento de data)
         data_final: str
         hoje = datetime.date.today()
 
@@ -42,32 +46,38 @@ class AddTransactionTool(BaseTool):  # type: ignore[misc]
             anteontem = hoje - datetime.timedelta(days=2)
             data_final = anteontem.strftime("%Y-%m-%d")
         else:
-            # Se não for uma palavra-chave, assume que é uma data no formato correto
             data_final = data
-        # --- FIM DA NOVA LÓGICA ---
 
         try:
-            self.planilha_manager.adicionar_registro(
-                data=data_final,  # Usa a data processada
+            # --- DIP: Chama as funções injetadas ---
+            self.adicionar_registro(
+                data=data_final,
                 tipo=tipo,
                 categoria=categoria,
                 descricao=descricao,
                 valor=valor,
                 status=status,
             )
-            self.planilha_manager.save()
+            self.save()  # Salva a transação
 
-            resumo_atual = self.planilha_manager.get_summary()
+            resumo_atual = self.get_summary()
+            # --- Fim das chamadas injetadas ---
+
             saldo_final = resumo_atual.get("saldo", 0.0)
 
+            # Formatação BRL
             valor_str_en = f"{valor:,.2f}"
             valor_str_br = (
                 valor_str_en.replace(",", "X").replace(".", ",").replace("X", ".")
             )
+            saldo_str_en = f"{saldo_final:,.2f}"
+            saldo_str_br = (
+                saldo_str_en.replace(",", "X").replace(".", ",").replace("X", ".")
+            )
 
             return (
                 f"Transação '{descricao}' (Categoria: {categoria}) no valor de R$ {valor_str_br} "
-                f"adicionada com sucesso em {data_final}. O novo saldo é R$ {saldo_final:.2f}."
+                f"adicionada com sucesso em {data_final}. O novo saldo é R$ {saldo_str_br}."
             )
         except Exception as e:
             return f"Ocorreu um erro ao adicionar a transação: {e}"

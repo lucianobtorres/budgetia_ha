@@ -1,71 +1,85 @@
 # Em: tests/tools/conftest.py
-
-from typing import Any
+from unittest.mock import MagicMock
 
 import pandas as pd
 import pytest
 
-# Importações do projeto
 import config
 from finance.excel_handler import ExcelHandler
 from finance.financial_calculator import FinancialCalculator
 from finance.planilha_manager import PlanilhaManager
 
-# --- NOVA IMPORTAÇÃO ---
-# Precisamos das estratégias para criar um mock real
-from finance.strategies.base_strategy import BaseMappingStrategy
-from finance.strategies.default_strategy import DefaultStrategy
-
-# --- FIM DA NOVA IMPORTAÇÃO ---
+# --- NOVO IMPORT ---
+from finance.repositories.budget_repository import BudgetRepository
+from finance.repositories.data_context import FinancialDataContext
+from finance.repositories.debt_repository import DebtRepository
+from finance.repositories.insight_repository import InsightRepository
+from finance.repositories.profile_repository import ProfileRepository
+from finance.repositories.transaction_repository import TransactionRepository
 
 
 @pytest.fixture
 def plan_manager_para_ferramentas() -> PlanilhaManager:
     """
-    Fixture que cria um PlanilhaManager "Mock" na memória para testes
-    de ferramentas.
-    - Evita I/O de disco (não lê/salva arquivos).
-    - Fornece um ambiente limpo (self.dfs) para cada teste.
+    Cria um PlanilhaManager "dummy" em memória para os testes das ferramentas.
+    Simula a nova estrutura interna com todos os repositórios reais.
     """
 
-    class MockPlanilhaManager(PlanilhaManager):
-        """Mock que herda do real, mas sobrescreve I/O."""
+    # 1. Mockar o ExcelHandler
+    handler_teste = MagicMock(spec=ExcelHandler)
+    handler_teste.file_path = "dummy_tool_test.xlsx"
+    mock_dfs = {
+        aba: pd.DataFrame(columns=colunas)
+        for aba, colunas in config.LAYOUT_PLANILHA.items()
+    }
+    handler_teste.load_sheets.return_value = (mock_dfs, True)  # is_new_file
 
-        def __init__(self, *args: Any, **kwargs: Any) -> None:
-            # Não chama o __init__ pai para evitar I/O
-            self.dfs = {
-                aba: pd.DataFrame(columns=cols)
-                for aba, cols in config.LAYOUT_PLANILHA.items()
-            }
-            self.calculator = FinancialCalculator()
-            self.is_new_file = True
+    # 2. Criar Componentes Reais
+    data_context_real = FinancialDataContext(
+        excel_handler=handler_teste, mapeamento=None
+    )
+    data_context_real.save = MagicMock()  # Mocka o save
 
-            # --- CORREÇÃO: Adiciona o atributo 'strategy' ---
-            # O mock agora se parece mais com o objeto real
-            # Usamos a DefaultStrategy, pois é a mais simples
-            self.strategy: BaseMappingStrategy = DefaultStrategy(
-                config.LAYOUT_PLANILHA, None
-            )
-            # --- FIM DA CORREÇÃO ---
+    calculator_real = FinancialCalculator()
 
-            # (O excel_handler pode ser None, pois vamos sobrescrever o save)
-            self.excel_handler: ExcelHandler | None = None
+    transaction_repo_real = TransactionRepository(
+        context=data_context_real, calculator=calculator_real
+    )
 
-        def save(self, add_intelligence: bool = False) -> None:
-            """
-            Sobrescreve (overrides) o método 'save' real.
-            Em vez de salvar no disco, ele apenas "finge".
+    budget_repo_real = BudgetRepository(
+        context=data_context_real,
+        calculator=calculator_real,
+        transaction_repo=transaction_repo_real,
+    )
 
-            Como este método agora usa 'self.strategy' no código real,
-            o nosso mock DEVE ter 'self.strategy' (adicionado acima)
-            para que a assinatura da herança seja válida, mesmo que
-            não o usemos aqui.
-            """
-            # Simula o salvamento, mas não faz nada
-            print("--- MOCK SAVE CALLED (sem I/O) ---")
-            pass
+    debt_repo_real = DebtRepository(
+        context=data_context_real, calculator=calculator_real
+    )
 
-    # Instancia o Mock
-    # Passamos excel_handler=None pois o __init__ real não será chamado
-    # e o método save() (que o usa) está mockado.
-    return MockPlanilhaManager(excel_handler=None, mapeamento=None)
+    profile_repo_real = ProfileRepository(context=data_context_real)
+
+    # --- NOVO PASSO: Criar o InsightRepository REAL ---
+    insight_repo_real = InsightRepository(context=data_context_real)
+    # --- FIM DO NOVO PASSO ---
+
+    # 3. Criar a classe PlanilhaManager (a fachada)
+    plan_manager = PlanilhaManager.__new__(PlanilhaManager)
+
+    # 4. Injetar manualmente os componentes
+    plan_manager._context = data_context_real
+    plan_manager.calculator = calculator_real
+    plan_manager.transaction_repo = transaction_repo_real
+    plan_manager.budget_repo = budget_repo_real
+    plan_manager.debt_repo = debt_repo_real
+    plan_manager.profile_repo = profile_repo_real
+    plan_manager.insight_repo = insight_repo_real  # Injeta o novo repo
+    plan_manager.is_new_file = True
+
+    # 5. Mockar os métodos de orquestração
+    plan_manager.save = data_context_real.save
+    plan_manager.recalculate_budgets = MagicMock()
+
+    # Os métodos reais (adicionar_insight_ia, etc.)
+    # agora delegam para o repo real injetado.
+
+    return plan_manager

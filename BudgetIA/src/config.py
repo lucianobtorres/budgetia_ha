@@ -18,6 +18,7 @@ os.makedirs(PROMPTS_DIR, exist_ok=True)
 PLANILHA_FILENAME = "planilha_mestra.xlsx"
 DADOS_EXEMPLO_FILENAME = "dados_exemplo.json"
 SYSTEM_PROMPT_FILENAME = "system_prompt.txt"
+PLANILHA_KEY = "planilha_path"
 
 # Caminhos completos para serem usados em toda a aplicação
 PLANILHA_PATH = os.path.join(DATA_DIR, PLANILHA_FILENAME)

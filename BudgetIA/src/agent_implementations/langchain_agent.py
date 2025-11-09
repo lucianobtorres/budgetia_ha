@@ -1,3 +1,5 @@
+# src/agent_implementations/langchain_agent.py
+
 from dotenv import load_dotenv
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain.memory import ConversationSummaryBufferMemory
@@ -8,7 +10,14 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 import config
 from core.agent_runner_interface import AgentRunner
 from core.llm_manager import LLMOrchestrator
-from finance.planilha_manager import PlanilhaManager
+from finance.repositories.budget_repository import BudgetRepository
+
+# Importa todos os repositórios e o contexto
+from finance.repositories.data_context import FinancialDataContext
+from finance.repositories.debt_repository import DebtRepository
+from finance.repositories.insight_repository import InsightRepository
+from finance.repositories.profile_repository import ProfileRepository
+from finance.repositories.transaction_repository import TransactionRepository
 from finance.tool_loader import load_all_financial_tools
 
 load_dotenv()
@@ -17,28 +26,30 @@ load_dotenv()
 class IADeFinancas(AgentRunner):  # type: ignore[misc]
     """
     Gerencia a comunicação com a API do LLM para gerar insights financeiros
-    e interagir com a planilha usando ferramentas, implementando a interface AgentRunner.
+    e interagir com a planilha usando ferramentas (via repositórios).
     """
 
     def __init__(
         self,
-        planilha_manager: PlanilhaManager,
+        # planilha_manager: PlanilhaManager, # REMOVIDO
         llm_orchestrator: LLMOrchestrator,
         contexto_perfil: str,
+        # --- NOVOS ARGUMENTOS (DIP) ---
+        data_context: FinancialDataContext,
+        transaction_repo: TransactionRepository,
+        budget_repo: BudgetRepository,
+        debt_repo: DebtRepository,
+        profile_repo: ProfileRepository,
+        insight_repo: InsightRepository,
+        # --- FIM NOVOS ARGUMENTOS ---
     ) -> None:
         """
-        Inicializa o modelo LLM (via orquestrador), as ferramentas e o agente LangChain.
+        Inicializa o modelo LLM, as ferramentas (via ToolLoader) e o agente LangChain.
         """
-        self.plan_manager = planilha_manager
-        self.llm_orchestrator = llm_orchestrator
-
+        # self.plan_manager = planilha_manager # REMOVIDO
         self.llm_orchestrator = llm_orchestrator
         self.model = self.llm_orchestrator.get_current_llm()
 
-        # --- Carregamento do Prompt Externo ---
-        # 1. Obter o contexto do perfil ANTES de criar o prompt
-        # contexto_perfil = self.plan_manager.get_perfil_como_texto()
-        # print(f"--- DEBUG AGENTE: Contexto do Perfil injetado: {contexto_perfil} ---")
         try:
             with open(config.SYSTEM_PROMPT_PATH, encoding="utf-8") as f:
                 prompt_template_str = f.read()
@@ -46,19 +57,15 @@ class IADeFinancas(AgentRunner):  # type: ignore[misc]
             print(
                 f"ERRO: Arquivo de prompt do sistema não encontrado em {config.SYSTEM_PROMPT_PATH}"
             )
-            prompt_template_str = (
-                "Você é um assistente prestativo. {contexto_perfil}"  # Fallback
-            )
+            prompt_template_str = "Você é um assistente prestativo. {contexto_perfil}"
 
-        # 2. Formatar o template com o contexto
         final_system_prompt = prompt_template_str.format(
             contexto_perfil=contexto_perfil
         )
 
-        # 3. Usar o prompt final formatado
         prompt_template = ChatPromptTemplate.from_messages(
             [
-                ("system", final_system_prompt),  # <-- USA A STRING FORMATADA
+                ("system", final_system_prompt),
                 MessagesPlaceholder(variable_name="chat_history"),
                 ("human", "{input}"),
                 MessagesPlaceholder(variable_name="agent_scratchpad"),
@@ -66,14 +73,24 @@ class IADeFinancas(AgentRunner):  # type: ignore[misc]
         )
 
         self.memory = ConversationSummaryBufferMemory(
-            llm=llm_orchestrator.get_configured_llm(),  # Passa o LLM para sumarizar
-            max_token_limit=1024,  # Limite de tokens da memória
+            llm=llm_orchestrator.get_configured_llm(),
+            max_token_limit=1024,
             memory_key="chat_history",
             return_messages=True,
-            output_key="output",  # Garante que a saída do agente seja rastreada
+            output_key="output",
         )
 
-        tools_custom = load_all_financial_tools(planilha_manager)
+        print("--- DEBUG AGENTE: Carregando ferramentas com injeção de repositório...")
+        tools_custom = load_all_financial_tools(
+            # planilha_manager=planilha_manager, # REMOVIDO
+            data_context=data_context,
+            transaction_repo=transaction_repo,
+            budget_repo=budget_repo,
+            debt_repo=debt_repo,
+            profile_repo=profile_repo,
+            insight_repo=insight_repo,
+        )
+
         self.tools = [
             StructuredTool.from_function(
                 func=tool.run,
@@ -85,20 +102,18 @@ class IADeFinancas(AgentRunner):  # type: ignore[misc]
         ]
 
         llm = self.llm_orchestrator.get_configured_llm()
-
         self.agent_executor = AgentExecutor(
             agent=create_tool_calling_agent(llm, self.tools, prompt_template),
             tools=self.tools,
             verbose=True,
             memory=self.memory,
-            return_intermediate_steps=False,  # Opcional, mas limpa o log
-            handle_parsing_errors=True,  # Lida com erros de formatação
+            return_intermediate_steps=False,
+            handle_parsing_errors=True,
         )
 
     def interagir(self, input_usuario: str) -> str:
         """Executa o agente com a entrada do usuário."""
         try:
-            # O AgentExecutor com memória lida com o histórico automaticamente
             response = self.agent_executor.invoke({"input": input_usuario})
             return str(
                 response.get("output", "Não consegui processar sua solicitação.")
@@ -112,17 +127,12 @@ class IADeFinancas(AgentRunner):  # type: ignore[misc]
 
     @property
     def active_llm_info(self) -> str:
-        """
-        Retorna uma string com o nome do provedor e modelo LLM ativos
-        sendo usados por este agente, acessando do orquestrador.
-        """
         if not self.llm_orchestrator.active_llm_info:
             return "Nenhum LLM configurado"
         return str(self.llm_orchestrator.active_llm_info)
 
     @property
     def chat_history(self) -> list[dict[str, str]]:
-        # O getter agora lê da memória
         messages = self.memory.chat_memory.messages
         history: list[dict[str, str]] = []
         for msg in messages:
@@ -134,7 +144,6 @@ class IADeFinancas(AgentRunner):  # type: ignore[misc]
 
     @chat_history.setter
     def chat_history(self, history: list[dict[str, str]]) -> None:
-        # O setter agora popula a memória com o histórico vindo do Streamlit
         self.memory.clear()
         for item in history:
             if item["role"] == "user":

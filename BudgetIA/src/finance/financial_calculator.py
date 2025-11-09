@@ -1,221 +1,56 @@
-# src/finance/financial_calculator.py
-
+# Em: src/finance/financial_calculator.py
 import datetime
-from typing import (
-    Any,
-)
+from typing import Any
 
+import numpy_financial as npf
 import pandas as pd
+
+# Removido o import desnecessário de 'npv'
+# from numpy_financial import npv
 
 
 class FinancialCalculator:
     """
-    Uma classe especialista em realizar todos os cálculos financeiros
-    com base nos DataFrames de dados. Não tem estado próprio.
+    Classe especialista em realizar cálculos financeiros puros.
+    Não possui estado e não conhece a planilha.
     """
 
-    def calcular_status_orcamentos(
-        self, df_transacoes: pd.DataFrame, df_orcamentos: pd.DataFrame
-    ) -> pd.DataFrame:
-        """
-        Recebe os dataframes de transações e orçamentos, calcula os gastos
-        atuais e retorna um NOVO dataframe de orçamentos atualizado.
-        """
-        if df_orcamentos.empty:
-            return df_orcamentos  # Retorna o mesmo se não houver o que calcular
-
-        orcamentos_atualizados = df_orcamentos.copy()
-
-        # Prepara um dataframe de despesas do mês/ano corrente para consulta rápida
-        df_despesas = self._preparar_despesas_atuais(df_transacoes)
-
-        for index, row in orcamentos_atualizados.iterrows():
-            categoria = str(row.get("Categoria", "")).lower()
-            limite = row.get("Valor Limite Mensal", 0.0)
-            periodo = str(row.get("Período Orçamento", "mensal")).lower()
-
-            gasto_atual = self._calcular_gasto_para_categoria(
-                df_despesas, categoria, periodo
-            )
-
-            porcentagem = (gasto_atual / limite * 100) if limite > 0 else 0.0
-
-            status = "Ativo"
-            if porcentagem >= 100:
-                status = "Excedido"
-            elif porcentagem >= 80:
-                status = "Atenção: Próximo do Limite"
-
-            orcamentos_atualizados.loc[index, "Valor Gasto Atual"] = gasto_atual  # type: ignore[index]
-            orcamentos_atualizados.loc[index, "Porcentagem Gasta (%)"] = porcentagem  # type: ignore[index]
-            orcamentos_atualizados.loc[index, "Status Orçamento"] = status  # type: ignore[index]
-            orcamentos_atualizados.loc[index, "Última Atualização Orçamento"] = (  # type: ignore[index]
-                datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            )
-
-        return orcamentos_atualizados
-
-    def _preparar_despesas_atuais(self, df_transacoes: pd.DataFrame) -> pd.DataFrame:
-        """Filtra e prepara apenas as despesas do período relevante."""
-        if df_transacoes.empty:
-            return pd.DataFrame()
-
-        despesas = df_transacoes[
-            df_transacoes["Tipo (Receita/Despesa)"] == "Despesa"
-        ].copy()
-        if despesas.empty:
-            return pd.DataFrame()
-
-        despesas["Data"] = pd.to_datetime(despesas["Data"], errors="coerce")
-        despesas["AnoMes"] = despesas["Data"].dt.to_period("M")
-        return despesas
-
-    def _calcular_gasto_para_categoria(
-        self, df_despesas: pd.DataFrame, categoria: str, periodo: str
-    ) -> float:
-        """Calcula o gasto total para uma categoria e período."""
-        if df_despesas.empty:
-            return 0.0
-
-        if periodo == "mensal":
-            mes_corrente = pd.Period(datetime.datetime.now(), freq="M")
-            gastos_df = df_despesas[
-                (df_despesas["Categoria"].astype(str).str.lower() == categoria)
-                & (df_despesas["AnoMes"] == mes_corrente)
-            ]
-            return float(gastos_df["Valor"].sum())
-
-        # Adicionar lógica para 'anual' se necessário
-        return 0.0
-
     def get_summary(self, df_transacoes: pd.DataFrame) -> dict[str, float]:
-        """Calcula e retorna totais de receitas, despesas e saldo."""
-        if df_transacoes.empty:
-            return {"receitas": 0.0, "despesas": 0.0, "saldo": 0.0}
+        """
+        Calcula os totais de receitas, despesas e o saldo
+        a partir de um DataFrame de transações.
+        """
+        df = df_transacoes.copy()
 
-        total_receitas = df_transacoes[
-            df_transacoes["Tipo (Receita/Despesa)"] == "Receita"
-        ]["Valor"].sum()
-        total_despesas = df_transacoes[
-            df_transacoes["Tipo (Receita/Despesa)"] == "Despesa"
-        ]["Valor"].sum()
-        saldo_atual = total_receitas - total_despesas
+        # O teste 'test_get_summary_dataframe_vazio' passa um DF vazio
+        if df.empty:
+            return {"total_receitas": 0.0, "total_despesas": 0.0, "saldo": 0.0}
+
+        # Garante que 'Valor' é numérico
+        if "Valor" not in df.columns:
+            return {"total_receitas": 0.0, "total_despesas": 0.0, "saldo": 0.0}
+        df["Valor"] = pd.to_numeric(df["Valor"], errors="coerce").fillna(0)
+
+        if "Tipo (Receita/Despesa)" not in df.columns:
+            print("AVISO (Calculator): DataFrame de transações sem coluna 'Tipo'.")
+            return {"total_receitas": 0.0, "total_despesas": 0.0, "saldo": 0.0}
+
+        df_receitas = df[
+            df["Tipo (Receita/Despesa)"].astype(str).str.lower() == "receita"
+        ]
+        df_despesas = df[
+            df["Tipo (Receita/Despesa)"].astype(str).str.lower() == "despesa"
+        ]
+
+        total_receitas = float(df_receitas["Valor"].sum())
+        total_despesas = float(df_despesas["Valor"].sum())
+        saldo = total_receitas - total_despesas
 
         return {
-            "receitas": total_receitas,
-            "despesas": total_despesas,
-            "saldo": saldo_atual,
+            "total_receitas": total_receitas,
+            "total_despesas": total_despesas,
+            "saldo": saldo,
         }
-
-    def get_expenses_by_category(
-        self, df_transacoes: pd.DataFrame, top_n: int = 5
-    ) -> pd.Series:
-        """Calcula e retorna as 'N' maiores categorias de despesa."""
-        if df_transacoes.empty:
-            return pd.Series(dtype=float)
-
-        return (
-            df_transacoes[df_transacoes["Tipo (Receita/Despesa)"] == "Despesa"]
-            .groupby("Categoria")["Valor"]
-            .sum()
-            .nlargest(top_n)
-        )
-
-    def calcular_saldo_devedor(
-        self,
-        valor_parcela: float,
-        taxa_juros_mensal: float,
-        parcelas_totais: int,
-        parcelas_pagas: int,
-    ) -> float:
-        """Calcula o valor presente (saldo devedor) de uma dívida."""
-        juros = taxa_juros_mensal / 100
-        parcelas_restantes = parcelas_totais - parcelas_pagas
-
-        if parcelas_restantes <= 0:
-            return 0.0
-
-        if juros > 0:
-            # Fórmula do Valor Presente de uma anuidade
-            return valor_parcela * (1 - (1 + juros) ** -parcelas_restantes) / juros
-        else:
-            # Se não há juros, é simplesmente o valor das parcelas restantes
-            return valor_parcela * parcelas_restantes
-
-    def gerar_analise_proativa(
-        self, df_orcamentos: pd.DataFrame, saldo_total: float
-    ) -> list[dict[str, Any]]:
-        """
-        Analisa os orçamentos e o saldo, retornando uma lista de insights acionáveis.
-        """
-        insights_gerados = []
-
-        # 1. Análise de Orçamentos
-        if not df_orcamentos.empty:
-            for _, row in df_orcamentos.iterrows():
-                # Garantir que os valores são numéricos antes de comparar
-                try:
-                    status = str(row.get("Status Orçamento", "")).strip()
-                    categoria = str(row.get("Categoria", "N/A"))
-                    gasto_atual = float(row.get("Valor Gasto Atual", 0.0))
-                    limite = float(row.get("Valor Limite Mensal", 0.0))
-                    porcentagem = float(row.get("Porcentagem Gasta (%)", 0.0))
-                except ValueError:
-                    continue  # Pula linha com dados inválidos
-
-                if status == "Excedido":
-                    insights_gerados.append(
-                        {
-                            "tipo_insight": "Alerta de Orçamento Excedido",
-                            "titulo_insight": f"Atenção: Orçamento de '{categoria}' excedido!",
-                            "detalhes_recomendacao": (
-                                f"Você gastou R$ {gasto_atual:,.2f} em '{categoria}', "
-                                f"excedendo o limite de R$ {limite:,.2f}. "
-                                "É importante revisar seus gastos nesta categoria."
-                            ),
-                        }
-                    )
-                elif status == "Atenção: Próximo do Limite":
-                    insights_gerados.append(
-                        {
-                            "tipo_insight": "Atenção ao Orçamento",
-                            "titulo_insight": f"Alerta: Orçamento de '{categoria}' próximo do limite.",
-                            "detalhes_recomendacao": (
-                                f"Você já usou {porcentagem:.1f}% do seu orçamento de '{categoria}'. "
-                                f"O gasto atual é de R$ {gasto_atual:,.2f} do total de "
-                                f"R$ {limite:,.2f}. "
-                                "Mantenha o controle!"
-                            ),
-                        }
-                    )
-
-        # 2. Análise de Saldo Total
-        if saldo_total < 0:
-            insights_gerados.append(
-                {
-                    "tipo_insight": "Alerta de Saldo Negativo",
-                    "titulo_insight": "Seu balanço geral está negativo.",
-                    "detalhes_recomendacao": (
-                        f"Atualmente, seu balanço total é de R$ {saldo_total:,.2f}. "
-                        "Isso indica que suas despesas estão superando suas receitas. "
-                        "Vamos analisar seus gastos para encontrar economias."
-                    ),
-                }
-            )
-        elif saldo_total > 0:
-            insights_gerados.append(
-                {
-                    "tipo_insight": "Sugestão de Economia",
-                    "titulo_insight": "Ótimo! Seu saldo está positivo.",
-                    "detalhes_recomendacao": (
-                        f"Seu balanço atual é de R$ {saldo_total:,.2f}. "
-                        "Este é um excelente momento para pensar em sua reserva de emergência "
-                        "ou em uma meta de investimento."
-                    ),
-                }
-            )
-
-        return insights_gerados
 
     def calcular_saldo_devedor_atual(
         self,
@@ -225,21 +60,219 @@ class FinancialCalculator:
         parcelas_pagas: int,
     ) -> float:
         """
-        Calcula o saldo devedor atual (Valor Presente) de um financiamento.
+        Calcula o Saldo Devedor Atual (PV) de um financiamento.
         """
-        juros = taxa_juros_mensal / 100
+        if taxa_juros_mensal <= 0:
+            return float(valor_parcela * (parcelas_totais - parcelas_pagas))
+
+        taxa_decimal = taxa_juros_mensal / 100.0
         parcelas_restantes = parcelas_totais - parcelas_pagas
 
         if parcelas_restantes <= 0:
             return 0.0
 
-        if juros > 0:
-            # Fórmula do Valor Presente de uma anuidade
-            saldo_devedor = (
-                valor_parcela * (1 - (1 + juros) ** (-parcelas_restantes)) / juros
+        try:
+            saldo_devedor = npf.pv(
+                rate=taxa_decimal,
+                nper=parcelas_restantes,
+                pmt=-valor_parcela,
+                when="end",
             )
-        else:
-            # Se não há juros, é só multiplicar
-            saldo_devedor = valor_parcela * parcelas_restantes
+            return float(saldo_devedor)
+        except Exception as e:
+            print(f"Erro ao calcular PV: {e}")
+            return float(valor_parcela * parcelas_restantes)
 
-        return float(saldo_devedor)
+    def calcular_status_orcamentos(
+        self, df_transacoes: pd.DataFrame, df_orcamentos: pd.DataFrame
+    ) -> pd.DataFrame:
+        """
+        Calcula o gasto atual para cada orçamento com base nas transações.
+        """
+        if df_orcamentos.empty:
+            return df_orcamentos
+
+        df_orc_atualizado = df_orcamentos.copy()
+
+        # Garante colunas de status mesmo se não houver transações
+        if "Valor Gasto Atual" not in df_orc_atualizado.columns:
+            df_orc_atualizado["Valor Gasto Atual"] = 0.0
+        if "Porcentagem Gasta (%)" not in df_orc_atualizado.columns:
+            df_orc_atualizado["Porcentagem Gasta (%)"] = 0.0
+        if "Status Orçamento" not in df_orc_atualizado.columns:
+            df_orc_atualizado["Status Orçamento"] = "OK"
+
+        if df_transacoes.empty:
+            df_orc_atualizado["Valor Gasto Atual"] = 0.0
+            df_orc_atualizado["Porcentagem Gasta (%)"] = 0.0
+            df_orc_atualizado["Status Orçamento"] = "OK"
+            return df_orc_atualizado
+
+        if (
+            "Valor" not in df_transacoes.columns
+            or "Categoria" not in df_transacoes.columns
+        ):
+            return df_orc_atualizado
+
+        df_transacoes["Valor"] = pd.to_numeric(
+            df_transacoes["Valor"], errors="coerce"
+        ).fillna(0)
+        df_despesas = df_transacoes[
+            df_transacoes["Tipo (Receita/Despesa)"].astype(str).str.lower() == "despesa"
+        ].copy()
+
+        # --- Lógica de filtro de data (para Falha 3) ---
+        # Garante que 'Data' exista e seja datetime
+        if "Data" in df_despesas.columns:
+            df_despesas["Data"] = pd.to_datetime(df_despesas["Data"], errors="coerce")
+            df_despesas.dropna(
+                subset=["Data"], inplace=True
+            )  # Remove transações sem data válida
+
+            # Filtra para o mês atual
+            hoje = datetime.datetime.now()
+            df_despesas = df_despesas[
+                (df_despesas["Data"].dt.year == hoje.year)
+                & (df_despesas["Data"].dt.month == hoje.month)
+            ]
+        else:
+            print(
+                "AVISO (Calculator): Transações sem coluna 'Data'. Calculando orçamento com todas as transações."
+            )
+        # --- Fim da lógica de data ---
+
+        gastos_por_categoria = df_despesas.groupby("Categoria")["Valor"].sum()
+
+        def calcular_gasto(row: pd.Series) -> float:
+            categoria = row["Categoria"]
+            if categoria in gastos_por_categoria:
+                return float(gastos_por_categoria[categoria])
+            return 0.0  # Se não houver gasto, retorna 0 (não o valor antigo)
+
+        df_orc_atualizado["Valor Gasto Atual"] = df_orc_atualizado.apply(
+            calcular_gasto, axis=1
+        )
+
+        df_orc_atualizado["Valor Limite Mensal"] = pd.to_numeric(
+            df_orc_atualizado["Valor Limite Mensal"], errors="coerce"
+        ).fillna(0)
+
+        df_orc_atualizado["Porcentagem Gasta (%)"] = 0.0
+        # Filtro para evitar divisão por zero
+        filtro_limite_valido = df_orc_atualizado["Valor Limite Mensal"] > 0
+
+        df_orc_atualizado.loc[filtro_limite_valido, "Porcentagem Gasta (%)"] = (
+            df_orc_atualizado["Valor Gasto Atual"]
+            / df_orc_atualizado["Valor Limite Mensal"]
+        ) * 100
+
+        # --- CORREÇÃO (NameError - Falha 3) ---
+        # Troca 'df_orc_totalizado' por 'df_orc_atualizado'
+        conditions = [
+            (df_orc_atualizado["Porcentagem Gasta (%)"] > 100),
+            (df_orc_atualizado["Porcentagem Gasta (%)"] > 90),
+        ]
+        # --- FIM DA CORREÇÃO ---
+
+        choices = ["Estourado", "Alerta"]
+
+        # Define 'OK' como padrão e aplica as condições
+        df_orc_atualizado["Status Orçamento"] = "OK"
+        df_orc_atualizado["Status Orçamento"] = pd.Series(
+            df_orc_atualizado.apply(
+                lambda row: "Estourado"
+                if row["Porcentagem Gasta (%)"] > 100
+                else ("Alerta" if row["Porcentagem Gasta (%)"] > 90 else "OK"),
+                axis=1,
+            )
+        )
+
+        df_orc_atualizado["Última Atualização Orçamento"] = (
+            datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        )
+        return df_orc_atualizado
+
+    def get_expenses_by_category(
+        self, df_transacoes: pd.DataFrame, top_n: int = 5
+    ) -> pd.Series:
+        """Retorna as top N categorias por despesa."""
+        if (
+            df_transacoes.empty
+            or "Tipo (Receita/Despesa)" not in df_transacoes.columns
+            or "Valor" not in df_transacoes.columns
+        ):
+            return pd.Series(dtype=float)
+
+        df = df_transacoes.copy()
+        df["Valor"] = pd.to_numeric(df["Valor"], errors="coerce").fillna(0)
+        df_despesas = df[
+            df["Tipo (Receita/Despesa)"].astype(str).str.lower() == "despesa"
+        ]
+
+        if df_despesas.empty:
+            return pd.Series(dtype=float)
+
+        return (
+            df_despesas.groupby("Categoria")["Valor"]
+            .sum()
+            .nlargest(top_n)
+            .sort_values(ascending=False)
+        )
+
+    def gerar_analise_proativa(
+        self, orcamentos_df: pd.DataFrame, saldo_total: float
+    ) -> list[dict[str, Any]]:
+        """Gera insights proativos com base no status do orçamento."""
+        insights = []
+        if orcamentos_df.empty or "Status Orçamento" not in orcamentos_df.columns:
+            return insights
+
+        # --- CORREÇÃO (Falha 4) ---
+        # Procura por "Estourado" (que é o que 'calcular_status_orcamentos' gera)
+        orcamentos_estourados = orcamentos_df[
+            orcamentos_df["Status Orçamento"] == "Estourado"
+        ]
+        for _, row in orcamentos_estourados.iterrows():
+            insights.append(
+                {
+                    "tipo_insight": "Alerta de Orçamento",
+                    "titulo_insight": f"Orçamento Estourado: {row['Categoria']}",
+                    "detalhes_recomendacao": f"Você ultrapassou o limite de R$ {row['Valor Limite Mensal']:,.2f} para {row['Categoria']}, gastando R$ {row['Valor Gasto Atual']:,.2f}. Recomendo revisar seus gastos nesta categoria.",
+                }
+            )
+
+        # --- CORREÇÃO (Falha 4) ---
+        # Procura por "Alerta"
+        orcamentos_alerta = orcamentos_df[orcamentos_df["Status Orçamento"] == "Alerta"]
+        for _, row in orcamentos_alerta.iterrows():
+            insights.append(
+                {
+                    "tipo_insight": "Aviso de Orçamento",
+                    "titulo_insight": f"Orçamento em Alerta: {row['Categoria']}",
+                    "detalhes_recomendacao": f"Você está próximo do limite de R$ {row['Valor Limite Mensal']:,.2f} para {row['Categoria']}, já gastou R$ {row['Valor Gasto Atual']:,.2f} ({row['Porcentagem Gasta (%)']:.1f}%). Atenção aos próximos gastos.",
+                }
+            )
+        # --- FIM DA CORREÇÃO ---
+
+        if saldo_total < 0:
+            insights.append(
+                {
+                    "tipo_insight": "Alerta de Saldo",
+                    "titulo_insight": "Saldo Negativo",
+                    "detalhes_recomendacao": f"Seu saldo total está negativo em R$ {saldo_total:,.2f}. É crucial revisar suas receitas e despesas para evitar dívidas.",
+                }
+            )
+
+        # --- CORREÇÃO (Falha 5) ---
+        # Adiciona insight "saudável" se não houver alertas
+        if not insights and saldo_total > 0:
+            insights.append(
+                {
+                    "tipo_insight": "Sugestão de Economia",
+                    "titulo_insight": "Parabéns pelo Saldo Positivo!",
+                    "detalhes_recomendacao": f"Seu saldo este mês está positivo em R$ {saldo_total:,.2f} e seus orçamentos estão sob controle. Considere investir ou poupar parte desse valor.",
+                }
+            )
+        # --- FIM DA CORREÇÃO ---
+
+        return insights

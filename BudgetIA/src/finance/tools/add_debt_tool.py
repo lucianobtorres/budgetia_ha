@@ -1,31 +1,30 @@
+# src/finance/tools/add_debt_tool.py
+from collections.abc import Callable  # Importar Callable
+
 from pydantic import BaseModel
 
 from core.base_tool import BaseTool
-from finance.planilha_manager import PlanilhaManager
-
-from ..schemas import AdicionarDividaInput
+from finance.schemas import AdicionarDividaInput
 
 
 class AdicionarDividaTool(BaseTool):  # type: ignore[misc]
     name: str = "adicionar_divida"
     description: str = (
         "Adiciona uma nova dívida à aba 'Minhas Dívidas' da Planilha Mestra. "
-        "Útil para o usuário registrar empréstimos, financiamentos, etc. "
-        "Calcula o saldo devedor atual com base nas parcelas pagas. "
-        "Parâmetros: "
-        "- nome_divida: O nome da dívida ou credor. "
-        "- valor_original: O valor total original da dívida. "
-        "- taxa_juros_mensal: A taxa de juros mensal em porcentagem. "
-        "- parcelas_totais: O número total de parcelas. "
-        "- valor_parcela: O valor de cada parcela. "
-        "- parcelas_pagas: O número de parcelas já pagas (padrão 0). "
-        "- data_proximo_pgto: Data do próximo pagamento (opcional). "
-        "Retorna uma string de confirmação."
+        "Calcula o saldo devedor atual com base nas parcelas pagas."
     )
     args_schema: type[BaseModel] = AdicionarDividaInput
 
-    def __init__(self, planilha_manager: PlanilhaManager) -> None:
-        self.planilha_manager = planilha_manager
+    # --- DIP: Depende de Callables ---
+    def __init__(
+        self,
+        add_debt_func: Callable[..., str],
+        save_func: Callable[[], None],
+    ) -> None:
+        self.adicionar_ou_atualizar_divida = add_debt_func
+        self.save = save_func
+
+    # --- FIM DA MUDANÇA ---
 
     def run(
         self,
@@ -40,7 +39,8 @@ class AdicionarDividaTool(BaseTool):  # type: ignore[misc]
     ) -> str:
         print(f"LOG: Ferramenta '{self.name}' chamada para {nome_divida}.")
         try:
-            mensagem = self.planilha_manager.adicionar_ou_atualizar_divida(
+            # --- DIP: Chama as funções injetadas ---
+            mensagem = self.adicionar_ou_atualizar_divida(
                 nome_divida,
                 valor_original,
                 taxa_juros_mensal,
@@ -50,7 +50,7 @@ class AdicionarDividaTool(BaseTool):  # type: ignore[misc]
                 data_proximo_pgto,
                 observacoes,
             )
-            self.planilha_manager.save()
+            self.save()  # Salva a dívida
             return str(mensagem)
         except Exception as e:
             return f"Erro ao adicionar dívida: {e}"

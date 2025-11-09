@@ -1,24 +1,29 @@
+# src/finance/planilha_manager.py
 import datetime
-import importlib
-import os
-import sys
 from typing import Any
 
 import pandas as pd
 
 import config
-from finance.excel_handler import ExcelHandler
-from finance.financial_calculator import FinancialCalculator
 
-# Importa as classes de estratégia
-from finance.strategies.base_strategy import BaseMappingStrategy
-from finance.strategies.default_strategy import DefaultStrategy
+from .excel_handler import ExcelHandler
+from .financial_calculator import FinancialCalculator
+from .repositories.budget_repository import BudgetRepository
+
+# Importa todos os repositórios
+from .repositories.data_context import FinancialDataContext
+from .repositories.debt_repository import DebtRepository
+from .repositories.insight_repository import InsightRepository
+from .repositories.profile_repository import ProfileRepository
+from .repositories.transaction_repository import TransactionRepository
+from .utils import _carregar_dados_exemplo
 
 
 class PlanilhaManager:
     """
-    Classe central para gerenciar os dados da planilha.
-    Agora é responsável por carregar e manter a estratégia de mapeamento.
+    Orquestra os dados financeiros. (Fachada)
+    Sua única responsabilidade é construir os repositórios
+    e delegar chamadas para eles.
     """
 
     def __init__(
@@ -27,118 +32,62 @@ class PlanilhaManager:
         mapeamento: dict[str, Any] | None = None,
     ) -> None:
         """
-        Inicializa o gerenciador.
-        'mapeamento' é um dicionário que instrui o ExcelHandler
-        sobre como traduzir a planilha do usuário para o nosso schema.
+        Inicializa o gerenciador, o DataContext e todos os Repositórios.
         """
-        self.excel_handler = excel_handler
+        self._context = FinancialDataContext(
+            excel_handler=excel_handler, mapeamento=mapeamento
+        )
         self.calculator = FinancialCalculator()
-        self.mapeamento = mapeamento
+        self.is_new_file = self._context.is_new_file
 
-        # --- LÓGICA DE ESTRATÉGIA MOVIDA PARA CÁ ---
-        # 1. Determina e instancia a estratégia correta
-        self.strategy: BaseMappingStrategy = self._get_strategy(
-            config.LAYOUT_PLANILHA, self.mapeamento
+        # --- CRIA TODOS OS REPOSITÓRIOS ---
+        self.transaction_repo = TransactionRepository(
+            context=self._context, calculator=self.calculator
         )
-
-        # 2. Chama o handler, passando a estratégia
-        self.dfs, self.is_new_file = self.excel_handler.load_sheets(
-            config.LAYOUT_PLANILHA, self.strategy
+        self.budget_repo = BudgetRepository(
+            context=self._context,
+            calculator=self.calculator,
+            transaction_repo=self.transaction_repo,
         )
+        self.debt_repo = DebtRepository(
+            context=self._context, calculator=self.calculator
+        )
+        self.profile_repo = ProfileRepository(context=self._context)
+        self.insight_repo = InsightRepository(context=self._context)
+        # --- FIM DA CRIAÇÃO ---
 
-        # 3. Carrega dados de exemplo (se aplicável)
-        if (
-            self.is_new_file
-            and not mapeamento  # Só adiciona dados se for a estratégia padrão
-            and config.DADOS_EXEMPLO_PATH
-        ):
-            print("--- DEBUG PM: Nova planilha, carregando dados de exemplo... ---")
-            self._carregar_dados_exemplo()
-
-        # 4. Cálculos iniciais
-        self._recalculate_debts()
-        self.recalculate_all_budgets()
-
-    def _get_strategy(
-        self,
-        layout_config: dict[str, Any],
-        mapeamento: dict[str, Any] | None,
-    ) -> BaseMappingStrategy:
-        """
-        Carrega dinamicamente a classe de estratégia com base no mapeamento.
-        """
-        strategy_class: type[BaseMappingStrategy] = DefaultStrategy
-        strategy_name = "DefaultStrategy"
-
-        if mapeamento:
-            strategy_module_name = mapeamento.get("strategy_module")
-            if strategy_module_name:
+        if self.is_new_file:
+            print("LOG: Detectado arquivo novo ou abas faltando.")
+            if mapeamento is None:
                 print(
-                    f"--- DEBUG PM: Carregando estratégia customizada '{strategy_module_name}'... ---"
+                    "--- DEBUG PM: Arquivo novo padrão. Populando com dados de exemplo... ---"
                 )
-                try:
-                    module_path = f"finance.strategies.{strategy_module_name}"
+                self._populate_initial_data()
+                self._context.save(add_intelligence=True)
+            else:
+                print(
+                    "--- DEBUG PM: Arquivo mapeado/novo. Salvando abas do sistema... ---"
+                )
+                self._context.save(add_intelligence=False)
+        else:
+            print("LOG: Arquivo existente carregado. Recalculando orçamentos...")
+            self.recalculate_budgets()
 
-                    strategy_dir = os.path.join(
-                        config.PROJECT_ROOT, "src", "finance", "strategies"
-                    )
-                    if strategy_dir not in sys.path:
-                        sys.path.insert(0, strategy_dir)
-
-                    module = importlib.import_module(module_path)
-                    importlib.reload(module)  # Garante a versão mais recente
-
-                    strategy_class = getattr(
-                        module, "CustomStrategy"
-                    )  # Nome da classe gerada
-                    strategy_name = f"CustomStrategy (de {strategy_module_name})"
-                except Exception as e:
-                    print(
-                        f"ERRO ao carregar estratégia '{strategy_module_name}': {e}. Usando DefaultStrategy."
-                    )
-                    strategy_class = DefaultStrategy
-
-        print(f"--- DEBUG PM: Instanciando Estratégia: {strategy_name} ---")
-        return strategy_class(layout_config, mapeamento)
-
-    def _carregar_dados_exemplo(self):
-        """Carrega dados de exemplo na aba de transações."""
-        # Implemente sua lógica de carregamento de dados de exemplo aqui
-        # Ex:
-        # transacoes_exemplo = ... (ler de config.DADOS_EXEMPLO_PATH)
-        # df_exemplo = pd.DataFrame(transacoes_exemplo)
-        # self.dfs[config.NomesAbas.TRANSACOES] = pd.concat(
-        #     [self.dfs[config.NomesAbas.TRANSACOES], df_exemplo], ignore_index=True
-        # )
-        # self.save(add_intelligence=True) # Salva os dados de exemplo
-        print("AVISO: Lógica de _carregar_dados_exemplo() precisa ser implementada.")
-        pass
-
-    def _recalculate_debts(self):
-        """Recalcula o saldo devedor das dívidas."""
-        # (Implemente sua lógica original de cálculo de dívidas)
-        pass
-
-    def recalculate_all_budgets(self):
-        """Recalcula o status de todos os orçamentos."""
-        # (Implemente sua lógica original de cálculo de orçamentos)
-        pass
+    # --- MÉTODOS DE PERSISTÊNCIA E ACESSO (DELEGADOS) ---
 
     def save(self, add_intelligence: bool = False) -> None:
-        """
-        Delega a tarefa de salvar todos os DataFrames para o ExcelHandler,
-        usando a estratégia que foi carregada no __init__.
-        """
-        self.excel_handler.save_sheets(self.dfs, self.strategy, add_intelligence)
+        """Delega a tarefa de salvar para o DataContext."""
+        self._context.save(add_intelligence)
+
+    def visualizar_dados(self, aba_nome: str) -> pd.DataFrame:
+        """Delega a visualização de dados para o DataContext."""
+        return self._context.get_dataframe(aba_nome)
 
     def update_dataframe(self, sheet_name: str, new_df: pd.DataFrame) -> None:
-        """Atualiza um DataFrame inteiro em memória."""
-        if sheet_name in self.dfs:
-            self.dfs[sheet_name] = new_df
-        else:
-            print(
-                f"ERRO: Tentativa de atualizar aba '{sheet_name}' que não existe no self.dfs."
-            )
+        """Delega a atualização de dados para o DataContext."""
+        self._context.update_dataframe(sheet_name, new_df)
+
+    # --- MÉTODOS DE TRANSAÇÃO (DELEGADOS) ---
 
     def adicionar_registro(
         self,
@@ -149,45 +98,21 @@ class PlanilhaManager:
         valor: float,
         status: str = "Concluído",
     ) -> None:
-        """Adiciona uma nova transação à memória e recalcula os orçamentos."""
-        # Assegura que estamos escrevendo na aba correta
-        aba_transacoes = config.NomesAbas.TRANSACOES
-        if aba_transacoes not in self.dfs:
-            print(
-                f"ERRO: Aba de transações '{aba_transacoes}' não encontrada em self.dfs."
-            )
-            return  # Não pode adicionar o registro
-
-        df = self.dfs[aba_transacoes]
-        novo_id = (
-            (df["ID Transacao"].max() + 1)
-            if not df.empty
-            and "ID Transacao" in df.columns
-            and df["ID Transacao"].notna().any()
-            else 1
+        """Delega a adição para o Repo e recalcula orçamentos."""
+        self.transaction_repo.add_transaction(
+            data, tipo, categoria, descricao, valor, status
         )
-
-        novo_registro = pd.DataFrame(
-            [
-                {
-                    "ID Transacao": novo_id,
-                    "Data": data,
-                    "Tipo (Receita/Despesa)": tipo,
-                    "Categoria": categoria,
-                    "Descricao": descricao,
-                    "Valor": valor,
-                    "Status": status,
-                }
-            ],
-            # Usa as colunas do config para garantir a ordem
-            columns=config.LAYOUT_PLANILHA[aba_transacoes],
-        )
-
-        if df.empty:
-            self.dfs[aba_transacoes] = novo_registro
-        else:
-            self.dfs[aba_transacoes] = pd.concat([df, novo_registro], ignore_index=True)
         self.recalculate_budgets()
+
+    def get_summary(self) -> dict[str, float]:
+        """Delega o cálculo do resumo para o TransactionRepository."""
+        return self.transaction_repo.get_summary()
+
+    def get_expenses_by_category(self, top_n: int = 5) -> pd.Series:
+        """Delega o cálculo das despesas por categoria para o TransactionRepository."""
+        return self.transaction_repo.get_expenses_by_category(top_n)
+
+    # --- MÉTODOS DE ORÇAMENTO (DELEGADOS) ---
 
     def adicionar_ou_atualizar_orcamento(
         self,
@@ -196,76 +121,21 @@ class PlanilhaManager:
         periodo: str = "Mensal",
         observacoes: str = "",
     ) -> str:
-        """Adiciona ou atualiza um orçamento em memória e recalcula."""
-        aba_orcamentos = config.NomesAbas.ORCAMENTOS
-        if aba_orcamentos not in self.dfs:
-            return f"ERRO: Aba de orçamentos '{aba_orcamentos}' não encontrada."
-
-        df = self.dfs[aba_orcamentos]
-
-        # Garantir colunas essenciais
-        if "Categoria" not in df.columns or "Período Orçamento" not in df.columns:
-            print("ERRO: Aba de orçamentos mal formatada.")
-            # Recria o DF com as colunas certas se estiver vazio
-            if df.empty:
-                df = pd.DataFrame(columns=config.LAYOUT_PLANILHA[aba_orcamentos])
-            else:
-                return "ERRO: Aba de orçamentos corrompida."
-
-        categorias_existentes = df["Categoria"].astype(str).str.strip().str.lower()
-        periodos_existentes = (
-            df["Período Orçamento"].astype(str).str.strip().str.lower()
+        """Delega a lógica de adicionar/atualizar e orquestra o recálculo."""
+        mensagem = self.budget_repo.add_or_update_budget(
+            categoria=categoria,
+            valor_limite=valor_limite,
+            periodo=periodo,
+            observacoes=observacoes,
         )
-        categoria_limpa = categoria.strip().lower()
-        periodo_limpo = periodo.strip().lower()
-
-        idx_existente = df[
-            (categorias_existentes == categoria_limpa)
-            & (periodos_existentes == periodo_limpo)
-        ].index
-
-        if not idx_existente.empty:
-            idx = idx_existente[0]  # Pega o primeiro índice
-            df.loc[idx, "Valor Limite Mensal"] = valor_limite
-            df.loc[idx, "Observações"] = observacoes
-            mensagem = f"Orçamento para '{categoria}' atualizado."
-        else:
-            novo_id = (
-                (df["ID Orcamento"].max() + 1)
-                if not df.empty
-                and "ID Orcamento" in df.columns
-                and df["ID Orcamento"].notna().any()
-                else 1
-            )
-            novo_orcamento = pd.DataFrame(
-                [
-                    {
-                        "ID Orcamento": novo_id,
-                        "Categoria": categoria,
-                        "Valor Limite Mensal": valor_limite,
-                        "Período Orçamento": periodo,
-                        "Observações": observacoes,
-                    }
-                ],
-                columns=config.LAYOUT_PLANILHA[aba_orcamentos],
-            )
-
-            if df.empty:
-                df = novo_orcamento
-            else:
-                df = pd.concat([df, novo_orcamento], ignore_index=True)
-
-            df = df.fillna(
-                {
-                    "Valor Gasto Atual": 0,
-                    "Porcentagem Gasta (%)": 0,
-                }
-            )
-            mensagem = f"Novo orçamento para '{categoria}' criado."
-
-        self.dfs[aba_orcamentos] = df
         self.recalculate_budgets()
         return mensagem
+
+    def recalculate_budgets(self) -> None:
+        """Delega a lógica de recálculo para o BudgetRepository."""
+        self.budget_repo.recalculate_all_budgets()
+
+    # --- MÉTODOS DE DÍVIDA (DELEGADOS) ---
 
     def adicionar_ou_atualizar_divida(
         self,
@@ -275,93 +145,22 @@ class PlanilhaManager:
         parcelas_totais: int,
         valor_parcela: float,
         parcelas_pagas: int = 0,
-        data_proximo_pgto: str | None = None,  # Corrigido para Optional[str]
+        data_proximo_pgto: str | None = None,
         observacoes: str = "",
     ) -> str:
-        """
-        Adiciona ou atualiza uma dívida na aba 'Minhas Dívidas'.
-        Delega o cálculo do saldo devedor para o FinancialCalculator.
-        """
-        aba_dividas = config.NomesAbas.DIVIDAS
-        if aba_dividas not in self.dfs:
-            return f"ERRO: Aba de dívidas '{aba_dividas}' não encontrada."
-
-        dividas_df = self.dfs[aba_dividas]
-
-        # Garantir colunas essenciais
-        if "Nome da Dívida" not in dividas_df.columns:
-            if dividas_df.empty:
-                dividas_df = pd.DataFrame(columns=config.LAYOUT_PLANILHA[aba_dividas])
-            else:
-                return "ERRO: Aba de dívidas corrompida."
-
-        if data_proximo_pgto is None:
-            data_proximo_pgto = ""  # Ou pd.NaT se preferir
-
-        saldo_devedor_atual = self.calculator.calcular_saldo_devedor_atual(
-            valor_parcela=valor_parcela,
+        """Delega a lógica de adicionar/atualizar para o DebtRepository."""
+        return self.debt_repo.add_or_update_debt(
+            nome_divida=nome_divida,
+            valor_original=valor_original,
             taxa_juros_mensal=taxa_juros_mensal,
             parcelas_totais=parcelas_totais,
+            valor_parcela=valor_parcela,
             parcelas_pagas=parcelas_pagas,
+            data_proximo_pgto=data_proximo_pgto,
+            observacoes=observacoes,
         )
 
-        dividas_existentes = (
-            dividas_df["Nome da Dívida"].astype(str).str.strip().str.lower()
-        )
-        nome_divida_limpo = nome_divida.strip().lower()
-
-        idx_existente = dividas_df[dividas_existentes == nome_divida_limpo].index
-
-        if not idx_existente.empty:
-            idx = idx_existente[0]
-            dividas_df.loc[idx, "Saldo Devedor Atual"] = saldo_devedor_atual
-            dividas_df.loc[idx, "Taxa Juros Mensal (%)"] = taxa_juros_mensal
-            dividas_df.loc[idx, "Data Próximo Pgto"] = data_proximo_pgto
-            dividas_df.loc[idx, "Parcelas Pagas"] = parcelas_pagas
-            dividas_df.loc[idx, "Observações"] = observacoes
-            # Atualiza outros campos caso tenham mudado
-            dividas_df.loc[idx, "Valor Original"] = valor_original
-            dividas_df.loc[idx, "Parcelas Totais"] = parcelas_totais
-            dividas_df.loc[idx, "Valor Parcela"] = valor_parcela
-
-            self.dfs[aba_dividas] = dividas_df
-            mensagem = f"Dívida '{nome_divida}' atualizada. Saldo devedor: R$ {saldo_devedor_atual:,.2f}."
-        else:
-            novo_id = (
-                (dividas_df["ID Divida"].max() + 1)
-                if not dividas_df.empty
-                and "ID Divida" in dividas_df.columns
-                and dividas_df["ID Divida"].notna().any()
-                else 1
-            )
-            nova_divida = pd.DataFrame(
-                [
-                    {
-                        "ID Divida": novo_id,
-                        "Nome da Dívida": nome_divida,
-                        "Valor Original": valor_original,
-                        "Saldo Devedor Atual": saldo_devedor_atual,
-                        "Taxa Juros Mensal (%)": taxa_juros_mensal,
-                        "Parcelas Totais": parcelas_totais,
-                        "Parcelas Pagas": parcelas_pagas,
-                        "Valor Parcela": valor_parcela,
-                        "Data Próximo Pgto": data_proximo_pgto,
-                        "Observações": observacoes,
-                    }
-                ],
-                columns=config.LAYOUT_PLANILHA[aba_dividas],  # Usa o config
-            )
-
-            if dividas_df.empty:
-                dividas_df = nova_divida
-            else:
-                dividas_df = pd.concat([dividas_df, nova_divida], ignore_index=True)
-
-            self.dfs[aba_dividas] = dividas_df
-            mensagem = f"Nova dívida '{nome_divida}' registrada com saldo inicial de R$ {saldo_devedor_atual:,.2f}."
-
-        print(f"LOG: {mensagem}")
-        return str(mensagem)
+    # --- MÉTODOS DE INSIGHT (DELEGADOS) ---
 
     def adicionar_insight_ia(
         self,
@@ -371,109 +170,35 @@ class PlanilhaManager:
         detalhes_recomendacao: str,
         status: str = "Novo",
     ) -> None:
-        """Adiciona um insight gerado pela IA na aba 'Consultoria da IA'."""
-        aba_nome = config.NomesAbas.CONSULTORIA_IA
-        if aba_nome not in self.dfs:
-            print(f"ERRO: Aba '{aba_nome}' não existe para adicionar insight de IA.")
-            return
-
-        df_insight = self.dfs[aba_nome]
-        novo_id = (
-            (df_insight["ID Insight"].max() + 1)
-            if not df_insight.empty
-            and "ID Insight" in df_insight.columns
-            and df_insight["ID Insight"].notna().any()
-            else 1
+        """Delega a adição de insight para o InsightRepository."""
+        self.insight_repo.add_insight(
+            data_insight=data_insight,
+            tipo_insight=tipo_insight,
+            titulo_insight=titulo_insight,
+            detalhes_recomendacao=detalhes_recomendacao,
+            status=status,
         )
 
-        novo_insight = pd.DataFrame(
-            [
-                {
-                    "ID Insight": novo_id,
-                    "Data do Insight": data_insight,
-                    "Tipo de Insight": tipo_insight,
-                    "Título do Insight": titulo_insight,
-                    "Detalhes/Recomendação da IA": detalhes_recomendacao,
-                    "Status (Novo/Lido/Concluído)": status,
-                }
-            ],
-            columns=config.LAYOUT_PLANILHA[aba_nome],  # Usa o config
-        )
+    # --- MÉTODOS DE PERFIL (DELEGADOS) ---
 
-        self.dfs[aba_nome] = pd.concat([df_insight, novo_insight], ignore_index=True)
-        print(f"LOG: Insight de IA '{titulo_insight}' adicionado à aba '{aba_nome}'.")
-
-    # --- MÉTODO PARA SALVAR PERFIL (QUE USAMOS ANTES) ---
     def salvar_dado_perfil(self, campo: str, valor: Any) -> str:
-        """
-        Adiciona ou atualiza um item na aba 'Perfil Financeiro'.
-        Usa "Campo" como chave única.
-        """
-        aba_nome = config.NomesAbas.PERFIL_FINANCEIRO
-        # Usa visualizar_dados para garantir que a aba seja criada em memória se não existir
-        df_perfil = self.visualizar_dados(aba_nome)
+        """Delega a lógica de salvar/atualizar para o ProfileRepository."""
+        return self.profile_repo.save_profile_field(campo=campo, valor=valor)
 
-        if "Campo" not in df_perfil.columns:
-            # Se a aba foi criada agora ou está corrompida
-            df_perfil = pd.DataFrame(columns=config.LAYOUT_PLANILHA[aba_nome])
-            print(
-                f"AVISO: Aba '{aba_nome}' recriada em memória pois estava mal formatada."
-            )
+    def get_perfil_como_texto(self) -> str:
+        """Delega a lógica de formatação do perfil para o ProfileRepository."""
+        return self.profile_repo.get_profile_as_text()
 
-        campo_limpo = str(campo).strip().lower()
-
-        idx_existente = df_perfil[
-            df_perfil["Campo"].astype(str).str.strip().str.lower() == campo_limpo
-        ].index
-
-        if not idx_existente.empty:
-            idx = idx_existente[0]
-            df_perfil.loc[idx, "Valor"] = valor
-            mensagem = f"Perfil atualizado: '{campo}' definido como '{valor}'."
-        else:
-            novo_dado = pd.DataFrame(
-                [{"Campo": campo, "Valor": valor, "Observações": ""}],
-                columns=config.LAYOUT_PLANILHA[aba_nome],
-            )
-
-            if df_perfil.empty:
-                df_perfil = novo_dado
-            else:
-                df_perfil = pd.concat([df_perfil, novo_dado], ignore_index=True)
-
-            mensagem = f"Perfil criado: '{campo}' definido como '{valor}'."
-
-        self.dfs[aba_nome] = df_perfil
-        self.save()  # Salva imediatamente
-        print(f"LOG: {mensagem}")
-        return mensagem
-
-    # --- MÉTODOS DE ANÁLISE E CÁLCULO (DELEGADOS) ---
-    def recalculate_budgets(self) -> None:
-        """Delega o recálculo dos orçamentos para o FinancialCalculator."""
-        df_orcamentos_atualizado = self.calculator.calcular_status_orcamentos(
-            df_transacoes=self.dfs[config.NomesAbas.TRANSACOES],
-            df_orcamentos=self.dfs[config.NomesAbas.ORCAMENTOS],
-        )
-        self.dfs[config.NomesAbas.ORCAMENTOS] = df_orcamentos_atualizado
-
-    def get_summary(self) -> dict[str, float]:
-        """Delega o cálculo do resumo para o FinancialCalculator."""
-        return self.calculator.get_summary(self.dfs[config.NomesAbas.TRANSACOES])
-
-    def get_expenses_by_category(self, top_n: int = 5) -> pd.Series:
-        """Delega o cálculo das despesas por categoria para o FinancialCalculator."""
-        return self.calculator.get_expenses_by_category(
-            self.dfs[config.NomesAbas.TRANSACOES], top_n
-        )
+    # --- MÉTODOS DE ORQUESTRAÇÃO (Ainda vivem aqui) ---
 
     def analisar_para_insights_proativos(self) -> list[dict[str, Any]]:
         """Orquestra a geração de insights proativos."""
         print("LOG: Orquestrando análise proativa para gerar insights.")
         self.recalculate_budgets()
-        resumo = self.get_summary()
+
+        resumo = self.get_summary()  # Delegado
         saldo_total = resumo.get("saldo", 0.0)
-        orcamentos_df = self.visualizar_dados(aba_nome=config.NomesAbas.ORCAMENTOS)
+        orcamentos_df = self._context.get_dataframe(config.NomesAbas.ORCAMENTOS)
 
         insights_gerados = self.calculator.gerar_analise_proativa(
             orcamentos_df, saldo_total
@@ -482,7 +207,8 @@ class PlanilhaManager:
         if insights_gerados:
             print(f"LOG: {len(insights_gerados)} insights gerados. Registrando...")
             for insight in insights_gerados:
-                self.adicionar_insight_ia(
+                # Usa o repo para adicionar
+                self.insight_repo.add_insight(
                     data_insight=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     tipo_insight=insight["tipo_insight"],
                     titulo_insight=insight["titulo_insight"],
@@ -493,69 +219,81 @@ class PlanilhaManager:
 
         return insights_gerados
 
-    def get_perfil_como_texto(self) -> str:
-        """Retorna os dados do perfil como um texto formatado."""
-        try:
-            df_perfil = self.visualizar_dados(config.NomesAbas.PERFIL_FINANCEIRO)
-            if df_perfil.empty or "Campo" not in df_perfil.columns:
-                return "Perfil financeiro ainda não preenchido."
-
-            contexto = (
-                "--- CONTEXTO DO PERFIL DO USUÁRIO (NÃO REPETIR/PERGUNTAR ISSO):\n"
-            )
-            for _, row in df_perfil.iterrows():
-                if pd.notna(row["Valor"]):
-                    contexto += f"- {row['Campo']}: {row['Valor']}\n"
-            return contexto
-        except Exception:
-            return "Perfil financeiro não encontrado."
-
-    def visualizar_dados(self, aba_nome: str) -> pd.DataFrame:
-        """Retorna uma cópia do DataFrame da aba especificada."""
-        if aba_nome not in self.dfs:
-            raise ValueError(f"Aba '{aba_nome}' não encontrada.")
-        return self.dfs[aba_nome].copy()
-
     def _populate_initial_data(self) -> None:
         """Popula a planilha com dados de exemplo se estiver vazia."""
         print("--- DEBUG PM: Populando com dados de exemplo... ---")
-        if self.dfs[config.NomesAbas.ORCAMENTOS].empty:
-            orcamentos = [
+
+        # 1. Orçamentos
+        if self.visualizar_dados(config.NomesAbas.ORCAMENTOS).empty:
+            orcamentos_dicts = [
                 {
                     "Categoria": "Alimentação",
                     "Valor Limite Mensal": 600.0,
                     "Período Orçamento": "Mensal",
+                    "Observações": "",
                 },
                 {
                     "Categoria": "Transporte",
                     "Valor Limite Mensal": 250.0,
                     "Período Orçamento": "Mensal",
+                    "Observações": "",
                 },
             ]
-            for o in orcamentos:
-                self.adicionar_ou_atualizar_orcamento(**o)  # Já recalcula
+            for o in orcamentos_dicts:
+                # Chama o método delegado (que recalcula)
+                self.adicionar_ou_atualizar_orcamento(
+                    categoria=o["Categoria"],
+                    valor_limite=o["Valor Limite Mensal"],
+                    periodo=o["Período Orçamento"],
+                    observacoes=o.get("Observações", ""),
+                )
 
-        if self.dfs[config.NomesAbas.TRANSACOES].empty:
-            transacoes = [
-                {
-                    "data": "2024-07-01",
-                    "tipo": "Receita",
-                    "categoria": "Salário",
-                    "descricao": "Pagamento",
-                    "valor": 5000.0,
-                },
-                {
-                    "data": "2024-07-05",
-                    "tipo": "Despesa",
-                    "categoria": "Moradia",
-                    "descricao": "Aluguel",
-                    "valor": 1500.0,
-                },
-            ]
-            for t in transacoes:
-                self.adicionar_registro(**t)  # Já recalcula
+        # 2. Transações
+        if self.visualizar_dados(config.NomesAbas.TRANSACOES).empty:
+            transacoes_exemplo = _carregar_dados_exemplo(config.DADOS_EXEMPLO_PATH)
+            if not transacoes_exemplo:
+                transacoes_exemplo = [
+                    {
+                        "data": "2024-07-01",
+                        "tipo": "Receita",
+                        "categoria": "Salário",
+                        "descricao": "Pagamento",
+                        "valor": 5000.0,
+                        "status": "Concluído",
+                    },
+                    {
+                        "data": "2024-07-05",
+                        "tipo": "Despesa",
+                        "categoria": "Moradia",
+                        "descricao": "Aluguel",
+                        "valor": 1500.0,
+                        "status": "Concluído",
+                    },
+                ]
 
-        # Garante que o perfil tenha os campos mínimos
+            for t in transacoes_exemplo:
+                # Adiciona sem recalcular cada vez
+                self.transaction_repo.add_transaction(
+                    data=t["data"],
+                    tipo=t["tipo"],
+                    categoria=t["categoria"],
+                    descricao=t.get("descricao", ""),
+                    valor=t["valor"],
+                    status=t.get("status", "Concluído"),
+                )
+
+            self.recalculate_budgets()  # Recalcula UMA VEZ no final
+
+        # 3. Perfil
         print("--- DEBUG PM: Garantindo campos de perfil... ---")
-        self.salvar_dado_perfil("Renda Mensal Média", None)
-        self.salvar_dado_perfil("Principal Objetivo", None)
+        self_df_perfil = self.visualizar_dados(config.NomesAbas.PERFIL_FINANCEIRO)
+        campos_existentes = (
+            set(self_df_perfil["Campo"].astype(str).str.lower())
+            if "Campo" in self_df_perfil.columns
+            else set()
+        )
+
+        if "renda mensal média" not in campos_existentes:
+            self.profile_repo.save_profile_field("Renda Mensal Média", None)
+        if "principal objetivo" not in campos_existentes:
+            self.profile_repo.save_profile_field("Principal Objetivo", None)

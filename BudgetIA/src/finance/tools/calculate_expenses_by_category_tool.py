@@ -1,9 +1,11 @@
+# src/finance/tools/calculate_expenses_by_category_tool.py
+from collections.abc import Callable  # Importar Callable
+
+import pandas as pd
 from pydantic import BaseModel
 
 from core.base_tool import BaseTool
-from finance.planilha_manager import PlanilhaManager
-
-from ..schemas import CalcularDespesasPorCategoriaInput
+from finance.schemas import CalcularDespesasPorCategoriaInput
 
 
 class CalcularDespesasPorCategoriaTool(BaseTool):  # type: ignore[misc]
@@ -15,12 +17,17 @@ class CalcularDespesasPorCategoriaTool(BaseTool):  # type: ignore[misc]
     )
     args_schema: type[BaseModel] = CalcularDespesasPorCategoriaInput
 
-    def __init__(self, planilha_manager: PlanilhaManager) -> None:
-        self.planilha_manager = planilha_manager
+    # --- DIP: Depende de Callables ---
+    def __init__(self, view_data_func: Callable[..., pd.DataFrame]) -> None:
+        self.visualizar_dados = view_data_func
+
+    # --- FIM DA MUDANÇA ---
 
     def run(self) -> str:
         print(f"LOG: Ferramenta '{self.name}' foi chamada.")
-        df = self.planilha_manager.visualizar_dados(aba_nome="Visão Geral e Transações")
+
+        # --- DIP: Chama a função injetada ---
+        df = self.visualizar_dados(aba_nome="Visão Geral e Transações")
         if df.empty:
             return "Não há dados na planilha para calcular despesas por categoria."
 

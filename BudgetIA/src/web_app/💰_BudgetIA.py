@@ -34,7 +34,7 @@ def load_financial_system(
     print(f"\n--- DEBUG: Entrando em load_financial_system para '{planilha_path}' ---")
     try:
         plan_manager, agent_runner, llm_orchestrator, dados_adicionados = (
-            initialize_financial_system(planilha_path, _llm_orchestrator)
+            initialize_financial_system(planilha_path)
         )
         if plan_manager and agent_runner and llm_orchestrator:
             print("--- DEBUG: load_financial_system retornando objetos válidos. ---")
