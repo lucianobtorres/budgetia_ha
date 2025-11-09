@@ -1,22 +1,30 @@
+# src/finance/tools/define_budget_tool.py
+from collections.abc import Callable  # Importar Callable
+
 from pydantic import BaseModel
 
 from core.base_tool import BaseTool
-from finance.planilha_manager import PlanilhaManager
-
-from ..schemas import DefinirOrcamentoInput
+from finance.schemas import DefinirOrcamentoInput
 
 
 class DefineBudgetTool(BaseTool):  # type: ignore[misc]
     name: str = "definir_orcamento"
     description: str = (
         "Define ou atualiza um orçamento para uma categoria específica na aba 'Meus Orçamentos'. "
-        "Útil para o usuário estabelecer ou modificar limites de gastos. "
         "Ex: 'Quero orçar R$500 para alimentação por mês'."
     )
     args_schema: type[BaseModel] = DefinirOrcamentoInput
 
-    def __init__(self, planilha_manager: PlanilhaManager) -> None:
-        self.planilha_manager = planilha_manager
+    # --- DIP: Depende de Callables ---
+    def __init__(
+        self,
+        add_budget_func: Callable[..., str],
+        save_func: Callable[[], None],
+    ) -> None:
+        self.adicionar_ou_atualizar_orcamento = add_budget_func
+        self.save = save_func
+
+    # --- FIM DA MUDANÇA ---
 
     def run(
         self,
@@ -25,22 +33,19 @@ class DefineBudgetTool(BaseTool):  # type: ignore[misc]
         periodo: str = "Mensal",
         observacoes: str = "",
     ) -> str:
-        if not self.planilha_manager:
-            return "Erro..."
         print(
             f"LOG: Ferramenta '{self.name}' chamada para Categoria={categoria}, Limite={valor_limite}, Período={periodo}."
         )
-        if not self.planilha_manager:
-            return "Erro: PlanilhaManager não inicializado."
 
         try:
-            mensagem = self.planilha_manager.adicionar_ou_atualizar_orcamento(
+            # --- DIP: Chama as funções injetadas ---
+            mensagem = self.adicionar_ou_atualizar_orcamento(
                 categoria=categoria,
                 valor_limite=valor_limite,
                 periodo=periodo,
                 observacoes=observacoes,
             )
-            self.planilha_manager.save()
+            self.save()  # Salva o orçamento
             return str(mensagem)
         except Exception as e:
             return f"Erro ao definir orçamento: {e}"

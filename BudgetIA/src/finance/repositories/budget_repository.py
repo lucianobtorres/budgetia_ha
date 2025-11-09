@@ -1,0 +1,110 @@
+# src/finance/repositories/budget_repository.py
+import pandas as pd
+
+import config
+
+from ..financial_calculator import FinancialCalculator
+from .data_context import FinancialDataContext
+from .transaction_repository import TransactionRepository
+
+
+class BudgetRepository:
+    """
+    Repositório para gerenciar TODA a lógica de
+    acesso e manipulação de Orçamentos.
+    """
+
+    def __init__(
+        self,
+        context: FinancialDataContext,
+        calculator: FinancialCalculator,
+        transaction_repo: TransactionRepository,
+    ) -> None:
+        """
+        Inicializa o repositório.
+        """
+        self._context = context
+        self._calculator = calculator
+        self._transaction_repo = transaction_repo
+        self._aba_nome = config.NomesAbas.ORCAMENTOS
+
+    def add_or_update_budget(
+        self,
+        categoria: str,
+        valor_limite: float,
+        periodo: str = "Mensal",
+        observacoes: str = "",
+    ) -> str:
+        """Adiciona ou atualiza um orçamento em memória (sem recalcular)."""
+        df = self._context.get_dataframe(self._aba_nome)
+
+        if "Categoria" not in df.columns or "Período Orçamento" not in df.columns:
+            if df.empty:
+                df = pd.DataFrame(columns=config.LAYOUT_PLANILHA[self._aba_nome])
+            else:
+                return "ERRO: Aba de orçamentos corrompida."
+
+        categorias_existentes = df["Categoria"].astype(str).str.strip().str.lower()
+        periodos_existentes = (
+            df["Período Orçamento"].astype(str).str.strip().str.lower()
+        )
+        categoria_limpa = categoria.strip().lower()
+        periodo_limpo = periodo.strip().lower()
+
+        idx_existente = df[
+            (categorias_existentes == categoria_limpa)
+            & (periodos_existentes == periodo_limpo)
+        ].index
+
+        if not idx_existente.empty:
+            idx = idx_existente[0]
+            df.loc[idx, "Valor Limite Mensal"] = valor_limite
+            df.loc[idx, "Observações"] = observacoes
+            mensagem = f"Orçamento para '{categoria}' atualizado."
+        else:
+            novo_id = (
+                (df["ID Orcamento"].max() + 1)
+                if not df.empty
+                and "ID Orcamento" in df.columns
+                and df["ID Orcamento"].notna().any()
+                else 1
+            )
+            novo_orcamento = pd.DataFrame(
+                [
+                    {
+                        "ID Orcamento": novo_id,
+                        "Categoria": categoria,
+                        "Valor Limite Mensal": valor_limite,
+                        "Período Orçamento": periodo,
+                        "Observações": observacoes,
+                    }
+                ],
+                columns=config.LAYOUT_PLANILHA[self._aba_nome],
+            )
+            df = pd.concat([df, novo_orcamento], ignore_index=True).fillna(
+                {"Valor Gasto Atual": 0, "Porcentagem Gasta (%)": 0}
+            )
+            mensagem = f"Novo orçamento para '{categoria}' criado."
+
+        self._context.update_dataframe(self._aba_nome, df)
+
+        # --- CORREÇÃO: REMOVER ESTA LINHA ---
+        # A orquestração não pertence ao repositório.
+        # self.recalculate_all_budgets()
+        # --- FIM DA CORREÇÃO ---
+
+        return mensagem
+
+    def recalculate_all_budgets(self) -> None:
+        """
+        Delega o recálculo dos orçamentos para o FinancialCalculator,
+        buscando os dados frescos dos repositórios.
+        """
+        df_transacoes = self._transaction_repo.get_all_transactions()
+        df_orcamentos = self._context.get_dataframe(self._aba_nome)
+
+        df_orcamentos_atualizado = self._calculator.calcular_status_orcamentos(
+            df_transacoes=df_transacoes,
+            df_orcamentos=df_orcamentos,
+        )
+        self._context.update_dataframe(self._aba_nome, df_orcamentos_atualizado)

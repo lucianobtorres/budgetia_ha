@@ -1,60 +1,63 @@
+# src/finance/tools/recommend_rule_tool.py
+from collections.abc import Callable  # Importar Callable
+
+import pandas as pd
 from pydantic import BaseModel
 
 from core.base_tool import BaseTool
-from finance.planilha_manager import PlanilhaManager
 from finance.schemas import RecomendarRegraIdealInput
 
 
-class RecomendarRegraIdealTool(BaseTool):
+class RecomendarRegraIdealTool(BaseTool):  # type: ignore[misc]
     name: str = "recomendar_regra_ideal"
-    description: str = (
-        "Recomenda a melhor Regra de Ouro Financeira (ex: 50/30/20) com base no perfil e momento de vida do usuário. "
-        "Usa a 'Fase de Vida' e a 'Maior Meta' registradas para dar um conselho personalizado."
-    )
+    description: str = "Recomenda a melhor Regra de Ouro Financeira (ex: 50/30/20) com base no perfil e momento de vida do usuário."
     args_schema: type[BaseModel] = RecomendarRegraIdealInput
 
-    def __init__(self, planilha_manager: PlanilhaManager):
+    # --- DIP: Depende de Callables ---
+    def __init__(self, view_data_func: Callable[..., pd.DataFrame]) -> None:
         super().__init__()
-        self.planilha_manager = planilha_manager
-        self.aba_perfil = "Metas Financeiras"
+        self.visualizar_dados = view_data_func
+        self.aba_perfil = "Perfil Financeiro"
+
+    # --- FIM DA MUDANÇA ---
 
     def run(self) -> str:
         print(f"LOG: Ferramenta '{self.name}' chamada: Sugerindo Regra de Ouro.")
 
-        df_metas = self.planilha_manager.visualizar_dados(aba_nome=self.aba_perfil)
+        # --- DIP: Chama a função injetada ---
+        df_perfil = self.visualizar_dados(aba_nome=self.aba_perfil)
 
-        # Tenta encontrar o perfil do usuário (o último registro que começa com 'Perfil:')
-        perfil = (
-            df_metas[
-                df_metas["Nome da Meta"].astype(str).str.contains("Perfil:", na=False)
-            ]
-            .iloc[::-1]
-            .head(1)
-        )
+        if df_perfil.empty or "Campo" not in df_perfil.columns:
+            return "AVISO: Não foi possível encontrar o perfil do usuário. Por favor, peça para ele preencher a 'Renda Mensal Média' e 'Principal Objetivo' na aba de Perfil ou pelo chat."
 
-        if perfil.empty:
-            return "AVISO: Não foi possível encontrar o perfil de vida do usuário. Por favor, use a ferramenta 'coletar_perfil_usuario' primeiro."
+        try:
+            # Converte a tabela em um dicionário (Campo -> Valor)
+            valores_perfil = df_perfil.set_index("Campo")["Valor"].to_dict()
+        except KeyError:
+            return "Erro: A aba 'Perfil Financeiro' parece estar mal formatada."
 
-        # Extrai os dados do perfil
-        obs = perfil.iloc[0]["Observações"]
-        fase_vida = ""
-        maior_meta = ""
+        fase_vida = str(valores_perfil.get("Fase de Vida", "")).lower()
+        maior_meta = str(valores_perfil.get("Principal Objetivo", "")).lower()
 
-        if ";" in obs:
-            fase_vida = obs.split("Fase: ")[1].split(";")[0].strip().lower()
-            maior_meta = obs.split("Meta Principal: ")[1].split(";")[0].strip().lower()
+        if not fase_vida and not maior_meta:
+            return "AVISO: Não foi possível encontrar a 'Fase de Vida' ou 'Principal Objetivo' no perfil. A recomendação será genérica."
 
         # --- O DECISION ENGINE (Lógica do Consultor) ---
         regra_sugerida = "50/30/20"  # Padrão
-        justificativa = "É a regra mais equilibrada, focada em manter uma divisão saudável entre gastos essenciais, desejos e o futuro (investimento/dívida)."
+        justificativa = "É a regra mais equilibrada, focada em manter uma divisão saudável entre gastos essenciais (50%), desejos (30%) e o futuro (20% para investimentos/dívida)."
 
-        if "dívidas pesadas" in fase_vida or "quitar" in maior_meta:
-            regra_sugerida = "20/10/60/10"  # Prioriza Essenciais (60%) e Dívida (10%)
-            justificativa = "Com base em sua meta de quitar dívidas e sua fase de 'Pagamento de Dívidas Pesadas', a regra 20/10/60/10 é a mais adequada. Ela garante que 60% da sua renda cubra o essencial e destina 10% do seu foco para a quitação acelerada de dívidas, permitindo que você ataque o endividamento de forma segura."
-
-        elif "riqueza" in maior_meta or "renda crescendo" in fase_vida:
+        if "dívida" in fase_vida or "quitar" in maior_meta or "endividado" in fase_vida:
+            regra_sugerida = "20/10/60/10"  # (Invest/Desejos/Essencial/Dívida)
+            justificativa = (
+                "Com base em sua meta de quitar dívidas, a regra 20/10/60/10 pode ser mais adequada. "
+                "Ela foca 60% no essencial, 10% para lazer, 10% para pagamento acelerado de dívidas e 20% para investimentos futuros. "
+                "Isso garante que você ataque o endividamento de forma segura."
+            )
+        elif "riqueza" in maior_meta or "crescendo" in fase_vida:
             regra_sugerida = "50/30/20"
-            justificativa = "Seu foco é a construção de riqueza. Manter a regra 50/30/20 com um foco rigoroso nos 20% de Investimento é a melhor estratégia para acelerar a acumulação de patrimônio."
+            justificativa = (
+                "Seu foco é a construção de riqueza. Manter a regra 50/30/20 com um foco rigoroso nos 20% de Investimento "
+                "é uma excelente estratégia para acelerar a acumulação de patrimônio."
+            )
 
-        # 4. Retornar a Sugestão para o LLM
         return f"RECOMENDAÇÃO: A regra ideal para a sua fase de vida é '{regra_sugerida}'. Justificativa: {justificativa}"

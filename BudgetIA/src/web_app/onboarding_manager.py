@@ -18,7 +18,6 @@ from initialization.strategy_generator import StrategyGenerator
 
 # Constantes de configuração
 CONFIG_FILE_PATH = Path(config.DATA_DIR) / "user_config.json"
-PLANILHA_KEY = "planilha_path"
 
 
 class OnboardingManager:
@@ -70,18 +69,18 @@ class OnboardingManager:
 
     def get_saved_planilha_path(self) -> str | None:
         # (Lógica permanece a mesma)
-        path_str = self.config_data.get(PLANILHA_KEY)
+        path_str = self.config_data.get(config.PLANILHA_KEY)
         if path_str:
             if Path(path_str).is_file():
                 return path_str
-            self.config_data.pop(PLANILHA_KEY, None)
+            self.config_data.pop(config.PLANILHA_KEY, None)
             self._save_persistent_config()
         return None
 
     def _save_planilha_path(self, path_str: str) -> None:
         """Salva o caminho da planilha na configuração persistente."""
         print(f"--- DEBUG OB_MGR: Salvando planilha '{path_str}' no config... ---")
-        self.config_data[PLANILHA_KEY] = path_str
+        self.config_data[config.PLANILHA_KEY] = path_str
         # Limpa o estado de fallback se salvarmos com sucesso
         self.config_data.pop("onboarding_state", None)
         self.config_data.pop("pending_planilha_path", None)

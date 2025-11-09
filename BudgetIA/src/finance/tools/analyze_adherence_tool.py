@@ -1,31 +1,29 @@
 # src/finance/tools/analyze_adherence_tool.py
 import json
+from collections.abc import Callable  # Importar Callable
 
-from pydantic import BaseModel, Field
+import pandas as pd
+from pydantic import BaseModel
 
 from core.base_tool import BaseTool
 from finance.financial_rules import FinancialRules
-from finance.planilha_manager import PlanilhaManager
+from finance.schemas import AnalisarAdesaoInput
 
 
-class AnalisarAdesaoInput(BaseModel):
-    rule_name: str = Field(
-        description=f"O nome da regra de ouro financeira a ser analisada. Escolha entre: {', '.join(FinancialRules.get_available_rules())}"
-    )
-
-
-class AnalisarAdesaoFinanceiraTool(BaseTool):
+class AnalisarAdesaoFinanceiraTool(BaseTool):  # type: ignore[misc]
     name: str = "analisar_adesao_financeira"
     description: str = (
         "Analisa a distribuição da receita do usuário em relação a uma regra financeira específica (ex: 50/30/20, 20/10/60/10). "
-        "Usa as categorias da planilha e as compara com os objetivos da regra. "
         "Use esta ferramenta sempre que o usuário perguntar sobre a saúde geral do orçamento ou a adesão a uma regra."
     )
     args_schema: type[BaseModel] = AnalisarAdesaoInput
 
-    def __init__(self, planilha_manager: PlanilhaManager):
+    # --- DIP: Depende de Callables ---
+    def __init__(self, view_data_func: Callable[..., pd.DataFrame]) -> None:
         super().__init__()
-        self.planilha_manager = planilha_manager
+        self.visualizar_dados = view_data_func
+
+    # --- FIM DA MUDANÇA ---
 
     def run(self, rule_name: str) -> str:
         print(
@@ -36,7 +34,8 @@ class AnalisarAdesaoFinanceiraTool(BaseTool):
         if not regras_alvo:
             return f"Erro: A regra '{rule_name}' não é reconhecida. As regras disponíveis são: {', '.join(FinancialRules.get_available_rules())}"
 
-        df = self.planilha_manager.visualizar_dados(aba_nome="Visão Geral e Transações")
+        # --- DIP: Chama a função injetada ---
+        df = self.visualizar_dados(aba_nome="Visão Geral e Transações")
         if df.empty:
             return "Não há dados na planilha para analisar a distribuição da receita."
 
@@ -50,61 +49,56 @@ class AnalisarAdesaoFinanceiraTool(BaseTool):
         if total_receita <= 0:
             return "Não foi registrada receita para analisar a distribuição."
 
-        # Mapear as categorias do usuário para os grupos da regra
         mapping = FinancialRules.get_category_mapping()
-        grupos_calculados: Dict[str, float] = {
+        grupos_calculados: dict[str, float] = {
             grupo: 0.0 for grupo in regras_alvo.keys()
         }
 
-        # Lógica para mapear os gastos do usuário aos grupos
         for cat_regra, categorias_planilha in mapping.items():
             if cat_regra in grupos_calculados:
-                # Filtra despesas_por_cat pelas categorias da planilha que pertencem a este grupo
                 gastos_do_grupo = despesas_por_cat[
-                    despesas_por_cat.index.str.lower().isin(
-                        [c.lower() for c in categorias_planilha]
-                    )
+                    despesas_por_cat.index.astype(str)
+                    .str.lower()
+                    .isin([c.lower() for c in categorias_planilha])
                 ].sum()
                 grupos_calculados[cat_regra] = float(gastos_do_grupo)
 
-        # O remanescente da receita que não foi gasto (idealmente, Investimento)
         total_gasto = sum(grupos_calculados.values())
         destinado_a_investimento = total_receita - total_gasto
 
-        # Ajuste a contagem de Investimento/Dívida para se adequar à regra específica
         if "INVESTIMENTO_DIVIDA" in regras_alvo:
-            # Se a regra usar um grupo combinado, calculamos o total de ambas as fontes
-            investimento_e_divida = (
-                destinado_a_investimento + grupos_calculados["DIVIDAS_EDUCACAO"]
+            investimento_e_divida = destinado_a_investimento + grupos_calculados.get(
+                "DIVIDAS_EDUCACAO", 0.0
             )
             grupos_calculados["INVESTIMENTO_DIVIDA"] = investimento_e_divida
-            # Remove os grupos individuais para evitar duplicidade na resposta
             grupos_calculados.pop("DIVIDAS_EDUCACAO", None)
             grupos_calculados.pop("INVESTIMENTO_POUPANCA", None)
+        elif "INVESTIMENTO_POUPANCA" in regras_alvo:
+            # Garante que o que sobrou seja considerado investimento
+            grupos_calculados["INVESTIMENTO_POUPANCA"] += destinado_a_investimento
 
-        # Formatar o resultado com % de Adesão
         resumo_adesao = {}
         for grupo, alvo_pct in regras_alvo.items():
             valor_real = grupos_calculados.get(grupo, 0.0)
-            pct_real = (valor_real / total_receita) * 100
+
+            # Garante que o valor real não seja negativo (acontece se gastou mais que ganhou)
+            valor_real = max(valor_real, 0.0)
+
+            pct_real = (valor_real / total_receita) * 100 if total_receita > 0 else 0.0
+            alvo_pct_100 = alvo_pct * 100
+
+            status = "Atingido"
+            if pct_real > alvo_pct_100:
+                status = "Acima"
+            elif pct_real < (alvo_pct_100 * 0.9):  # 90% da meta
+                status = "Abaixo"
+
             resumo_adesao[grupo] = {
-                "Alvo_Pct": alvo_pct * 100,
+                "Alvo_Pct": alvo_pct_100,
                 "Real_Pct": pct_real,
                 "Valor_Real": valor_real,
                 "Alvo_Valor": total_receita * alvo_pct,
-                "Status": "Acima"
-                if pct_real > (alvo_pct * 100)
-                else (
-                    "Abaixo" if pct_real < (alvo_pct * 100) * 0.9 else "Atingido"
-                ),  # Lógica simplificada
+                "Status": status,
             }
 
-        # Garante que o investimento não seja negativo
-        if (
-            "INVESTIMENTO_POUPANCA" in resumo_adesao
-            and resumo_adesao["INVESTIMENTO_POUPANCA"]["Valor_Real"] < 0
-        ):
-            resumo_adesao["INVESTIMENTO_POUPANCA"]["Valor_Real"] = 0
-
-        # Retorna um JSON para o LLM interpretar
         return f"Análise da Regra '{rule_name}':\n{json.dumps(resumo_adesao, indent=2)}"

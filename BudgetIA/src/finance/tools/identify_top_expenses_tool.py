@@ -1,25 +1,29 @@
+# src/finance/tools/identify_top_expenses_tool.py
+from collections.abc import Callable  # Importar Callable
+
+import pandas as pd
 from pydantic import BaseModel
 
 from core.base_tool import BaseTool
-from finance.planilha_manager import PlanilhaManager
-
-from ..schemas import IdentificarMaioresGastosInput
+from finance.schemas import IdentificarMaioresGastosInput
 
 
 class IdentificarMaioresGastosTool(BaseTool):  # type: ignore[misc]
     name: str = "identificar_maiores_gastos"
-    description: str = (
-        "Identifica e retorna as N maiores despesas individuais na planilha, útil para encontrar gastos significativos. "
-        "Use esta ferramenta quando o usuário perguntar 'Quais foram meus maiores gastos?', 'Me mostre os gastos mais altos'."
-    )
+    description: str = "Identifica e retorna as N maiores despesas individuais na planilha, útil para encontrar gastos significativos."
     args_schema: type[BaseModel] = IdentificarMaioresGastosInput
 
-    def __init__(self, planilha_manager: PlanilhaManager) -> None:
-        self.planilha_manager = planilha_manager
+    # --- DIP: Depende de Callables ---
+    def __init__(self, view_data_func: Callable[..., pd.DataFrame]) -> None:
+        self.visualizar_dados = view_data_func
+
+    # --- FIM DA MUDANÇA ---
 
     def run(self, top_n: int = 3) -> str:
         print(f"LOG: Ferramenta '{self.name}' foi chamada com top_n={top_n}.")
-        df = self.planilha_manager.visualizar_dados(aba_nome="Visão Geral e Transações")
+
+        # --- DIP: Chama a função injetada ---
+        df = self.visualizar_dados(aba_nome="Visão Geral e Transações")
         if df.empty:
             return "Não há dados na planilha para identificar os maiores gastos."
 
@@ -27,14 +31,24 @@ class IdentificarMaioresGastosTool(BaseTool):  # type: ignore[misc]
         if despesas_df.empty:
             return "Não há despesas registradas na planilha."
 
-        maiores_gastos = despesas_df.nlargest(top_n, "Valor")
+        try:
+            # Garantir que 'Valor' é numérico para nlargest
+            despesas_df["Valor"] = pd.to_numeric(despesas_df["Valor"], errors="coerce")
+            despesas_df.dropna(subset=["Valor"], inplace=True)
+
+            maiores_gastos = despesas_df.nlargest(top_n, "Valor")
+        except Exception as e:
+            return f"Erro ao processar valores das despesas: {e}"
 
         if maiores_gastos.empty:
-            return "Nenhum gasto significativo encontrado."
+            return f"Nenhum gasto significativo encontrado (top_n={top_n})."
 
-        # Seleciona colunas relevantes para o LLM
-        maiores_gastos_selecionados = maiores_gastos[
-            ["Data", "Categoria", "Descricao", "Valor"]
+        colunas_relevantes = ["Data", "Categoria", "Descricao", "Valor"]
+        # Filtra colunas que realmente existem no DF
+        colunas_para_mostrar = [
+            col for col in colunas_relevantes if col in maiores_gastos.columns
         ]
+
+        maiores_gastos_selecionados = maiores_gastos[colunas_para_mostrar]
 
         return f"Seus {top_n} maiores gastos individuais:\n{maiores_gastos_selecionados.to_markdown(index=False)}"

@@ -1,35 +1,42 @@
+# src/finance/tools/generate_monthly_summary_tool.py
 import json
+from collections.abc import Callable  # Importar Callable
 
 import pandas as pd
 from pydantic import BaseModel
 
 from core.base_tool import BaseTool
-from finance.planilha_manager import PlanilhaManager
-
-from ..schemas import GerarResumoMensalInput
+from finance.schemas import GerarResumoMensalInput
 
 
 class GerarResumoMensalTool(BaseTool):  # type: ignore[misc]
     name: str = "gerar_resumo_mensal"
     description: str = (
         "Gera um resumo detalhado de receitas, despesas e saldo para um mês/ano específico "
-        "ou para todos os meses disponíveis se nenhum for especificado. "
-        "Use esta ferramenta quando o usuário pedir 'Resumo do mês X', 'Balanço de Y', "
-        "'Qual meu lucro/prejuízo em março?', 'Me dê um resumo geral'."
+        "ou para todos os meses disponíveis se nenhum for especificado."
     )
     args_schema: type[BaseModel] = GerarResumoMensalInput
 
-    def __init__(self, planilha_manager: PlanilhaManager) -> None:
-        self.planilha_manager = planilha_manager
+    # --- DIP: Depende de Callables ---
+    def __init__(self, view_data_func: Callable[..., pd.DataFrame]) -> None:
+        self.visualizar_dados = view_data_func
+
+    # --- FIM DA MUDANÇA ---
 
     def run(self, ano: int | None = None, mes: int | None = None) -> str:
         print(f"LOG: Ferramenta '{self.name}' chamada para Ano={ano}, Mês={mes}.")
-        df = self.planilha_manager.visualizar_dados(aba_nome="Visão Geral e Transações")
+
+        # --- DIP: Chama a função injetada ---
+        df = self.visualizar_dados(aba_nome="Visão Geral e Transações")
         if df.empty:
             return "Não há dados na planilha para gerar um resumo mensal."
 
-        df["Data"] = pd.to_datetime(df["Data"])
-        df["AnoMes"] = df["Data"].dt.to_period("M")
+        try:
+            df["Data"] = pd.to_datetime(df["Data"], errors="coerce")
+            df.dropna(subset=["Data"], inplace=True)  # Ignora dados sem data
+            df["AnoMes"] = df["Data"].dt.to_period("M")
+        except Exception as e:
+            return f"Erro ao processar datas da planilha: {e}"
 
         if ano and mes:
             periodo_filtro = pd.Period(year=ano, month=mes, freq="M")
@@ -49,12 +56,16 @@ class GerarResumoMensalTool(BaseTool):  # type: ignore[misc]
             for periodo, grupo in df_filtrado.groupby("AnoMes"):
                 resumos[str(periodo)] = self._calcular_resumo_para_df(grupo)
 
+            if not resumos:
+                return f"Nenhum dado encontrado para o ano {ano}."
             return f"Resumo para o ano {ano}:\n{json.dumps(resumos, indent=2)}"
         else:  # Resumo geral por mês
             resumos = {}
             for periodo, grupo in df.groupby("AnoMes"):
                 resumos[str(periodo)] = self._calcular_resumo_para_df(grupo)
 
+            if not resumos:
+                return "Não há dados suficientes para um resumo geral."
             return f"Resumo geral por mês:\n{json.dumps(resumos, indent=2)}"
 
     def _calcular_resumo_para_df(self, df_periodo: pd.DataFrame) -> dict[str, float]:
@@ -67,7 +78,7 @@ class GerarResumoMensalTool(BaseTool):  # type: ignore[misc]
         ].sum()
         saldo = receitas - despesas
         return {
-            "Receitas": float(receitas),
-            "Despesas": float(despesas),
-            "Saldo": float(saldo),
+            "total_receitas": float(receitas),  # Chave correta
+            "total_despesas": float(despesas),  # Chave correta
+            "saldo": float(saldo),
         }

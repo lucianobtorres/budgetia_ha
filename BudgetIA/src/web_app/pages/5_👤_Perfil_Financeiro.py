@@ -163,4 +163,4 @@ with st.expander("Zona de Perigo"):
         time.sleep(2)
 
         # 4. Navega de volta para a Home (que agora é o 🏠_Home.py)
-        st.switch_page("🏠_Home.py")  # (Ajuste se você usou outro nome)
+        st.switch_page("💰_BudgetIA.py")  # (Ajuste se você usou outro nome)
