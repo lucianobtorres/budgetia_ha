@@ -1,0 +1,60 @@
+Você é um especialista em Python e Pandas. Sua tarefa é gerar o código-fonte
+completo para uma classe Python chamada `CustomStrategy` que herda de
+`BaseMappingStrategy`.
+
+Seu objetivo é traduzir uma planilha de usuário (com colunas e nomes de aba
+desconhecidos) para o formato interno padrão do sistema.
+
+Abaixo estão a *Interface* que você deve implementar e um *Exemplo* de
+implementação robusta.
+
+{base_strategy_interface}
+
+{default_strategy_example}
+
+--- REGRAS CRÍTICAS DE IMPLEMENTAÇÃO ---
+1.  **NOME DA CLASSE:** O nome da classe DEVE ser `CustomStrategy`.
+2.  **MAPEAMENTO:** Use o dicionário `mapeamento_usuario` (abaixo) para
+    traduzir os nomes das colunas e abas do usuário para os nomes internos
+    (definidos em `config.NomesAbas` e `config.LAYOUT_PLANILHA`).
+3.  **ROBUSTEZ NA LEITURA (map_transactions):**
+    * A planilha do usuário pode ter dados 'sujos'.
+    * **Datas (OBRIGATÓRIO):** Você DEVE converter a coluna de data (nome interno 'Data')
+        para objetos datetime. Use `pd.to_datetime(df['Data'], errors='coerce')`
+        para evitar quebras com datas mal formatadas (como "10 de dezembro").
+    * **Valores (OBRIGATÓRIO):** Você DEVE converter a coluna de valor (nome interno 'Valor')
+        para numérico. Use `pd.to_numeric(df['Valor'], errors='coerce')` para
+        evitar quebras com valores mal formatados (como "R$ 10,00").
+    * **Schema:** Garanta que o DataFrame retornado por `map_transactions`
+        TENHA EXATAMENTE as colunas do layout padrão (`self.colunas_transacoes`),
+        mesmo que isso signifique adicionar colunas vazias (`pd.NA`).
+4.  **ROBUSTEZ NA ESCRITA (unmap_transactions):**
+    * Ao traduzir de volta, reverta os nomes das colunas para o formato do
+        usuário.
+    * Remova colunas que o usuário não tinha originalmente.
+5.  **ABAS DO SISTEMA (map_other_sheet):**
+    * Abas como 'Meus Orçamentos', 'Minhas Dívidas' são geralmente salvas
+        com o nome padrão (veja `DefaultStrategy`). Apenas garanta que as colunas
+        obrigatórias do layout existam.
+
+--- CONTEXTO DO USUÁRIO ---
+
+**Formato da Planilha do Usuário (head() e colunas):**
+{user_sheet_head}
+
+**Dicionário de Mapeamento (Gerado pela IA ou Padrão):**
+(Este dicionário mapeia: "Nome_Do_Usuario" -> "Nome_Interno_Sistema")
+{mapeamento_usuario}
+
+--- CÓDIGO FINAL ---
+Gere apenas o código Python completo. Não inclua NENHUM texto, explicação ou
+markdown (como ```python) antes ou depois do código.
+
+from typing import Any
+import pandas as pd
+import config
+from .base_strategy import BaseMappingStrategy
+from .default_strategy import DefaultStrategy
+
+# O código DEVE começar com a definição da classe 'CustomStrategy'
+class CustomStrategy(BaseStrategy):

@@ -8,6 +8,13 @@ import config
 # Import relativo para "subir" um nível
 from ..excel_handler import ExcelHandler
 
+# --- IMPORTAÇÕES ADICIONADAS ---
+from ..strategies.base_strategy import BaseMappingStrategy
+from ..strategies.custom_json_strategy import CustomJsonStrategy
+from ..strategies.default_strategy import DefaultStrategy
+
+# --- FIM DAS IMPORTAÇÕES ADICIONADAS ---
+
 
 class FinancialDataContext:
     """
@@ -25,9 +32,40 @@ class FinancialDataContext:
         Inicializa o contexto, carregando os dados da planilha para a memória.
         """
         self.excel_handler = excel_handler
-        self.dfs, self.is_new_file = self.excel_handler.load_sheets(
-            config.LAYOUT_PLANILHA, mapeamento
+        self.strategy: BaseMappingStrategy
+
+        # --- LOG ADICIONADO ---
+        print(
+            f"--- DEBUG (DataContext): Chamando 'excel_handler.load_sheets' para '{excel_handler.file_path}' ---"
         )
+        # --- FIM DO LOG ---
+
+        # --- LÓGICA DA ESTRATÉGIA (O FIX) ---
+        # Decidimos qual estratégia usar com base no mapeamento
+        if mapeamento:
+            print(
+                "--- DEBUG (DataContext): Mapeamento encontrado. Usando CustomJSONStrategy. ---"
+            )
+            # Se temos um mapa, usamos a estratégia de JSON customizada
+            self.strategy = CustomJsonStrategy(config.LAYOUT_PLANILHA, mapeamento)
+        else:
+            print(
+                "--- DEBUG (DataContext): Mapeamento NULO. Usando DefaultStrategy. ---"
+            )
+            # Se não, usamos a estratégia padrão
+            self.strategy = DefaultStrategy(config.LAYOUT_PLANILHA, mapeamento)
+        # --- FIM DO FIX ---
+
+        self.dfs, self.is_new_file = self.excel_handler.load_sheets(
+            config.LAYOUT_PLANILHA, self.strategy
+        )
+
+        # --- LOG ADICIONADO ---
+        print(
+            f"--- DEBUG (DataContext): 'load_sheets' retornou. 'self.is_new_file' agora é: {self.is_new_file} ---"
+        )
+        # --- FIM DO LOG ---
+
         print("LOG: FinancialDataContext inicializado.")
 
     def get_dataframe(self, aba_nome: str) -> pd.DataFrame:
@@ -87,4 +125,4 @@ class FinancialDataContext:
             f"LOG: Solicitando salvamento ao ExcelHandler para '{self.excel_handler.file_path}'"
         )
         # Passa o 'self.dfs' para o handler salvar
-        self.excel_handler.save_sheets(self.dfs, add_intelligence)
+        self.excel_handler.save_sheets(self.dfs, self.strategy, add_intelligence)

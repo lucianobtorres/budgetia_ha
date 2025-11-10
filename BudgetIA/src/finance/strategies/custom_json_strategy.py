@@ -5,6 +5,10 @@ from typing import Any
 import pandas as pd
 
 import config
+from config import (
+    ColunasTransacoes,
+    ValoresTipo,
+)
 
 from .base_strategy import BaseMappingStrategy
 
@@ -41,15 +45,43 @@ class CustomJsonStrategy(BaseMappingStrategy):
         # 2. Aplicar transformações (Ex: Valores Negativos)
         if self.mapeamento.get("transform_valor_negativo", False):
             print("LOG: Aplicando transformação de valor negativo...")
-            if "Valor" in df_mapeado.columns:
-                df_mapeado["Tipo (Receita/Despesa)"] = df_mapeado["Valor"].apply(
-                    lambda x: "Receita" if pd.notna(x) and x > 0 else "Despesa"
+            if ColunasTransacoes.VALOR in df_mapeado.columns:
+                df_mapeado[ColunasTransacoes.TIPO] = df_mapeado[
+                    ColunasTransacoes.VALOR
+                ].apply(
+                    lambda x: ValoresTipo.RECEITA
+                    if pd.notna(x) and x > 0
+                    else ValoresTipo.DESPESA
                 )
-                df_mapeado["Valor"] = df_mapeado["Valor"].abs()
+                df_mapeado[ColunasTransacoes.VALOR] = df_mapeado[
+                    ColunasTransacoes.VALOR
+                ].abs()
             else:
                 print(
                     "AVISO: 'transform_valor_negativo' ligado, mas 'Valor' não encontrado."
                 )
+
+        # --- INÍCIO DA CORREÇÃO ---
+        # Garante a conversão de tipo para a coluna de Data (pelo nome INTERNO)
+        coluna_data_interna = "Data"  # Nome padrão da coluna no nosso sistema
+
+        if coluna_data_interna in df_mapeado.columns:
+            try:
+                print(
+                    f"--- DEBUG (CustomStrategy): Convertendo coluna '{coluna_data_interna}' para datetime... ---"
+                )
+                df_mapeado[coluna_data_interna] = pd.to_datetime(
+                    df_mapeado[coluna_data_interna], errors="coerce"
+                )
+                print(
+                    f"--- DEBUG (CustomStrategy): Conversão concluída. Valores nulos após conversão: {df_mapeado[coluna_data_interna].isna().sum()} ---"
+                )
+            except Exception as e:
+                print(
+                    f"AVISO (CustomStrategy): Falha ao converter coluna '{coluna_data_interna}' para datetime: {e}"
+                )
+                # Se falhar, continua, mas o data_editor pode quebrar
+        # --- FIM DA CORREÇÃO ---
 
         # 3. Garantir todas as colunas padrão (lógica da classe base)
         # Isso garante que colunas como 'ID Transacao', 'Status', etc., existam
@@ -67,20 +99,20 @@ class CustomJsonStrategy(BaseMappingStrategy):
         if self.mapeamento.get("transform_valor_negativo", False):
             print("LOG: Aplicando transformação INVERSA de valor negativo...")
             if (
-                "Valor" in df_para_salvar.columns
-                and "Tipo (Receita/Despesa)" in df_para_salvar.columns
+                ColunasTransacoes.VALOR in df_para_salvar.columns
+                and ColunasTransacoes.TIPO in df_para_salvar.columns
             ):
-                df_para_salvar["Valor"] = df_para_salvar.apply(
-                    lambda row: row["Valor"] * -1
-                    if row["Tipo (Receita/Despesa)"] == "Despesa"
-                    else row["Valor"],
+                df_para_salvar[ColunasTransacoes.VALOR] = df_para_salvar.apply(
+                    lambda row: row[ColunasTransacoes.VALOR] * -1
+                    if row[ColunasTransacoes.TIPO] == ValoresTipo.DESPESA
+                    else row[ColunasTransacoes.VALOR],
                     axis=1,
                 )
 
                 # Se a coluna "Tipo" não foi mapeada pelo usuário, removemos
-                if "Tipo (Receita/Despesa)" not in self.mapa_reverso:
+                if ColunasTransacoes.TIPO not in self.mapa_reverso:
                     df_para_salvar = df_para_salvar.drop(
-                        columns=["Tipo (Receita/Despesa)"]
+                        columns=[ColunasTransacoes.TIPO]
                     )
 
         # 2. Renomear colunas (operação inversa: NossaColuna -> SuaColuna)

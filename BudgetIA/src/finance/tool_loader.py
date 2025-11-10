@@ -73,7 +73,7 @@ def load_all_financial_tools(
                         and issubclass(attribute, BaseTool)
                         and attribute is not BaseTool
                     ):
-                        tool_class: Type[BaseTool] = attribute
+                        tool_class: type[BaseTool] = attribute
 
                         try:
                             tool_signature = inspect.signature(tool_class.__init__)

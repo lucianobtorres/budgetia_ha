@@ -26,6 +26,28 @@ class DefaultStrategy(BaseMappingStrategy):
         Para a estratégia padrão, apenas garantimos que as colunas
         do nosso layout de transações existam.
         """
+        # --- INÍCIO DA CORREÇÃO ---
+        # Garante a conversão de tipo para a coluna de Data
+        coluna_data_padrao = "Data"  # Nome padrão da coluna no nosso sistema
+
+        if coluna_data_padrao in df_bruto.columns:
+            try:
+                print(
+                    f"--- DEBUG (DefaultStrategy): Convertendo coluna '{coluna_data_padrao}' para datetime... ---"
+                )
+                df_bruto[coluna_data_padrao] = pd.to_datetime(
+                    df_bruto[coluna_data_padrao], errors="coerce"
+                )
+                print(
+                    f"--- DEBUG (DefaultStrategy): Conversão concluída. Valores nulos após conversão: {df_bruto[coluna_data_padrao].isna().sum()} ---"
+                )
+            except Exception as e:
+                print(
+                    f"AVISO (DefaultStrategy): Falha ao converter coluna '{coluna_data_padrao}' para datetime: {e}"
+                )
+                # Se falhar, continua, mas o data_editor pode quebrar
+        # --- FIM DA CORREÇÃO ---
+
         # Reutiliza a lógica genérica da classe base para garantir as colunas
         return self.map_other_sheet(df_bruto, config.NomesAbas.TRANSACOES)
 

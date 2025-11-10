@@ -3,7 +3,7 @@ import pandas as pd
 import streamlit as st
 
 # Importar NomesAbas e PlanilhaManager
-from config import NomesAbas
+from config import ColunasOrcamentos, NomesAbas
 
 try:
     from ..ui_components.common_ui import setup_page
@@ -40,36 +40,36 @@ try:
         num_rows="dynamic",
         use_container_width=True,
         column_config={  # Configurações para melhor edição
-            "ID Orcamento": st.column_config.NumberColumn(disabled=True),
-            "Categoria": st.column_config.TextColumn(
+            ColunasOrcamentos.ID: st.column_config.NumberColumn(disabled=True),
+            ColunasOrcamentos.CATEGORIA: st.column_config.TextColumn(
                 required=True, help="Nome da categoria (Ex: Alimentação)"
             ),
-            "Valor Limite Mensal": st.column_config.NumberColumn(
+            ColunasOrcamentos.LIMITE: st.column_config.NumberColumn(
                 format="R$ %.2f",
                 required=True,
                 min_value=0.0,
                 step=0.01,
                 help="O valor máximo que você planeja gastar nesta categoria por mês.",
             ),
-            "Período Orçamento": st.column_config.SelectboxColumn(
+            ColunasOrcamentos.PERIODO: st.column_config.SelectboxColumn(
                 options=["Mensal", "Anual", "Único"],
                 default="Mensal",
                 required=True,
                 help="Frequência do orçamento (geralmente Mensal).",
             ),
-            "Observações": st.column_config.TextColumn(
+            ColunasOrcamentos.OBS: st.column_config.TextColumn(
                 help="Notas opcionais sobre este orçamento."
             ),
             # Colunas calculadas não devem ser editáveis diretamente
-            "Valor Gasto Atual": st.column_config.NumberColumn(
+            ColunasOrcamentos.GASTO: st.column_config.NumberColumn(
                 format="R$ %.2f", disabled=True
             ),
-            "Porcentagem Gasta (%)": st.column_config.ProgressColumn(  # Usar barra de progresso!
+            ColunasOrcamentos.PERCENTUAL: st.column_config.ProgressColumn(  # Usar barra de progresso!
                 format="%.1f%%",
                 min_value=0,
                 max_value=100,  # A barra vai até 100%, mesmo se exceder
             ),
-            "Status Orçamento": st.column_config.TextColumn(disabled=True),
+            ColunasOrcamentos.STATUS: st.column_config.TextColumn(disabled=True),
             "Última Atualização Orçamento": st.column_config.DatetimeColumn(
                 disabled=True, format="YYYY-MM-DD HH:mm:ss"
             ),

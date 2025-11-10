@@ -210,3 +210,6 @@ __marimo__/
 .streamlit/secrets.toml
 
 *.xlsx
+
+user_config.json
+strategy_user_*.py

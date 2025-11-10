@@ -4,6 +4,7 @@ from collections.abc import Callable  # Importar Callable
 import pandas as pd
 from pydantic import BaseModel
 
+from config import ColunasTransacoes, ValoresTipo
 from core.base_tool import BaseTool
 from finance.schemas import CalcularDespesasPorCategoriaInput
 
@@ -31,12 +32,14 @@ class CalcularDespesasPorCategoriaTool(BaseTool):  # type: ignore[misc]
         if df.empty:
             return "Não há dados na planilha para calcular despesas por categoria."
 
-        despesas_df = df[df["Tipo (Receita/Despesa)"] == "Despesa"]
+        despesas_df = df[df[ColunasTransacoes.TIPO] == ValoresTipo.DESPESA]
         if despesas_df.empty:
             return "Não há despesas registradas na planilha."
 
         despesas_por_cat = (
-            despesas_df.groupby("Categoria")["Valor"].sum().sort_values(ascending=False)
+            despesas_df.groupby(ColunasTransacoes.CATEGORIA)[ColunasTransacoes.VALOR]
+            .sum()
+            .sort_values(ascending=False)
         )
 
         if despesas_por_cat.empty:

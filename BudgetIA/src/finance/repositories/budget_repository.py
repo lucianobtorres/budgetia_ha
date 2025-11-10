@@ -2,6 +2,7 @@
 import pandas as pd
 
 import config
+from config import ColunasOrcamentos
 
 from ..financial_calculator import FinancialCalculator
 from .data_context import FinancialDataContext
@@ -38,15 +39,20 @@ class BudgetRepository:
         """Adiciona ou atualiza um orçamento em memória (sem recalcular)."""
         df = self._context.get_dataframe(self._aba_nome)
 
-        if "Categoria" not in df.columns or "Período Orçamento" not in df.columns:
+        if (
+            ColunasOrcamentos.CATEGORIA not in df.columns
+            or ColunasOrcamentos.PERIODO not in df.columns
+        ):
             if df.empty:
                 df = pd.DataFrame(columns=config.LAYOUT_PLANILHA[self._aba_nome])
             else:
                 return "ERRO: Aba de orçamentos corrompida."
 
-        categorias_existentes = df["Categoria"].astype(str).str.strip().str.lower()
+        categorias_existentes = (
+            df[ColunasOrcamentos.CATEGORIA].astype(str).str.strip().str.lower()
+        )
         periodos_existentes = (
-            df["Período Orçamento"].astype(str).str.strip().str.lower()
+            df[ColunasOrcamentos.PERIODO].astype(str).str.strip().str.lower()
         )
         categoria_limpa = categoria.strip().lower()
         periodo_limpo = periodo.strip().lower()
@@ -58,31 +64,31 @@ class BudgetRepository:
 
         if not idx_existente.empty:
             idx = idx_existente[0]
-            df.loc[idx, "Valor Limite Mensal"] = valor_limite
-            df.loc[idx, "Observações"] = observacoes
+            df.loc[idx, ColunasOrcamentos.LIMITE] = valor_limite
+            df.loc[idx, ColunasOrcamentos.OBS] = observacoes
             mensagem = f"Orçamento para '{categoria}' atualizado."
         else:
             novo_id = (
-                (df["ID Orcamento"].max() + 1)
+                (df[ColunasOrcamentos.ID].max() + 1)
                 if not df.empty
-                and "ID Orcamento" in df.columns
-                and df["ID Orcamento"].notna().any()
+                and ColunasOrcamentos.ID in df.columns
+                and df[ColunasOrcamentos.ID].notna().any()
                 else 1
             )
             novo_orcamento = pd.DataFrame(
                 [
                     {
-                        "ID Orcamento": novo_id,
-                        "Categoria": categoria,
-                        "Valor Limite Mensal": valor_limite,
-                        "Período Orçamento": periodo,
-                        "Observações": observacoes,
+                        ColunasOrcamentos.ID: novo_id,
+                        ColunasOrcamentos.CATEGORIA: categoria,
+                        ColunasOrcamentos.GASTO: valor_limite,
+                        ColunasOrcamentos.PERIODO: periodo,
+                        ColunasOrcamentos.OBS: observacoes,
                     }
                 ],
                 columns=config.LAYOUT_PLANILHA[self._aba_nome],
             )
             df = pd.concat([df, novo_orcamento], ignore_index=True).fillna(
-                {"Valor Gasto Atual": 0, "Porcentagem Gasta (%)": 0}
+                {ColunasOrcamentos.GASTO: 0, ColunasOrcamentos.PERCENTUAL: 0}
             )
             mensagem = f"Novo orçamento para '{categoria}' criado."
 
@@ -108,3 +114,8 @@ class BudgetRepository:
             df_orcamentos=df_orcamentos,
         )
         self._context.update_dataframe(self._aba_nome, df_orcamentos_atualizado)
+
+        print(
+            "--- DEBUG (BudgetRepo): Solicitando salvamento do orçamento atualizado... ---"
+        )
+        self._context.save()

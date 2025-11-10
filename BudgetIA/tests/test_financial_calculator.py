@@ -5,6 +5,12 @@ import pandas as pd
 import pytest
 
 import config
+from config import (  # <--- ADICIONE ISSO
+    ColunasOrcamentos,
+    ColunasTransacoes,
+    SummaryKeys,
+    ValoresTipo,
+)
 from finance.financial_calculator import FinancialCalculator
 
 
@@ -60,9 +66,14 @@ def test_get_summary_calcula_corretamente(calculator: FinancialCalculator) -> No
     """Testa o cálculo de receitas, despesas e saldo."""
     # ARRANGE
     dados_transacoes = {
-        "Tipo (Receita/Despesa)": ["Receita", "Despesa", "Receita", "Despesa"],
-        "Valor": [5000.0, 150.0, 200.0, 80.50],
-        "Categoria": ["Salário", "Lazer", "Freelance", "Alimentação"],
+        ColunasTransacoes.TIPO: [
+            ValoresTipo.RECEITA,
+            ValoresTipo.DESPESA,
+            ValoresTipo.RECEITA,
+            ValoresTipo.DESPESA,
+        ],
+        ColunasTransacoes.VALOR: [5000.0, 150.0, 200.0, 80.50],
+        ColunasTransacoes.CATEGORIA: ["Salário", "Lazer", "Freelance", "Alimentação"],
     }
     df_transacoes = pd.DataFrame(
         dados_transacoes, columns=config.LAYOUT_PLANILHA[config.NomesAbas.TRANSACOES]
@@ -76,9 +87,9 @@ def test_get_summary_calcula_corretamente(calculator: FinancialCalculator) -> No
     resumo = calculator.get_summary(df_transacoes)
 
     # --- CORREÇÃO (KeyError - Falha 1) ---
-    assert resumo["total_receitas"] == pytest.approx(receitas_esperadas)
-    assert resumo["total_despesas"] == pytest.approx(despesas_esperadas)
-    assert resumo["saldo"] == pytest.approx(saldo_esperado)
+    assert resumo[SummaryKeys.RECEITAS] == pytest.approx(receitas_esperadas)
+    assert resumo[SummaryKeys.DESPESAS] == pytest.approx(despesas_esperadas)
+    assert resumo[SummaryKeys.SALDO] == pytest.approx(saldo_esperado)
     # --- FIM DA CORREÇÃO ---
 
 
@@ -91,9 +102,9 @@ def test_get_summary_dataframe_vazio(calculator: FinancialCalculator) -> None:
     resumo = calculator.get_summary(df_vazio)
 
     # --- CORREÇÃO (KeyError - Falha 2) ---
-    assert resumo["total_receitas"] == 0.0
-    assert resumo["total_despesas"] == 0.0
-    assert resumo["saldo"] == 0.0
+    assert resumo[SummaryKeys.RECEITAS] == 0.0
+    assert resumo[SummaryKeys.DESPESAS] == 0.0
+    assert resumo[SummaryKeys.SALDO] == 0.0
     # --- FIM DA CORREÇÃO ---
 
 
@@ -118,9 +129,9 @@ def test_calcular_status_orcamentos_cenarios_diversos(
     )
 
     dados_orcamentos = {
-        "Categoria": ["Alimentação", "Lazer", "Transporte", "Educação"],
-        "Valor Limite Mensal": [1000.0, 500.0, 300.0, 1500.0],
-        "Período Orçamento": ["Mensal", "Mensal", "Mensal", "Mensal"],
+        ColunasTransacoes.CATEGORIA: ["Alimentação", "Lazer", "Transporte", "Educação"],
+        ColunasOrcamentos.LIMITE: [1000.0, 500.0, 300.0, 1500.0],
+        ColunasOrcamentos.PERIODO: ["Mensal", "Mensal", "Mensal", "Mensal"],
     }
     df_orcamentos = pd.DataFrame(
         dados_orcamentos,
@@ -128,15 +139,15 @@ def test_calcular_status_orcamentos_cenarios_diversos(
     ).fillna(0)
 
     dados_transacoes = {
-        "Tipo (Receita/Despesa)": [
-            "Despesa",  # 1. Gasto OK (60%)
-            "Despesa",  # 2. Gasto em ALERTA (95%)
-            "Despesa",  # 3. Gasto ESTOURADO (110%)
-            "Receita",  # 4. Receita (ignorado)
-            "Despesa",  # 5. Gasto SEM orçamento (ignorado)
-            "Despesa",  # 6. Gasto MÊS PASSADO (ignorado pelo filtro de data)
+        ColunasTransacoes.TIPO: [
+            ValoresTipo.DESPESA,  # 1. Gasto OK (60%)
+            ValoresTipo.DESPESA,  # 2. Gasto em ALERTA (95%)
+            ValoresTipo.DESPESA,  # 3. Gasto ESTOURADO (110%)
+            ValoresTipo.RECEITA,  # 4. Receita (ignorado)
+            ValoresTipo.DESPESA,  # 5. Gasto SEM orçamento (ignorado)
+            ValoresTipo.DESPESA,  # 6. Gasto MÊS PASSADO (ignorado pelo filtro de data)
         ],
-        "Categoria": [
+        ColunasTransacoes.CATEGORIA: [
             "Transporte",
             "Lazer",
             "Alimentação",
@@ -144,8 +155,8 @@ def test_calcular_status_orcamentos_cenarios_diversos(
             "Saúde",
             "Alimentação",
         ],
-        "Valor": [180.0, 475.0, 1100.0, 5000.0, 200.0, 300.0],
-        "Data": [
+        ColunasTransacoes.VALOR: [180.0, 475.0, 1100.0, 5000.0, 200.0, 300.0],
+        ColunasTransacoes.DATA: [
             data_hoje_str,
             data_hoje_str,
             data_hoje_str,
@@ -163,23 +174,23 @@ def test_calcular_status_orcamentos_cenarios_diversos(
     df_resultado = calculator.calcular_status_orcamentos(df_transacoes, df_orcamentos)
 
     # ASSERT
-    df_resultado.set_index("Categoria", inplace=True)
+    df_resultado.set_index(ColunasTransacoes.CATEGORIA, inplace=True)
 
     # Cenário 1: Transporte (180 / 300 = 60%) -> OK
-    assert df_resultado.loc["Transporte", "Valor Gasto Atual"] == 180.0
-    assert df_resultado.loc["Transporte", "Status Orçamento"] == "OK"
+    assert df_resultado.loc["Transporte", ColunasOrcamentos.GASTO] == 180.0
+    assert df_resultado.loc["Transporte", ColunasOrcamentos.STATUS] == "OK"
 
     # Cenário 2: Lazer (475 / 500 = 95%) -> Alerta
-    assert df_resultado.loc["Lazer", "Valor Gasto Atual"] == 475.0
-    assert df_resultado.loc["Lazer", "Status Orçamento"] == "Alerta"
+    assert df_resultado.loc["Lazer", ColunasOrcamentos.GASTO] == 475.0
+    assert df_resultado.loc["Lazer", ColunasOrcamentos.STATUS] == "Alerta"
 
     # Cenário 3: Alimentação (1100 / 1000 = 110%) -> Estourado (ignora os 300 do mês passado)
-    assert df_resultado.loc["Alimentação", "Valor Gasto Atual"] == 1100.0
-    assert df_resultado.loc["Alimentação", "Status Orçamento"] == "Estourado"
+    assert df_resultado.loc["Alimentação", ColunasOrcamentos.GASTO] == 1100.0
+    assert df_resultado.loc["Alimentação", ColunasOrcamentos.STATUS] == "Estourado"
 
     # Cenário 4: Educação (Sem gastos) -> OK
-    assert df_resultado.loc["Educação", "Valor Gasto Atual"] == 0.0
-    assert df_resultado.loc["Educação", "Status Orçamento"] == "OK"
+    assert df_resultado.loc["Educação", ColunasOrcamentos.GASTO] == 0.0
+    assert df_resultado.loc["Educação", ColunasOrcamentos.STATUS] == "OK"
 
 
 # --- Testes de get_expenses_by_category ---
@@ -189,9 +200,9 @@ def test_get_expenses_by_category_ranking_correto(
 ) -> None:
     # ... (teste permanece igual) ...
     dados = {
-        "Tipo (Receita/Despesa)": ["Despesa", "Despesa", "Despesa", "Receita"],
-        "Categoria": ["Alimentação", "Lazer", "Alimentação", "Salário"],
-        "Valor": [100.0, 50.0, 20.0, 3000.0],
+        ColunasTransacoes.TIPO: ["Despesa", "Despesa", "Despesa", "Receita"],
+        ColunasTransacoes.CATEGORIA: ["Alimentação", "Lazer", "Alimentação", "Salário"],
+        ColunasTransacoes.VALOR: [100.0, 50.0, 20.0, 3000.0],
     }
     df = pd.DataFrame(dados)
     resultado = calculator.get_expenses_by_category(df, top_n=5)
@@ -204,9 +215,9 @@ def test_get_expenses_by_category_sem_despesas(
 ) -> None:
     # ... (teste permanece igual) ...
     dados = {
-        "Tipo (Receita/Despesa)": ["Receita", "Receita"],
-        "Categoria": ["Salário", "Freelance"],
-        "Valor": [100.0, 50.0],
+        ColunasTransacoes.TIPO: ["Receita", "Receita"],
+        ColunasTransacoes.CATEGORIA: ["Salário", "Freelance"],
+        ColunasTransacoes.VALOR: [100.0, 50.0],
     }
     df = pd.DataFrame(dados)
     resultado = calculator.get_expenses_by_category(df, top_n=5)
@@ -224,12 +235,12 @@ def test_gerar_analise_proativa_com_alertas(calculator: FinancialCalculator) -> 
     """
     # ARRANGE
     dados_orcamentos = {
-        "Categoria": ["Alimentação", "Lazer", "Transporte"],
-        "Valor Limite Mensal": [1000.0, 500.0, 300.0],
-        "Valor Gasto Atual": [1100.0, 475.0, 100.0],
-        "Porcentagem Gasta (%)": [110.0, 95.0, 33.3],
+        ColunasTransacoes.CATEGORIA: ["Alimentação", "Lazer", "Transporte"],
+        ColunasOrcamentos.LIMITE: [1000.0, 500.0, 300.0],
+        ColunasOrcamentos.GASTO: [1100.0, 475.0, 100.0],
+        ColunasOrcamentos.PERCENTUAL: [110.0, 95.0, 33.3],
         # --- Status como o 'calcular_status_orcamentos' gera ---
-        "Status Orçamento": ["Estourado", "Alerta", "OK"],
+        ColunasOrcamentos.STATUS: ["Estourado", "Alerta", "OK"],
     }
     df_orcamentos = pd.DataFrame(
         dados_orcamentos,
@@ -259,11 +270,11 @@ def test_gerar_analise_proativa_cenario_saudavel(
     """
     # ARRANGE
     dados_orcamentos = {
-        "Categoria": ["Alimentação", "Lazer"],
-        "Valor Limite Mensal": [1000.0, 500.0],
-        "Valor Gasto Atual": [700.0, 200.0],
-        "Porcentagem Gasta (%)": [70.0, 40.0],
-        "Status Orçamento": ["OK", "OK"],  # Status correto
+        ColunasTransacoes.CATEGORIA: ["Alimentação", "Lazer"],
+        ColunasOrcamentos.LIMITE: [1000.0, 500.0],
+        ColunasOrcamentos.GASTO: [700.0, 200.0],
+        ColunasOrcamentos.PERCENTUAL: [70.0, 40.0],
+        ColunasOrcamentos.STATUS: ["OK", "OK"],  # Status correto
     }
     df_orcamentos = pd.DataFrame(
         dados_orcamentos,

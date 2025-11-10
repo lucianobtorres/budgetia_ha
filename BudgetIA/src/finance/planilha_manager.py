@@ -1,5 +1,8 @@
 # src/finance/planilha_manager.py
 import datetime
+
+# --- ADICIONE O MÓDULO DE LOGGING ---
+import logging
 from typing import Any
 
 import pandas as pd
@@ -17,6 +20,10 @@ from .repositories.insight_repository import InsightRepository
 from .repositories.profile_repository import ProfileRepository
 from .repositories.transaction_repository import TransactionRepository
 from .utils import _carregar_dados_exemplo
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+# --- FIM DA ADIÇÃO ---
 
 
 class PlanilhaManager:
@@ -39,6 +46,12 @@ class PlanilhaManager:
         )
         self.calculator = FinancialCalculator()
         self.is_new_file = self._context.is_new_file
+
+        # --- LOG ADICIONADO ---
+        print(
+            f"--- DEBUG (PlanilhaManager): 'self.is_new_file' (vindo do context) é: {self.is_new_file} ---"
+        )
+        # --- FIM DO LOG ---
 
         # --- CRIA TODOS OS REPOSITÓRIOS ---
         self.transaction_repo = TransactionRepository(

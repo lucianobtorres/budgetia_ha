@@ -2,6 +2,7 @@
 import pandas as pd
 
 import config
+from config import ColunasTransacoes
 
 # Imports relativos para "subir" um nível
 from ..financial_calculator import FinancialCalculator
@@ -49,23 +50,23 @@ class TransactionRepository:
         df = self.get_all_transactions()  # Pega a cópia atual
 
         novo_id = (
-            (df["ID Transacao"].max() + 1)
+            (df[ColunasTransacoes.ID].max() + 1)
             if not df.empty
-            and "ID Transacao" in df.columns
-            and df["ID Transacao"].notna().any()
+            and ColunasTransacoes.ID in df.columns
+            and df[ColunasTransacoes.ID].notna().any()
             else 1
         )
 
         novo_registro = pd.DataFrame(
             [
                 {
-                    "ID Transacao": novo_id,
-                    "Data": data,
-                    "Tipo (Receita/Despesa)": tipo,
-                    "Categoria": categoria,
-                    "Descricao": descricao,
-                    "Valor": valor,
-                    "Status": status,
+                    ColunasTransacoes.ID: novo_id,
+                    ColunasTransacoes.DATA: data,
+                    ColunasTransacoes.TIPO: tipo,
+                    ColunasTransacoes.CATEGORIA: categoria,
+                    ColunasTransacoes.DESCRICAO: descricao,
+                    ColunasTransacoes.VALOR: valor,
+                    ColunasTransacoes.STATUS: status,
                 }
             ],
             columns=config.LAYOUT_PLANILHA[self._aba_nome],

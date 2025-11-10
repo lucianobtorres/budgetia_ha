@@ -19,6 +19,8 @@ def test_add_transaction_tool_com_data(
     # Faz o mock de get_summary retornar um saldo para o teste
     mock_get_summary = MagicMock(return_value={"saldo": 1000.0})
 
+    mock_recalculate_budgets = MagicMock()
+
     # Argumentos para a ferramenta
     data = "2025-10-17"
     tipo = "Despesa"
@@ -33,6 +35,7 @@ def test_add_transaction_tool_com_data(
         add_transaction_func=mock_add_transaction,
         save_func=mock_save,
         get_summary_func=mock_get_summary,
+        recalculate_budgets_func=mock_recalculate_budgets,
     )
     # --- FIM DA CORREÇÃO ---
 
@@ -58,5 +61,9 @@ def test_add_transaction_tool_com_data(
         valor=valor,
         status="Concluído",  # Verifica o status padrão
     )
+
+    # 3. Verifica se o recálculo do orçamento foi chamado
+    mock_recalculate_budgets.assert_called_once()
+
     mock_save.assert_called_once()
     mock_get_summary.assert_called_once()

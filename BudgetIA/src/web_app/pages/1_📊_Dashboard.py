@@ -3,7 +3,7 @@
 import pandas as pd
 import streamlit as st
 
-from config import NomesAbas
+from config import ColunasOrcamentos, NomesAbas, SummaryKeys
 
 try:
     from ..ui_components.common_ui import setup_page
@@ -18,23 +18,31 @@ plan_manager, agent_runner = setup_page(
 try:
     summary = plan_manager.get_summary()
 
+    # --- DEBUG PRINT 1 ---
+    # Vamos ver o que o summary realmente contém QUANDO A PÁGINA RODA
+    print(f"--- DEBUG (Dashboard): Sumário carregado: {summary} ---")
+    # --- FIM DO DEBUG ---
+
     st.info("Aqui você verá um resumo visual dos seus dados financeiros.")
-    if summary and (summary.get("receitas", 0) > 0 or summary.get("despesas", 0) > 0):
+    if summary and (
+        summary.get(SummaryKeys.RECEITAS, 0) > 0
+        or summary.get(SummaryKeys.DESPESAS, 0) > 0
+    ):
         col1, col2, col3 = st.columns(3)
 
         # Formatação BRL (ponto e vírgula)
         saldo_str_br = (
-            f"{summary.get('saldo', 0):,.2f}".replace(",", "X")
+            f"{summary.get(SummaryKeys.SALDO, 0):,.2f}".replace(",", "X")
             .replace(".", ",")
             .replace("X", ".")
         )
         receitas_str_br = (
-            f"{summary.get('receitas', 0):,.2f}".replace(",", "X")
+            f"{summary.get(SummaryKeys.RECEITAS, 0):,.2f}".replace(",", "X")
             .replace(".", ",")
             .replace("X", ".")
         )
         despesas_str_br = (
-            f"{summary.get('despesas', 0):,.2f}".replace(",", "X")
+            f"{summary.get(SummaryKeys.DESPESAS, 0):,.2f}".replace(",", "X")
             .replace(".", ",")
             .replace("X", ".")
         )
@@ -55,13 +63,16 @@ try:
         df_orcamentos = plan_manager.visualizar_dados(aba_nome=NomesAbas.ORCAMENTOS)
         if not df_orcamentos.empty:
             orcamentos_mensais_ativos = df_orcamentos[
-                (df_orcamentos["Período Orçamento"].astype(str).str.lower() == "mensal")
-                & (df_orcamentos["Status Orçamento"] != "Inativo")  # Exemplo
+                (
+                    df_orcamentos[ColunasOrcamentos.PERIODO].astype(str).str.lower()
+                    == "mensal"
+                )
+                & (df_orcamentos[ColunasOrcamentos.STATUS] != "Inativo")  # Exemplo
             ].copy()  # Usar .copy() para evitar SettingWithCopyWarning
 
             if not orcamentos_mensais_ativos.empty:
                 # Aplicar formatação BRL às colunas relevantes ANTES do loop
-                for col in ["Valor Limite Mensal", "Valor Gasto Atual"]:
+                for col in [ColunasOrcamentos.LIMITE, ColunasOrcamentos.GASTO]:
                     if col in orcamentos_mensais_ativos.columns:
                         # Tratar possíveis valores não numéricos antes de formatar
                         orcamentos_mensais_ativos[f"{col}_BRL"] = (
@@ -78,9 +89,9 @@ try:
                     # Usar as colunas formatadas _BRL que criamos
                     limite_brl = row.get("Valor Limite Mensal_BRL", "0,00")
                     gasto_brl = row.get("Valor Gasto Atual_BRL", "0,00")
-                    porcentagem = row.get("Porcentagem Gasta (%)", 0.0)
-                    status = row.get("Status Orçamento", "N/A")
-                    categoria = row.get("Categoria", "N/A")
+                    porcentagem = row.get(ColunasOrcamentos.PERCENTUAL, 0.0)
+                    status = row.get(ColunasOrcamentos.STATUS, "N/A")
+                    categoria = row.get(ColunasOrcamentos.CATEGORIA, "N/A")
 
                     st.markdown(
                         f"**{categoria}**: Orçado R$ {limite_brl}, "
@@ -92,6 +103,12 @@ try:
         else:
             st.info("Nenhum orçamento configurado. Defina na aba 'Meus Orçamentos'.")
     else:
+        # --- DEBUG PRINT 2 ---
+        # Se chegarmos aqui, o PRINT 1 nos dirá o porquê.
+        print(
+            "--- DEBUG (Dashboard): 'summary' considerado vazio. Mostrando aviso. ---"
+        )
+        # --- FIM DO DEBUG ---
         st.info(
             "Sua planilha de transações parece estar vazia. "
             "Adicione receitas/despesas usando o 'Chat com a IA' ou editando as 'Transações'."

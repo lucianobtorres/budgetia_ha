@@ -3,6 +3,9 @@
 import pandas as pd
 
 import config
+from config import (
+    ColunasDividas,
+)
 
 from ..financial_calculator import FinancialCalculator
 from .data_context import FinancialDataContext
@@ -47,7 +50,7 @@ class DebtRepository:
         """
         dividas_df = self._context.get_dataframe(self._aba_nome)
 
-        if "Nome da Dívida" not in dividas_df.columns:
+        if ColunasDividas.NOME not in dividas_df.columns:
             if dividas_df.empty:
                 dividas_df = pd.DataFrame(
                     columns=config.LAYOUT_PLANILHA[self._aba_nome]
@@ -67,7 +70,7 @@ class DebtRepository:
         )
 
         dividas_existentes = (
-            dividas_df["Nome da Dívida"].astype(str).str.strip().str.lower()
+            dividas_df[ColunasDividas.NOME].astype(str).str.strip().str.lower()
         )
         nome_divida_limpo = nome_divida.strip().lower()
 
@@ -75,36 +78,36 @@ class DebtRepository:
 
         if not idx_existente.empty:
             idx = idx_existente[0]
-            dividas_df.loc[idx, "Saldo Devedor Atual"] = saldo_devedor_atual
-            dividas_df.loc[idx, "Taxa Juros Mensal (%)"] = taxa_juros_mensal
-            dividas_df.loc[idx, "Data Próximo Pgto"] = data_proximo_pgto_str
-            dividas_df.loc[idx, "Parcelas Pagas"] = parcelas_pagas
-            dividas_df.loc[idx, "Observações"] = observacoes
-            dividas_df.loc[idx, "Valor Original"] = valor_original
-            dividas_df.loc[idx, "Parcelas Totais"] = parcelas_totais
-            dividas_df.loc[idx, "Valor Parcela"] = valor_parcela
+            dividas_df.loc[idx, ColunasDividas.SALDO_DEVEDOR] = saldo_devedor_atual
+            dividas_df.loc[idx, ColunasDividas.TAXA_JUROS] = taxa_juros_mensal
+            dividas_df.loc[idx, ColunasDividas.DATA_PGTO] = data_proximo_pgto_str
+            dividas_df.loc[idx, ColunasDividas.PARCELAS_PAGAS] = parcelas_pagas
+            dividas_df.loc[idx, ColunasDividas.OBS] = observacoes
+            dividas_df.loc[idx, ColunasDividas.VALOR_ORIGINAL] = valor_original
+            dividas_df.loc[idx, ColunasDividas.PARCELAS_TOTAIS] = parcelas_totais
+            dividas_df.loc[idx, ColunasDividas.VALOR_PARCELA] = valor_parcela
             mensagem = f"Dívida '{nome_divida}' atualizada. Saldo devedor: R$ {saldo_devedor_atual:,.2f}."
         else:
             novo_id = (
-                (dividas_df["ID Divida"].max() + 1)
+                (dividas_df[ColunasDividas.ID].max() + 1)
                 if not dividas_df.empty
-                and "ID Divida" in dividas_df.columns
-                and dividas_df["ID Divida"].notna().any()
+                and ColunasDividas.ID in dividas_df.columns
+                and dividas_df[ColunasDividas.ID].notna().any()
                 else 1
             )
             nova_divida = pd.DataFrame(
                 [
                     {
-                        "ID Divida": novo_id,
-                        "Nome da Dívida": nome_divida,
-                        "Valor Original": valor_original,
-                        "Saldo Devedor Atual": saldo_devedor_atual,
-                        "Taxa Juros Mensal (%)": taxa_juros_mensal,
-                        "Parcelas Totais": parcelas_totais,
-                        "Parcelas Pagas": parcelas_pagas,
-                        "Valor Parcela": valor_parcela,
-                        "Data Próximo Pgto": data_proximo_pgto_str,
-                        "Observações": observacoes,
+                        ColunasDividas.ID: novo_id,
+                        ColunasDividas.NOME: nome_divida,
+                        ColunasDividas.VALOR_ORIGINAL: valor_original,
+                        ColunasDividas.SALDO_DEVEDOR: saldo_devedor_atual,
+                        ColunasDividas.TAXA_JUROS: taxa_juros_mensal,
+                        ColunasDividas.PARCELAS_TOTAIS: parcelas_totais,
+                        ColunasDividas.PARCELAS_PAGAS: parcelas_pagas,
+                        ColunasDividas.VALOR_PARCELA: valor_parcela,
+                        ColunasDividas.DATA_PGTO: data_proximo_pgto_str,
+                        ColunasDividas.OBS: observacoes,
                     }
                 ],
                 columns=config.LAYOUT_PLANILHA[self._aba_nome],

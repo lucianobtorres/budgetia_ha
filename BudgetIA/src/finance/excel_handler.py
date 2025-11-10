@@ -12,7 +12,21 @@ class ExcelHandler:
     """Classe especialista em ler e escrever DataFrames para um arquivo Excel."""
 
     def __init__(self, file_path: str) -> None:
+        # --- LOG ADICIONADO ---
+        print(
+            f"--- DEBUG (ExcelHandler): __init__ chamado com file_path: '{file_path}' ---"
+        )
+        # --- FIM DO LOG ---
+
         self.file_path = file_path
+
+        # --- LOG ADICIONADO ---
+        file_exists = os.path.exists(self.file_path)
+        print(
+            f"--- DEBUG (ExcelHandler): 'os.path.exists' para '{self.file_path}' retornou: {file_exists} ---"
+        )
+        # --- FIM DO LOG ---
+
         # A flag is_new_file será determinada pelo load_sheets
         self.is_new_file = not os.path.exists(self.file_path)
 
@@ -25,8 +39,19 @@ class ExcelHandler:
         Carrega as abas da planilha usando a Estratégia de Mapeamento fornecida.
         Removemos toda a lógica 'if mapeamento:' daqui.
         """
+
+        # --- LOG INICIAL ---
+        print("\n--- [LOG ExcelHandler] Iniciando load_sheets ---")
+        print(f"--- [LOG ExcelHandler] Verificando arquivo: {self.file_path} ---")
+
         dataframes: dict[str, pd.DataFrame] = {}
         is_new_file = self.is_new_file  # Pega o estado inicial
+
+        # --- LOG ADICIONADO ---
+        print(
+            f"--- DEBUG (ExcelHandler): 'load_sheets' iniciando. 'is_new_file' (do self) é: {is_new_file} ---"
+        )
+        # --- FIM DO LOG ---
 
         if is_new_file:
             print(
@@ -73,10 +98,14 @@ class ExcelHandler:
                     if sheet_name_padrao == config.NomesAbas.TRANSACOES:
                         continue
 
+                    nome_aba_para_ler = strategy.get_sheet_name_to_save(
+                        sheet_name_padrao
+                    )
+
                     df_bruto_outra: pd.DataFrame
                     if sheet_name_padrao in abas_existentes:
                         df_bruto_outra = pd.read_excel(
-                            xls, sheet_name=sheet_name_padrao
+                            xls, sheet_name=nome_aba_para_ler
                         )
                     else:
                         print(

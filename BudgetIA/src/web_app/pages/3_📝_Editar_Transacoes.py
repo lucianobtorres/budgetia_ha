@@ -8,8 +8,7 @@ import streamlit as st
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-from config import NomesAbas
-from finance.planilha_manager import PlanilhaManager
+from config import ColunasTransacoes, NomesAbas, ValoresTipo
 
 try:
     from ..ui_components.common_ui import setup_page
@@ -19,28 +18,17 @@ except ImportError:
 
 # --- Configuração da Página ---
 plan_manager, agent_runner = setup_page(title="Editar Transações", icon="📝")
-
-# --- Verificação de Inicialização ---
-if "plan_manager" not in st.session_state:
-    st.error("Erro: O sistema financeiro não foi carregado. Volte à página principal.")
-    if st.button("Voltar à Página Principal"):
-        st.switch_page("💰_BudgetIA.py")
-    st.stop()
-
-# --- Obtém o PlanilhaManager (Fachada) ---
-plan_manager: PlanilhaManager = st.session_state.plan_manager
 aba_transacoes = NomesAbas.TRANSACOES
-
-# --- Renderização da Página de Edição de Transações ---
-st.header(f"📝 Visualizar/Editar: {aba_transacoes}")
-st.write(f"Gerencie diretamente as transações da sua aba '{aba_transacoes}'.")
 
 try:
     # Lê os dados usando a fachada
+    st.info(f"Gerencie diretamente as transações da sua aba '{aba_transacoes}'.")
     df_transacoes = plan_manager.visualizar_dados(aba_transacoes)
 
     # Garante que o ID da Transação seja o primeiro
-    cols = ["ID Transacao"] + [col for col in df_transacoes if col != "ID Transacao"]
+    cols = [ColunasTransacoes.ID] + [
+        col for col in df_transacoes if col != ColunasTransacoes.ID
+    ]
     df_transacoes = df_transacoes[cols]
 
     editor_key = f"editor_{aba_transacoes}"
@@ -50,17 +38,19 @@ try:
         num_rows="dynamic",
         use_container_width=True,
         column_config={
-            "ID Transacao": st.column_config.NumberColumn(disabled=True),
-            "Data": st.column_config.DateColumn(format="YYYY-MM-DD", required=True),
-            "Tipo (Receita/Despesa)": st.column_config.SelectboxColumn(
-                options=["Receita", "Despesa"], required=True
+            ColunasTransacoes.ID: st.column_config.NumberColumn(disabled=True),
+            ColunasTransacoes.DATA: st.column_config.DateColumn(
+                format="YYYY-MM-DD", required=True
             ),
-            "Categoria": st.column_config.TextColumn(required=True),
-            "Descricao": st.column_config.TextColumn(),
-            "Valor": st.column_config.NumberColumn(
+            ColunasTransacoes.TIPO: st.column_config.SelectboxColumn(
+                options=[ValoresTipo.RECEITA, ValoresTipo.DESPESA], required=True
+            ),
+            ColunasTransacoes.CATEGORIA: st.column_config.TextColumn(required=True),
+            ColunasTransacoes.DESCRICAO: st.column_config.TextColumn(),
+            ColunasTransacoes.VALOR: st.column_config.NumberColumn(
                 format="R$ %.2f", required=True, step=0.01
             ),
-            "Status": st.column_config.SelectboxColumn(
+            ColunasTransacoes.STATUS: st.column_config.SelectboxColumn(
                 options=["Concluído", "Pendente"], default="Concluído"
             ),
         },

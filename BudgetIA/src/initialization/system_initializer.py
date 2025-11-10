@@ -23,11 +23,7 @@ from core.agent_runner_interface import AgentRunner
 from core.llm_manager import LLMOrchestrator
 from core.llm_providers.gemini_provider import GeminiProvider
 from finance.excel_handler import ExcelHandler
-
-# Importa a Fachada
 from finance.planilha_manager import PlanilhaManager
-
-# Importa a função de utils (para quebrar o ciclo)
 
 
 def initialize_financial_system(
@@ -37,6 +33,13 @@ def initialize_financial_system(
     Inicializa e conecta todos os componentes do sistema financeiro.
     Retorna a fachada PlanilhaManager (para a UI) e o AgentRunner (com DIP).
     """
+
+    # --- LOG ADICIONADO ---
+    print(
+        f"--- DEBUG (system_initializer): 'initialize_financial_system' recebendo planilha_path: '{planilha_path}' ---"
+    )
+    # --- FIM DO LOG ---
+
     print(f"\n--- DEBUG INITIALIZER: Iniciando para '{planilha_path}' ---")
     plan_manager: PlanilhaManager | None = None
     agent_runner: AgentRunner | None = None
@@ -53,6 +56,12 @@ def initialize_financial_system(
             print(
                 "--- DEBUG INITIALIZER: Nenhum mapeamento encontrado, usando layout padrão. ---"
             )
+
+        # --- LOG ADICIONADO ---
+        print(
+            f"--- DEBUG (system_initializer): Criando 'ExcelHandler' com o file_path: '{planilha_path}' ---"
+        )
+        # --- FIM DO LOG ---
 
         excel_handler = ExcelHandler(file_path=planilha_path)
 

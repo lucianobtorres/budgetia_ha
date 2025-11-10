@@ -17,10 +17,12 @@ class AddTransactionTool(BaseTool):  # type: ignore[misc]
         add_transaction_func: Callable[..., None],
         save_func: Callable[[], None],
         get_summary_func: Callable[[], dict[str, float]],
+        recalculate_budgets_func: Callable,
     ) -> None:
         self.adicionar_registro = add_transaction_func
         self.save = save_func
         self.get_summary = get_summary_func
+        self.recalculate_budgets_func = recalculate_budgets_func
 
     # --- FIM DA MUDANÇA ---
 
@@ -59,6 +61,11 @@ class AddTransactionTool(BaseTool):  # type: ignore[misc]
                 status=status,
             )
             self.save()  # Salva a transação
+
+            print(
+                "LOG (Tool): Transação adicionada. Acionando recálculo de orçamentos..."
+            )
+            self.recalculate_budgets_func()
 
             resumo_atual = self.get_summary()
             # --- Fim das chamadas injetadas ---
