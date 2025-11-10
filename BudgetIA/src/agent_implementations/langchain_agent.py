@@ -53,6 +53,9 @@ class IADeFinancas(AgentRunner):  # type: ignore[misc]
         try:
             with open(config.SYSTEM_PROMPT_PATH, encoding="utf-8") as f:
                 prompt_template_str = f.read()
+                print(
+                    f"--- DEBUG (Agent): Verificando prompt carregado (primeiras 500 chars): {prompt_template_str[:500]} ---"
+                )
         except FileNotFoundError:
             print(
                 f"ERRO: Arquivo de prompt do sistema não encontrado em {config.SYSTEM_PROMPT_PATH}"
