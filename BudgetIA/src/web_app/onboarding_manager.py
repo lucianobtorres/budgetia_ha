@@ -100,7 +100,7 @@ class OnboardingManager:
     def get_current_state(self) -> str:
         return self.current_state
 
-    def set_state(self, new_state: str):
+    def set_state(self, new_state: str) -> None:
         print(
             f"--- DEBUG OB_MGR: Mudando estado de {self.current_state} -> {new_state} ---"
         )

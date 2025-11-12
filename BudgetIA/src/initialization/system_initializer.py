@@ -15,9 +15,11 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import config  # noqa: E402
 from agent_implementations.langchain_agent import IADeFinancas  # noqa: E402
+
+# --- FIM DA MUDANÇA ---
 from finance.planilha_manager import PlanilhaManager  # noqa: E402
 
-# --- 1. IMPORTAR O HANDLER DO NOVO LOCAL ---
+# --- 1. IMPORTAR AMBOS OS HANDLERS E A INTERFACE ---
 from finance.storage.excel_storage_handler import ExcelHandler  # noqa: E402
 from web_app.utils import (  # noqa: E402
     load_persistent_config,
@@ -53,7 +55,10 @@ def initialize_financial_system(
         config_persistente = load_persistent_config()
         mapeamento = config_persistente.get("mapeamento")
 
+        # --- 2. LÓGICA DE ESCOLHA DO HANDLER ---
         storage_handler: BaseStorageHandler
+
+        # Verifica se o 'planilha_path' é uma URL do Google Sheets
         if "docs.google.com/spreadsheets" in planilha_path:
             print("--- DEBUG INITIALIZER: Detectado Google Sheets. ---")
             storage_handler = GoogleSheetsStorageHandler(
@@ -62,7 +67,10 @@ def initialize_financial_system(
         else:
             print("--- DEBUG INITIALIZER: Detectado arquivo Excel local. ---")
             storage_handler = ExcelHandler(file_path=planilha_path)
-        # --- 3. INJETAR O HANDLER ABSTRATO NO PlanilhaManager ---
+        # --- FIM DA LÓGICA DE ESCOLHA ---
+
+        # --- 3. INJETAR O HANDLER ABSTRATO ---
+        # (Nenhuma mudança daqui para baixo, já está correto)
         plan_manager = PlanilhaManager(
             storage_handler=storage_handler, mapeamento=mapeamento
         )
@@ -73,7 +81,6 @@ def initialize_financial_system(
         is_new_file = plan_manager.is_new_file
         dados_de_exemplo_foram_adicionados = False
         if is_new_file and mapeamento is None:
-            # Verifica se os dados de exemplo foram realmente adicionados
             df_transacoes = plan_manager.visualizar_dados(config.NomesAbas.TRANSACOES)
             if not df_transacoes.empty:
                 dados_de_exemplo_foram_adicionados = True
@@ -93,7 +100,7 @@ def initialize_financial_system(
         agent_runner = IADeFinancas(
             llm_orchestrator=llm_orchestrator,
             contexto_perfil=contexto_perfil,
-            data_context=plan_manager._context,  # Injeta o DataContext
+            data_context=plan_manager._context,
             transaction_repo=plan_manager.transaction_repo,
             budget_repo=plan_manager.budget_repo,
             debt_repo=plan_manager.debt_repo,
