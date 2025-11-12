@@ -16,8 +16,15 @@ from finance.planilha_manager import PlanilhaManager
 # --- Importa o novo Gerador ---
 from initialization.strategy_generator import StrategyGenerator
 
-# Constantes de configuração
-CONFIG_FILE_PATH = Path(config.DATA_DIR) / "user_config.json"
+# --- 1. IMPORTAR AS FUNÇÕES DE UTILS ---
+# (Vamos usar as funções centralizadas em vez de duplicá-las)
+from web_app.utils import (
+    get_saved_planilha_path,
+    load_persistent_config,
+    save_persistent_config,
+)
+
+# (Remove a constante CONFIG_FILE_PATH, pois utils já a conhece)
 
 
 class OnboardingManager:
@@ -27,8 +34,12 @@ class OnboardingManager:
     """
 
     def __init__(self, llm_orchestrator: LLMOrchestrator):
-        self.config_data: dict = self._load_persistent_config()
-        self.planilha_path: str | None = self.get_saved_planilha_path()
+        # --- 2. USAR AS FUNÇÕES IMPORTADAS ---
+        self.config_data: dict = load_persistent_config()
+        # Chama a função get_saved_planilha_path() CORRIGIDA do utils.py
+        self.planilha_path: str | None = get_saved_planilha_path()
+        # --- FIM DA MUDANÇA ---
+
         self.llm_orchestrator = llm_orchestrator
         self.max_retries: int = 3
         self.current_state: str = "INIT"
@@ -45,37 +56,18 @@ class OnboardingManager:
             self.current_state = "AWAITING_FILE_SELECTION"
         print(f"--- DEBUG OB_MGR: Estado inicial: {self.current_state} ---")
 
-    # --- Métodos de Config/Utils (permanecem os mesmos) ---
+    # --- 3. REMOVER AS FUNÇÕES DUPLICADAS ---
+    # (Removido _load_persistent_config)
+    # (Removido _save_persistent_config)
+    # (Removido get_saved_planilha_path)
+    # --- FIM DA REMOÇÃO ---
 
-    def _load_persistent_config(self) -> dict:  # Modificado para dict
-        """Carrega a configuração do arquivo JSON."""
-        if CONFIG_FILE_PATH.exists():
-            try:
-                with open(CONFIG_FILE_PATH, encoding="utf-8") as f:
-                    return json.load(f)
-            except (json.JSONDecodeError, OSError) as e:
-                print(f"Erro ao ler config: {e}")
-                return {}
-        return {}
-
-    def _save_persistent_config(self) -> None:
-        """Salva a configuração no arquivo JSON."""
-        try:
-            CONFIG_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
-            with open(CONFIG_FILE_PATH, "w", encoding="utf-8") as f:
-                json.dump(self.config_data, f, indent=4)
-        except OSError as e:
-            print(f"Erro ao salvar config: {e}")
-
-    def get_saved_planilha_path(self) -> str | None:
-        # (Lógica permanece a mesma)
-        path_str = self.config_data.get(config.PLANILHA_KEY)
-        if path_str:
-            if Path(path_str).is_file():
-                return path_str
-            self.config_data.pop(config.PLANILHA_KEY, None)
-            self._save_persistent_config()
-        return None
+    def _save_planilha_path_e_config(self) -> None:
+        """
+        Função helper interna para salvar o config_data
+        (que agora pode conter 'planilha_path', 'mapeamento', etc.)
+        """
+        save_persistent_config(self.config_data)
 
     def _save_planilha_path(self, path_str: str) -> None:
         """Salva o caminho da planilha na configuração persistente."""
@@ -84,14 +76,16 @@ class OnboardingManager:
         # Limpa o estado de fallback se salvarmos com sucesso
         self.config_data.pop("onboarding_state", None)
         self.config_data.pop("pending_planilha_path", None)
-        self._save_persistent_config()
+
+        # Usa a função centralizada de save
+        save_persistent_config(self.config_data)
         self.planilha_path = path_str
 
     def reset_config(self) -> None:
         """Limpa a configuração da planilha e o estado."""
         print("--- DEBUG OB_MGR: Resetando configuração. ---")
         self.config_data = {}  # Limpa tudo
-        self._save_persistent_config()
+        save_persistent_config(self.config_data)  # Salva o config vazio
         self.planilha_path = None
         self.set_state("AWAITING_FILE_SELECTION")
 
@@ -108,12 +102,14 @@ class OnboardingManager:
         # Salva o estado de fallback no config
         if new_state == "STRATEGY_FAILED_FALLBACK":
             self.config_data["onboarding_state"] = "STRATEGY_FAILED_FALLBACK"
-            self._save_persistent_config()
+            save_persistent_config(self.config_data)  # Salva o estado de fallback
 
     # --- Fase 1: Lógica de Setup da Planilha ---
 
     def is_planilha_setup_complete(self) -> bool:
         """Verifica se a Fase 1 (seleção da planilha) está completa."""
+        # Esta lógica agora funciona, pois self.planilha_path
+        # foi preenchido pela função get_saved_planilha_path() CORRIGIDA
         return self.planilha_path is not None
 
     def create_new_planilha(
@@ -185,24 +181,47 @@ class OnboardingManager:
             self.set_state("STRATEGY_FAILED_FALLBACK")
             return False, f"Um erro inesperado ocorreu: {e}"
 
+    # --- 4. CORRIGIR A LÓGICA DE 'set_planilha_from_path' ---
+    # (Para aceitar URLs do Google Sheets)
     def set_planilha_from_path(self, path_str: str) -> tuple[bool, str]:
         """
         Lógica para usar uma planilha por caminho existente.
-        APENAS valida o caminho e define o estado de GERAÇÃO.
+        Valida o caminho (arquivo local OU URL GSheets) e define o estado de GERAÇÃO.
         """
-        path_obj = Path(path_str)
-        if not path_obj.is_file():
-            return False, f"Arquivo não encontrado: {path_str}"
-        if not path_obj.name.endswith(".xlsx"):
-            return False, "O arquivo deve ser .xlsx"
+
+        # Verifica se é uma URL válida do GSheets
+        if "docs.google.com/spreadsheets" in path_str:
+            # É uma URL, então pulamos a verificação .is_file()
+            pass
+
+        # Se não for URL, trata como arquivo local e verifica
+        else:
+            path_obj = Path(path_str)
+            if not path_obj.is_file():
+                return False, f"Arquivo não encontrado: {path_str}"
+            if not path_obj.name.endswith(".xlsx"):
+                return False, "O arquivo deve ser .xlsx"
 
         # Salva o caminho que a IA precisa processar
+        # (Se for GSheets, o "processamento" será pular a geração de estratégia)
         self.config_data["pending_planilha_path"] = path_str
-        self._save_persistent_config()
+        save_persistent_config(self.config_data)
 
-        # Apenas define o estado. NÃO chama _processar_planilha_customizada.
-        self.set_state("GENERATING_STRATEGY")
-        return True, "Caminho válido. Iniciando geração de estratégia..."
+        # --- LÓGICA DE ESCOLHA DE ESTADO ---
+        # Se for GSheets, não precisamos gerar estratégia (ainda)
+        if "docs.google.com/spreadsheets" in path_str:
+            print(
+                "--- DEBUG OB_MGR: Detectado Google Sheets, pulando geração de estratégia. ---"
+            )
+            self._save_planilha_path(path_str)  # Salva como caminho final
+            self.set_state("SETUP_COMPLETE")
+            return True, "Usando Planilha Google..."
+        else:
+            # Apenas define o estado para geração de estratégia
+            self.set_state("GENERATING_STRATEGY")
+            return True, "Caminho válido. Iniciando geração de estratégia..."
+
+    # --- FIM DA CORREÇÃO 4 ---
 
     def handle_uploaded_planilha(
         self,
@@ -220,7 +239,7 @@ class OnboardingManager:
 
             # Salva o caminho que a IA precisa processar
             self.config_data["pending_planilha_path"] = str(save_path)
-            self._save_persistent_config()
+            save_persistent_config(self.config_data)
 
             # Apenas define o estado. NÃO chama _processar_planilha_customizada.
             self.set_state("GENERATING_STRATEGY")
