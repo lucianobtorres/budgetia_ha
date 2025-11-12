@@ -5,6 +5,7 @@ import pandas as pd
 from numpy_financial import ipmt, nper
 from pydantic import BaseModel
 
+from config import ColunasDividas, NomesAbas
 from core.base_tool import BaseTool
 from finance.schemas import AnalisarDividaInput
 
@@ -29,14 +30,14 @@ class AnalisarDividaTool(BaseTool):  # type: ignore[misc]
         )
 
         # --- DIP: Chama a função injetada ---
-        df = self.visualizar_dados(aba_nome="Minhas Dívidas")
+        df = self.visualizar_dados(aba_nome=NomesAbas.DIVIDAS)
         if df.empty:
             return (
                 "A aba de dívidas está vazia. Nenhuma dívida encontrada para análise."
             )
 
         divida_encontrada = df[
-            df["Nome da Dívida"].astype(str).str.lower() == nome_divida.lower()
+            df[ColunasDividas.NOME].astype(str).str.lower() == nome_divida.lower()
         ]
 
         if divida_encontrada.empty:
@@ -45,11 +46,11 @@ class AnalisarDividaTool(BaseTool):  # type: ignore[misc]
         divida = divida_encontrada.iloc[0]
 
         try:
-            saldo_devedor = float(divida["Saldo Devedor Atual"])
-            taxa_juros_mensal = float(divida["Taxa Juros Mensal (%)"]) / 100
-            valor_parcela = float(divida["Valor Parcela"])
-            parcelas_totais = int(divida["Parcelas Totais"])
-            parcelas_pagas = int(divida["Parcelas Pagas"])
+            saldo_devedor = float(divida[ColunasDividas.SALDO_DEVEDOR])
+            taxa_juros_mensal = float(divida[ColunasDividas.TAXA_JUROS]) / 100
+            valor_parcela = float(divida[ColunasDividas.VALOR_PARCELA])
+            parcelas_totais = int(divida[ColunasDividas.PARCELAS_PAGAS])
+            parcelas_pagas = int(divida[ColunasDividas.PARCELAS_PAGAS])
 
             if saldo_devedor <= 0:
                 return f"A dívida '{nome_divida}' já está quitada."

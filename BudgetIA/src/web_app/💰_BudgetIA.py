@@ -3,12 +3,11 @@ from typing import Any
 
 import streamlit as st
 
-# Imports do seu projeto
-import config
-from app.chat_history_manager import StreamlitHistoryManager
-
 # --- NOVOS IMPORTS DA CAMADA DE SERVIÇO ---
+# Imports do seu projeto
+from app.chat_history_manager import StreamlitHistoryManager
 from app.chat_service import ChatService
+from config import DEFAULT_GEMINI_MODEL
 from core.llm_manager import LLMOrchestrator
 from core.llm_providers.gemini_provider import GeminiProvider
 from finance.planilha_manager import PlanilhaManager
@@ -76,7 +75,7 @@ st.set_page_config(
 def get_llm_orchestrator() -> LLMOrchestrator:
     """Cria e cacheia o LLMOrchestrator."""
     print("--- DEBUG APP: Criando LLMOrchestrator (cache_resource)... ---")
-    primary_provider = GeminiProvider(default_model=config.DEFAULT_GEMINI_MODEL)
+    primary_provider = GeminiProvider(default_model=DEFAULT_GEMINI_MODEL)
     orchestrator = LLMOrchestrator(primary_provider=primary_provider)
     orchestrator.get_configured_llm()
     return orchestrator

@@ -4,6 +4,7 @@ from collections.abc import Callable  # Importar Callable
 import pandas as pd
 from pydantic import BaseModel
 
+from config import ColunasOrcamentos, NomesAbas
 from core.base_tool import BaseTool
 from finance.schemas import VerificarStatusOrcamentoInput
 
@@ -36,7 +37,7 @@ class VerificarStatusOrcamentoTool(BaseTool):  # type: ignore[misc]
             self.recalculate_budgets()
 
             # 2. Visualiza os dados atualizados
-            orcamentos_df = self.visualizar_dados(aba_nome="Meus Orçamentos")
+            orcamentos_df = self.visualizar_dados(aba_nome=NomesAbas.ORCAMENTOS)
             # --- Fim das chamadas ---
 
             if orcamentos_df.empty:
@@ -44,7 +45,7 @@ class VerificarStatusOrcamentoTool(BaseTool):  # type: ignore[misc]
 
             if categoria:
                 orcamento_encontrado = orcamentos_df[
-                    orcamentos_df["Categoria"].astype(str).str.lower()
+                    orcamentos_df[ColunasOrcamentos.CATEGORIA].astype(str).str.lower()
                     == categoria.lower()
                 ]
                 if orcamento_encontrado.empty:
@@ -53,9 +54,9 @@ class VerificarStatusOrcamentoTool(BaseTool):  # type: ignore[misc]
                 orc = orcamento_encontrado.iloc[0].to_dict()
 
                 # Formatação segura
-                limite_f = f"{orc.get('Valor Limite Mensal', 0):,.2f}"
-                gasto_f = f"{orc.get('Valor Gasto Atual', 0):,.2f}"
-                pct_f = f"{orc.get('Porcentagem Gasta (%)', 0):.1f}"
+                limite_f = f"{orc.get(ColunasOrcamentos.LIMITE, 0):,.2f}"
+                gasto_f = f"{orc.get(ColunasOrcamentos.GASTO, 0):,.2f}"
+                pct_f = f"{orc.get(ColunasOrcamentos.PERCENTUAL, 0):.1f}"
 
                 return (
                     f"Status do orçamento para '{orc.get('Categoria', 'N/A')}' ({orc.get('Período Orçamento', 'N/A')}):\n"
@@ -68,11 +69,11 @@ class VerificarStatusOrcamentoTool(BaseTool):  # type: ignore[misc]
             else:
                 resumo_orcamentos = orcamentos_df[
                     [
-                        "Categoria",
-                        "Valor Limite Mensal",
-                        "Valor Gasto Atual",
-                        "Porcentagem Gasta (%)",
-                        "Status Orçamento",
+                        ColunasOrcamentos.CATEGORIA,
+                        ColunasOrcamentos.LIMITE,
+                        ColunasOrcamentos.GASTO,
+                        ColunasOrcamentos.PERCENTUAL,
+                        ColunasOrcamentos.STATUS,
                     ]
                 ]
                 return f"Resumo de todos os orçamentos:\n{resumo_orcamentos.to_markdown(index=False)}"

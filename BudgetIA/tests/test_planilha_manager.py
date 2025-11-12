@@ -4,9 +4,9 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
-import config
-from finance.excel_handler import ExcelHandler
+from BudgetIA.src import config
 from finance.planilha_manager import PlanilhaManager
+from finance.storage.excel_storage_handler import ExcelHandler
 
 # Precisamos do DataContext para o nosso mock
 
@@ -37,7 +37,7 @@ def plan_manager(mock_excel_handler: MagicMock) -> PlanilhaManager:
 
     # Pula o 'recalculate_budgets' que é chamado no 'else' do __init__
     with patch.object(PlanilhaManager, "recalculate_budgets", return_value=None):
-        pm = PlanilhaManager(excel_handler=mock_excel_handler)
+        pm = PlanilhaManager(storage_handler=mock_excel_handler)
 
         pm.save = MagicMock()
         pm.recalculate_budgets = MagicMock()
@@ -52,8 +52,12 @@ def test_get_summary_calcula_saldo_corretamente(plan_manager: PlanilhaManager) -
     """Testa se o método get_summary() calcula corretamente os totais."""
 
     dados_de_teste = {
-        "Tipo (Receita/Despesa)": ["Receita", "Despesa", "Despesa"],
-        "Valor": [1000.00, 150.25, 50.00],
+        config.ColunasTransacoes.TIPO: [
+            config.ValoresTipo.RECEITA,
+            config.ValoresTipo.DESPESA,
+            config.ValoresTipo.DESPESA,
+        ],
+        config.ColunasTransacoes.VALOR: [1000.00, 150.25, 50.00],
     }
     colunas = config.LAYOUT_PLANILHA[config.NomesAbas.TRANSACOES]
     df_teste = pd.DataFrame(dados_de_teste, columns=colunas).fillna(0)
@@ -64,9 +68,9 @@ def test_get_summary_calcula_saldo_corretamente(plan_manager: PlanilhaManager) -
     resumo = plan_manager.get_summary()
 
     # (Com a correção no FinancialCalculator, este teste deve passar)
-    assert resumo["total_receitas"] == 1000.00
-    assert resumo["total_despesas"] == 200.25
-    assert resumo["saldo"] == 799.75
+    assert resumo[config.SummaryKeys.RECEITAS] == 1000.00
+    assert resumo[config.SummaryKeys.DESPESAS] == 200.25
+    assert resumo[config.SummaryKeys.SALDO] == 799.75
 
 
 def test_adicionar_registro_atualiza_dados_e_orcamento(
@@ -84,7 +88,7 @@ def test_adicionar_registro_atualiza_dados_e_orcamento(
 
     df_transacoes = plan_manager.visualizar_dados(config.NomesAbas.TRANSACOES)
     assert len(df_transacoes) == 1
-    assert df_transacoes.iloc[0]["Categoria"] == "Alimentação"
+    assert df_transacoes.iloc[0][config.ColunasTransacoes.CATEGORIA] == "Alimentação"
     plan_manager.recalculate_budgets.assert_called_once()
 
 
@@ -100,7 +104,7 @@ def test_adicionar_ou_atualizar_orcamento_cria_novo_orcamento(
     assert "Novo orçamento para 'Alimentação' criado" in mensagem
     df_orcamentos = plan_manager.visualizar_dados(config.NomesAbas.ORCAMENTOS)
     assert len(df_orcamentos) == 1
-    assert df_orcamentos.iloc[0]["Categoria"] == "Alimentação"
+    assert df_orcamentos.iloc[0][config.ColunasTransacoes.CATEGORIA] == "Alimentação"
     plan_manager.recalculate_budgets.assert_called_once()
 
 
@@ -110,9 +114,9 @@ def test_adicionar_ou_atualizar_orcamento_atualiza_orcamento_existente(
     """Testa se o método atualiza a linha de um orçamento existente."""
 
     dados_orcamento = {
-        "Categoria": ["Alimentação"],
-        "Valor Limite Mensal": [600.0],
-        "Período Orçamento": ["Mensal"],
+        config.ColunasOrcamentos.CATEGORIA: ["Alimentação"],
+        config.ColunasOrcamentos.LIMITE: [600.0],
+        config.ColunasOrcamentos.PERIODO: ["Mensal"],
     }
     df_orcamentos = pd.DataFrame(
         dados_orcamento, columns=config.LAYOUT_PLANILHA[config.NomesAbas.ORCAMENTOS]
@@ -130,8 +134,8 @@ def test_adicionar_ou_atualizar_orcamento_atualiza_orcamento_existente(
     assert "Orçamento para 'Alimentação' atualizado" in mensagem
     df_orcamentos_final = plan_manager.visualizar_dados(config.NomesAbas.ORCAMENTOS)
     assert len(df_orcamentos_final) == 1
-    assert df_orcamentos_final.iloc[0]["Valor Limite Mensal"] == 750.0
-    assert df_orcamentos_final.iloc[0]["Observações"] == "Ajuste"
+    assert df_orcamentos_final.iloc[0][config.ColunasOrcamentos.LIMITE] == 750.0
+    assert df_orcamentos_final.iloc[0][config.ColunasOrcamentos.OBS] == "Ajuste"
 
 
 def test_adicionar_ou_atualizar_divida_cria_nova_divida_com_saldo_calculado(
@@ -159,9 +163,12 @@ def test_adicionar_ou_atualizar_divida_cria_nova_divida_com_saldo_calculado(
 
     df_dividas = plan_manager.visualizar_dados(config.NomesAbas.DIVIDAS)
     assert len(df_dividas) == 1
-    assert df_dividas.iloc[0]["Nome da Dívida"] == "Financiamento XPTO"
+    assert df_dividas.iloc[0][config.ColunasDividas.NOME] == "Financiamento XPTO"
 
-    assert pytest.approx(df_dividas.iloc[0]["Saldo Devedor Atual"], 0.01) == 17226.01
+    assert (
+        pytest.approx(df_dividas.iloc[0][config.ColunasDividas.SALDO_DEVEDOR], 0.01)
+        == 17226.01
+    )
 
 
 def test_adicionar_ou_atualizar_divida_atualiza_divida_existente(
@@ -170,12 +177,12 @@ def test_adicionar_ou_atualizar_divida_atualiza_divida_existente(
     """Testa se, ao atualizar uma dívida, o saldo é recalculado."""
 
     dados_divida_inicial = {
-        "Nome da Dívida": ["Financiamento XPTO"],
-        "Valor Original": [20000.0],
-        "Taxa Juros Mensal (%)": [1.0],
-        "Parcelas Totais": [24],
-        "Valor Parcela": [1000.0],
-        "Parcelas Pagas": [5],
+        config.ColunasDividas.NOME: ["Financiamento XPTO"],
+        config.ColunasDividas.VALOR_ORIGINAL: [20000.0],
+        config.ColunasDividas.TAXA_JUROS: [1.0],
+        config.ColunasDividas.PARCELAS_TOTAIS: [24],
+        config.ColunasDividas.VALOR_PARCELA: [1000.0],
+        config.ColunasDividas.PARCELAS_PAGAS: [5],
     }
     df_dividas = pd.DataFrame(
         dados_divida_inicial, columns=config.LAYOUT_PLANILHA[config.NomesAbas.DIVIDAS]
@@ -200,8 +207,11 @@ def test_adicionar_ou_atualizar_divida_atualiza_divida_existente(
 
     df_dividas_final = plan_manager.visualizar_dados(config.NomesAbas.DIVIDAS)
     assert len(df_dividas_final) == 1
-    assert df_dividas_final.iloc[0]["Parcelas Pagas"] == 10
+    assert df_dividas_final.iloc[0][config.ColunasDividas.PARCELAS_PAGAS] == 10
 
     assert (
-        pytest.approx(df_dividas_final.iloc[0]["Saldo Devedor Atual"], 0.01) == 13003.70
+        pytest.approx(
+            df_dividas_final.iloc[0][config.ColunasDividas.SALDO_DEVEDOR], 0.01
+        )
+        == 13003.70
     )

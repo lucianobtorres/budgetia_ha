@@ -262,8 +262,8 @@ class FinancialCalculator:
             insights.append(
                 {
                     "tipo_insight": "Alerta de Orçamento",
-                    "titulo_insight": f"Orçamento Estourado: {row['Categoria']}",
-                    "detalhes_recomendacao": f"Você ultrapassou o limite de R$ {row['Valor Limite Mensal']:,.2f} para {row['Categoria']}, gastando R$ {row['Valor Gasto Atual']:,.2f}. Recomendo revisar seus gastos nesta categoria.",
+                    "titulo_insight": f"Orçamento Estourado: {row[ColunasOrcamentos.CATEGORIA]}",
+                    "detalhes_recomendacao": f"Você ultrapassou o limite de R$ {row[ColunasOrcamentos.LIMITE]:,.2f} para {row[ColunasOrcamentos.CATEGORIA]}, gastando R$ {row[ColunasOrcamentos.GASTO]:,.2f}. Recomendo revisar seus gastos nesta categoria.",
                 }
             )
 
@@ -276,8 +276,8 @@ class FinancialCalculator:
             insights.append(
                 {
                     "tipo_insight": "Aviso de Orçamento",
-                    "titulo_insight": f"Orçamento em Alerta: {row['Categoria']}",
-                    "detalhes_recomendacao": f"Você está próximo do limite de R$ {row['Valor Limite Mensal']:,.2f} para {row['Categoria']}, já gastou R$ {row['Valor Gasto Atual']:,.2f} ({row['Porcentagem Gasta (%)']:.1f}%). Atenção aos próximos gastos.",
+                    "titulo_insight": f"Orçamento em Alerta: {row[ColunasOrcamentos.CATEGORIA]}",
+                    "detalhes_recomendacao": f"Você está próximo do limite de R$ {row[ColunasOrcamentos.LIMITE]:,.2f} para {row[ColunasOrcamentos.CATEGORIA]}, já gastou R$ {row[ColunasOrcamentos.GASTO]:,.2f} ({row[ColunasOrcamentos.PERCENTUAL]:.1f}%). Atenção aos próximos gastos.",
                 }
             )
         # --- FIM DA CORREÇÃO ---

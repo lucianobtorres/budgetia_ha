@@ -4,6 +4,7 @@ from collections.abc import Callable  # Importar Callable
 import pandas as pd
 from pydantic import BaseModel
 
+from config import ColunasTransacoes, NomesAbas, ValoresTipo
 from core.base_tool import BaseTool
 from finance.schemas import IdentificarMaioresGastosInput
 
@@ -23,27 +24,34 @@ class IdentificarMaioresGastosTool(BaseTool):  # type: ignore[misc]
         print(f"LOG: Ferramenta '{self.name}' foi chamada com top_n={top_n}.")
 
         # --- DIP: Chama a função injetada ---
-        df = self.visualizar_dados(aba_nome="Visão Geral e Transações")
+        df = self.visualizar_dados(sheet_name=NomesAbas.TRANSACOES)
         if df.empty:
             return "Não há dados na planilha para identificar os maiores gastos."
 
-        despesas_df = df[df["Tipo (Receita/Despesa)"] == "Despesa"]
+        despesas_df = df[df[ColunasTransacoes.TIPO] == ValoresTipo.DESPESA]
         if despesas_df.empty:
             return "Não há despesas registradas na planilha."
 
         try:
             # Garantir que 'Valor' é numérico para nlargest
-            despesas_df["Valor"] = pd.to_numeric(despesas_df["Valor"], errors="coerce")
-            despesas_df.dropna(subset=["Valor"], inplace=True)
+            despesas_df[ColunasTransacoes.VALOR] = pd.to_numeric(
+                despesas_df[ColunasTransacoes.VALOR], errors="coerce"
+            )
+            despesas_df.dropna(subset=[ColunasTransacoes.VALOR], inplace=True)
 
-            maiores_gastos = despesas_df.nlargest(top_n, "Valor")
+            maiores_gastos = despesas_df.nlargest(top_n, ColunasTransacoes.VALOR)
         except Exception as e:
             return f"Erro ao processar valores das despesas: {e}"
 
         if maiores_gastos.empty:
             return f"Nenhum gasto significativo encontrado (top_n={top_n})."
 
-        colunas_relevantes = ["Data", "Categoria", "Descricao", "Valor"]
+        colunas_relevantes = [
+            ColunasTransacoes.DATA,
+            ColunasTransacoes.CATEGORIA,
+            ColunasTransacoes.DESCRICAO,
+            ColunasTransacoes.VALOR,
+        ]
         # Filtra colunas que realmente existem no DF
         colunas_para_mostrar = [
             col for col in colunas_relevantes if col in maiores_gastos.columns

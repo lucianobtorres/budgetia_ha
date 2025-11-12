@@ -4,7 +4,7 @@ from collections.abc import Callable  # Importar Callable
 import pandas as pd
 from pydantic import BaseModel
 
-from config import ColunasTransacoes, ValoresTipo
+from config import ColunasTransacoes, NomesAbas, ValoresTipo
 from core.base_tool import BaseTool
 from finance.schemas import CalcularDespesasPorCategoriaInput
 
@@ -28,7 +28,7 @@ class CalcularDespesasPorCategoriaTool(BaseTool):  # type: ignore[misc]
         print(f"LOG: Ferramenta '{self.name}' foi chamada.")
 
         # --- DIP: Chama a função injetada ---
-        df = self.visualizar_dados(aba_nome="Visão Geral e Transações")
+        df = self.visualizar_dados(sheet_name=NomesAbas.TRANSACOES)
         if df.empty:
             return "Não há dados na planilha para calcular despesas por categoria."
 

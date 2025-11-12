@@ -33,7 +33,7 @@ class TransactionRepository:
 
     def get_all_transactions(self) -> pd.DataFrame:
         """Retorna o DataFrame completo de transações."""
-        return self._context.get_dataframe(self._aba_nome)
+        return self._context.get_dataframe(sheet_name=self._aba_nome)
 
     def add_transaction(
         self,

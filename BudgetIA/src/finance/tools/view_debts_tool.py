@@ -4,6 +4,7 @@ from collections.abc import Callable  # Importar Callable
 import pandas as pd
 from pydantic import BaseModel
 
+from config import NomesAbas
 from core.base_tool import BaseTool
 from finance.schemas import VisualizarDividasInput
 
@@ -26,7 +27,7 @@ class VisualizarDividasTool(BaseTool):  # type: ignore[misc]
         print(f"LOG: Ferramenta '{self.name}' foi chamada.")
 
         # --- DIP: Chama a função injetada ---
-        df = self.visualizar_dados(aba_nome="Minhas Dívidas")
+        df = self.visualizar_dados(aba_nome=NomesAbas.DIVIDAS)
         if df.empty:
             return "A aba de dívidas está vazia. Nenhuma dívida encontrada."
 

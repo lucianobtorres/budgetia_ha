@@ -4,6 +4,7 @@ from collections.abc import Callable  # Importar Callable
 import pandas as pd
 from pydantic import BaseModel
 
+from config import ColunasTransacoes, NomesAbas, ValoresTipo
 from core.base_tool import BaseTool
 from finance.schemas import AnalisarTendenciasGastosInput
 
@@ -26,31 +27,44 @@ class AnalisarTendenciasGastosTool(BaseTool):  # type: ignore[misc]
         print(f"LOG: Ferramenta '{self.name}' chamada para Categoria={categoria}.")
 
         # --- DIP: Chama a função injetada ---
-        df = self.visualizar_dados(aba_nome="Visão Geral e Transações")
+        df = self.visualizar_dados(sheet_name=NomesAbas.TRANSACOES)
         if df.empty:
             return "Não há dados na planilha para analisar tendências."
 
         try:
-            df["Data"] = pd.to_datetime(df["Data"], errors="coerce")
-            df.dropna(subset=["Data"], inplace=True)  # Remove linhas sem data válida
-            df["AnoMes"] = df["Data"].dt.to_period("M")
+            df[ColunasTransacoes.DATA] = pd.to_datetime(
+                df[ColunasTransacoes.DATA], errors="coerce"
+            )
+            df.dropna(
+                subset=[ColunasTransacoes.DATA], inplace=True
+            )  # Remove linhas sem data válida
+            df["AnoMes"] = df[ColunasTransacoes.DATA].dt.to_period("M")
         except Exception as e:
             return f"Erro ao processar datas da planilha: {e}"
 
-        df_despesas = df[df["Tipo (Receita/Despesa)"] == "Despesa"]
+        df_despesas = df[df[ColunasTransacoes.TIPO] == ValoresTipo.DESPESA]
         if df_despesas.empty:
             return "Não há despesas registradas para analisar."
 
         if categoria:
             df_filtrado = df_despesas[
-                df_despesas["Categoria"].astype(str).str.lower() == categoria.lower()
+                df_despesas[ColunasTransacoes.CATEGORIA].astype(str).str.lower()
+                == categoria.lower()
             ]
             if df_filtrado.empty:
                 return f"Nenhuma despesa encontrada para a categoria '{categoria}'."
-            tendencia = df_filtrado.groupby("AnoMes")["Valor"].sum().sort_index()
+            tendencia = (
+                df_filtrado.groupby("AnoMes")[ColunasTransacoes.VALOR]
+                .sum()
+                .sort_index()
+            )
             return f"Tendência de gastos para a categoria '{categoria}':\n{tendencia.to_markdown()}"
         else:
-            tendencia = df_despesas.groupby("AnoMes")["Valor"].sum().sort_index()
+            tendencia = (
+                df_despesas.groupby("AnoMes")[ColunasTransacoes.VALOR]
+                .sum()
+                .sort_index()
+            )
             if tendencia.empty:
                 return "Não há dados de despesa suficientes para calcular a tendência."
             return f"Tendência total de despesas por mês:\n{tendencia.to_markdown()}"

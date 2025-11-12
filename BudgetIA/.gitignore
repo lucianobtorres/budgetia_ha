@@ -214,3 +214,4 @@ __marimo__/
 user_config.json
 strategy_user_*.py
 gen-lang-client*.json
+data/*

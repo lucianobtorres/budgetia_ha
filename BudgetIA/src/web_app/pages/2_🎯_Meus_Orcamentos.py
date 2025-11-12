@@ -85,7 +85,7 @@ try:
             st.info("Salvando e recalculando...")
             try:
                 # Validações antes de salvar
-                if (edited_df_orc["Valor Limite Mensal"] <= 0).any():
+                if (edited_df_orc[ColunasOrcamentos.LIMITE] <= 0).any():
                     st.warning(
                         "Orçamentos devem ter um 'Valor Limite Mensal' positivo."
                     )

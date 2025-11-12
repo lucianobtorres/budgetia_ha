@@ -5,7 +5,6 @@ import pandas as pd
 import pytest
 
 import config
-from finance.excel_handler import ExcelHandler
 from finance.financial_calculator import FinancialCalculator
 from finance.planilha_manager import PlanilhaManager
 
@@ -16,6 +15,7 @@ from finance.repositories.debt_repository import DebtRepository
 from finance.repositories.insight_repository import InsightRepository
 from finance.repositories.profile_repository import ProfileRepository
 from finance.repositories.transaction_repository import TransactionRepository
+from finance.storage.excel_storage_handler import ExcelHandler
 
 
 @pytest.fixture
@@ -36,7 +36,7 @@ def plan_manager_para_ferramentas() -> PlanilhaManager:
 
     # 2. Criar Componentes Reais
     data_context_real = FinancialDataContext(
-        excel_handler=handler_teste, mapeamento=None
+        storage_handler=handler_teste, mapeamento=None
     )
     data_context_real.save = MagicMock()  # Mocka o save
 
