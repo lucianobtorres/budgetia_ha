@@ -32,7 +32,7 @@ class VisualizarDadosPlanilhaTool(BaseTool):  # type: ignore[misc]
 
         try:
             # --- DIP: Chama a função injetada ---
-            df = self.visualizar_dados(aba_nome=aba_nome)
+            df = self.visualizar_dados(sheet_name=aba_nome)
             if df.empty:
                 return f"A aba '{aba_nome}' está vazia."
 

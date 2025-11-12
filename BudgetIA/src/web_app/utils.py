@@ -53,18 +53,30 @@ def get_saved_planilha_path() -> str | None:
     config_data = load_persistent_config()
     path_str = config_data.get(PLANILHA_KEY)
 
-    if path_str:
-        planilha_path = Path(path_str)
-        if planilha_path.is_file():
-            print(f"--- DEBUG CONFIG: Planilha encontrada em config: {path_str} ---")
-            return path_str
-        else:
-            print(
-                f"--- DEBUG CONFIG WARN: Caminho '{path_str}' no config não é um arquivo válido. Ignorando. ---"
-            )
-            return None
-    print("--- DEBUG CONFIG: Nenhuma planilha válida encontrada no config. ---")
-    return None
+    print("--- DEBUG CONFIG: get_saved_planilha_path. ---")
+    if not path_str:
+        print("--- DEBUG CONFIG: Nenhuma planilha válida encontrada no config. ---")
+        return None
+
+    # 1. Primeiro, checa se é uma URL válida do Google Sheets
+    if "docs.google.com/spreadsheets" in path_str:
+        print(
+            f"--- DEBUG CONFIG: Planilha Google Sheets encontrada em config: {path_str} ---"
+        )
+        return str(path_str)
+
+    # 2. Se não for URL, checa se é um arquivo local
+    planilha_path = Path(path_str)
+    if planilha_path.is_file():
+        print(f"--- DEBUG CONFIG: Planilha local encontrada em config: {path_str} ---")
+        return str(path_str)
+    else:
+        print(
+            f"--- DEBUG CONFIG WARN: Caminho '{path_str}' no config não é um arquivo válido. Ignorando. ---"
+        )
+        config_data.pop(PLANILHA_KEY, None)
+        save_persistent_config(config_data)
+        return None
 
 
 def save_planilha_path(path_str: str) -> None:

@@ -5,6 +5,7 @@ from collections.abc import Callable  # Importar Callable
 import pandas as pd
 from pydantic import BaseModel
 
+from config import ColunasTransacoes, NomesAbas, ValoresTipo
 from core.base_tool import BaseTool
 from finance.financial_rules import FinancialRules
 from finance.schemas import AnalisarAdesaoInput
@@ -35,14 +36,16 @@ class AnalisarAdesaoFinanceiraTool(BaseTool):  # type: ignore[misc]
             return f"Erro: A regra '{rule_name}' não é reconhecida. As regras disponíveis são: {', '.join(FinancialRules.get_available_rules())}"
 
         # --- DIP: Chama a função injetada ---
-        df = self.visualizar_dados(aba_nome="Visão Geral e Transações")
+        df = self.visualizar_dados(sheet_name=NomesAbas.TRANSACOES)
         if df.empty:
             return "Não há dados na planilha para analisar a distribuição da receita."
 
-        total_receita = df[df["Tipo (Receita/Despesa)"] == "Receita"]["Valor"].sum()
+        total_receita = df[df[ColunasTransacoes.TIPO] == ValoresTipo.RECEITA][
+            ColunasTransacoes.VALOR
+        ].sum()
         despesas_por_cat = (
-            df[df["Tipo (Receita/Despesa)"] == "Despesa"]
-            .groupby("Categoria")["Valor"]
+            df[df[ColunasTransacoes.TIPO] == ValoresTipo.DESPESA]
+            .groupby(ColunasTransacoes.CATEGORIA)[ColunasTransacoes.VALOR]
             .sum()
         )
 

@@ -2,7 +2,7 @@
 
 import pandas as pd
 
-import config
+from config import LAYOUT_PLANILHA, ColunasInsights, NomesAbas
 
 from .data_context import FinancialDataContext
 
@@ -21,7 +21,7 @@ class InsightRepository:
             context: A Unidade de Trabalho (DataContext).
         """
         self._context = context
-        self._aba_nome = config.NomesAbas.CONSULTORIA_IA
+        self._aba_nome = NomesAbas.CONSULTORIA_IA
 
     def add_insight(
         self,
@@ -35,25 +35,25 @@ class InsightRepository:
         df_insight = self._context.get_dataframe(self._aba_nome)
 
         novo_id = (
-            (df_insight["ID Insight"].max() + 1)
+            (df_insight[ColunasInsights.ID].max() + 1)
             if not df_insight.empty
-            and "ID Insight" in df_insight.columns
-            and df_insight["ID Insight"].notna().any()
+            and ColunasInsights.ID in df_insight.columns
+            and df_insight[ColunasInsights.ID].notna().any()
             else 1
         )
 
         novo_insight = pd.DataFrame(
             [
                 {
-                    "ID Insight": novo_id,
-                    "Data do Insight": data_insight,
-                    "Tipo de Insight": tipo_insight,
-                    "Título do Insight": titulo_insight,
-                    "Detalhes/Recomendação da IA": detalhes_recomendacao,
-                    "Status (Novo/Lido/Concluído)": status,
+                    ColunasInsights.ID: novo_id,
+                    ColunasInsights.DATA: data_insight,
+                    ColunasInsights.TIPO: tipo_insight,
+                    ColunasInsights.TITULO: titulo_insight,
+                    ColunasInsights.DETALHE: detalhes_recomendacao,
+                    ColunasInsights.STATUS: status,
                 }
             ],
-            columns=config.LAYOUT_PLANILHA[self._aba_nome],
+            columns=LAYOUT_PLANILHA[self._aba_nome],
         )
 
         df_atualizado = pd.concat([df_insight, novo_insight], ignore_index=True)

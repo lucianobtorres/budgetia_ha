@@ -7,10 +7,9 @@ import pandas as pd
 import pytest
 from openpyxl import load_workbook
 
-import config
-
 # Importa as classes que vamos testar
-from finance.excel_handler import ExcelHandler
+from BudgetIA.src import config
+from finance.storage.excel_storage_handler import ExcelHandler
 from finance.strategies.custom_json_strategy import CustomJsonStrategy
 
 
@@ -73,23 +72,30 @@ def test_strategy_load_and_unmap(
     df_transacoes = dfs_interno[config.NomesAbas.TRANSACOES]
 
     # Verifica se as colunas foram renomeadas
-    assert "Valor" in df_transacoes.columns
-    assert "Descricao" in df_transacoes.columns
+    assert config.ColunasTransacoes.VALOR in df_transacoes.columns
+    assert config.ColunasTransacoes.DESCRICAO in df_transacoes.columns
     # Verifica se a transformação de negativo funcionou
-    assert df_transacoes.iloc[0]["Valor"] == 5000.00
-    assert df_transacoes.iloc[0]["Tipo (Receita/Despesa)"] == "Receita"
-    assert df_transacoes.iloc[1]["Valor"] == 180.50
-    assert df_transacoes.iloc[1]["Tipo (Receita/Despesa)"] == "Despesa"
+    assert df_transacoes.iloc[0][config.ColunasTransacoes.VALOR] == 5000.00
+    assert (
+        df_transacoes.iloc[0][config.ColunasTransacoes.TIPO]
+        == config.ValoresTipo.RECEITA
+    )
+    assert df_transacoes.iloc[1][config.ColunasTransacoes.VALOR] == 180.50
+    assert (
+        df_transacoes.iloc[1][config.ColunasTransacoes.TIPO]
+        == config.ValoresTipo.DESPESA
+    )
     # Verifica se colunas internas foram adicionadas
-    assert "ID Transacao" in df_transacoes.columns
-    assert "Status" in df_transacoes.columns
+    assert config.ColunasTransacoes.ID in df_transacoes.columns
+    assert config.ColunasTransacoes.STATUS in df_transacoes.columns
 
     # --- ETAPA 2: TESTE DE ESCRITA (unmap_transactions) ---
 
     # 1. Modifica o DataFrame interno (simulando a IA)
-    df_transacoes.loc[df_transacoes["Descricao"] == "Conta de Luz", "Status"] = (
-        "Verificado"
-    )
+    df_transacoes.loc[
+        df_transacoes[config.ColunasTransacoes.DESCRICAO] == "Conta de Luz",
+        config.ColunasTransacoes.STATUS,
+    ] = "Verificado"
 
     # 2. Cria o Handler de Escrita
     handler_escrita = ExcelHandler(file_path=file_path)
@@ -110,8 +116,8 @@ def test_strategy_load_and_unmap(
     df_salvo = pd.read_excel(file_path, sheet_name="Extrato_Banco")
 
     # 4. Verifica se as colunas internas ("ID", "Status") foram REMOVIDAS
-    assert "Status" not in df_salvo.columns
-    assert "ID Transacao" not in df_salvo.columns
+    assert config.ColunasTransacoes.STATUS not in df_salvo.columns
+    assert config.ColunasTransacoes.ID not in df_salvo.columns
 
     # 5. Verifica se as colunas voltaram ao NOME DO USUÁRIO
     assert "Montante" in df_salvo.columns

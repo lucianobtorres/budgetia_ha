@@ -5,6 +5,7 @@ from collections.abc import Callable  # Importar Callable
 import pandas as pd
 from pydantic import BaseModel
 
+from config import ColunasTransacoes, NomesAbas, SummaryKeys, ValoresTipo
 from core.base_tool import BaseTool
 from finance.schemas import GerarResumoMensalInput
 
@@ -27,14 +28,18 @@ class GerarResumoMensalTool(BaseTool):  # type: ignore[misc]
         print(f"LOG: Ferramenta '{self.name}' chamada para Ano={ano}, Mês={mes}.")
 
         # --- DIP: Chama a função injetada ---
-        df = self.visualizar_dados(aba_nome="Visão Geral e Transações")
+        df = self.visualizar_dados(sheet_name=NomesAbas.TRANSACOES)
         if df.empty:
             return "Não há dados na planilha para gerar um resumo mensal."
 
         try:
-            df["Data"] = pd.to_datetime(df["Data"], errors="coerce")
-            df.dropna(subset=["Data"], inplace=True)  # Ignora dados sem data
-            df["AnoMes"] = df["Data"].dt.to_period("M")
+            df[ColunasTransacoes.DATA] = pd.to_datetime(
+                df[ColunasTransacoes.DATA], errors="coerce"
+            )
+            df.dropna(
+                subset=[ColunasTransacoes.DATA], inplace=True
+            )  # Ignora dados sem data
+            df["AnoMes"] = df[ColunasTransacoes.DATA].dt.to_period("M")
         except Exception as e:
             return f"Erro ao processar datas da planilha: {e}"
 
@@ -48,7 +53,7 @@ class GerarResumoMensalTool(BaseTool):  # type: ignore[misc]
                 f"Resumo para {mes}/{ano}:\n{json.dumps(resumo_por_periodo, indent=2)}"
             )
         elif ano:
-            df_filtrado = df[df["Data"].dt.year == ano]
+            df_filtrado = df[df[ColunasTransacoes.DATA].dt.year == ano]
             if df_filtrado.empty:
                 return f"Não há transações para o ano {ano}."
 
@@ -70,15 +75,15 @@ class GerarResumoMensalTool(BaseTool):  # type: ignore[misc]
 
     def _calcular_resumo_para_df(self, df_periodo: pd.DataFrame) -> dict[str, float]:
         """Função auxiliar para calcular resumo para um DataFrame de um período."""
-        receitas = df_periodo[df_periodo["Tipo (Receita/Despesa)"] == "Receita"][
-            "Valor"
-        ].sum()
-        despesas = df_periodo[df_periodo["Tipo (Receita/Despesa)"] == "Despesa"][
-            "Valor"
-        ].sum()
+        receitas = df_periodo[
+            df_periodo[ColunasTransacoes.TIPO] == ValoresTipo.RECEITA
+        ][ColunasTransacoes.VALOR].sum()
+        despesas = df_periodo[
+            df_periodo[ColunasTransacoes.TIPO] == ValoresTipo.DESPESA
+        ][ColunasTransacoes.VALOR].sum()
         saldo = receitas - despesas
         return {
-            "total_receitas": float(receitas),  # Chave correta
-            "total_despesas": float(despesas),  # Chave correta
-            "saldo": float(saldo),
+            SummaryKeys.RECEITAS: float(receitas),  # Chave correta
+            SummaryKeys.DESPESAS: float(despesas),  # Chave correta
+            SummaryKeys.SALDO: float(saldo),
         }

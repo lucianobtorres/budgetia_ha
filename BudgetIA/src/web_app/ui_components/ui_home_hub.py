@@ -3,25 +3,27 @@
 import streamlit as st
 
 import config
-from core.agent_runner_interface import AgentRunner
+
+# --- NOVOS IMPORTS ---
+from app.chat_service import ChatService
+
+# Remover 'AgentRunner'
+# --- FIM NOVOS IMPORTS ---
 from finance.planilha_manager import PlanilhaManager
 
 
 def _render_dashboard_metrics(plan_manager: PlanilhaManager) -> None:
     """Renderiza os KPIs e gráficos do dashboard."""
-
+    # (Esta função não muda em nada)
     st.title("Meu Mentor Financeiro 💰")
     st.info(
         "Este é o seu Hub de IA. Visualize seus dados e converse com seu mentor abaixo."
     )
-
     summary = plan_manager.get_summary()
-
     if summary and (
         summary.get(config.SummaryKeys.RECEITAS, 0) > 0
         or summary.get(config.SummaryKeys.DESPESAS, 0) > 0
     ):
-        # --- 1. KPIs (Métricas Principais) ---
         col1, col2, col3 = st.columns(3)
         col1.metric(
             label="Total de Receitas",
@@ -35,12 +37,8 @@ def _render_dashboard_metrics(plan_manager: PlanilhaManager) -> None:
             label="Saldo Atual",
             value=f"R$ {summary.get(config.SummaryKeys.SALDO, 0):,.2f}",
         )
-
         st.divider()
-
-        # --- 2. Gráficos (Lado a Lado, como você sugeriu) ---
         col_graf_1, col_graf_2 = st.columns(2)
-
         with col_graf_1:
             st.subheader("Top 5 Despesas")
             despesas_por_categoria = plan_manager.get_expenses_by_category(top_n=5)
@@ -48,13 +46,11 @@ def _render_dashboard_metrics(plan_manager: PlanilhaManager) -> None:
                 st.bar_chart(despesas_por_categoria)
             else:
                 st.info("Sem despesas para exibir no gráfico.")
-
         with col_graf_2:
             st.subheader("Status dos Orçamentos")
             df_orcamentos = plan_manager.visualizar_dados(
                 aba_nome=config.NomesAbas.ORCAMENTOS
             )
-            # Filtra orçamentos ativos para o hub
             orcamentos_ativos = df_orcamentos[
                 (df_orcamentos[config.ColunasOrcamentos.PERIODO] == "Mensal")
                 & (df_orcamentos[config.ColunasOrcamentos.LIMITE] > 0)
@@ -65,23 +61,18 @@ def _render_dashboard_metrics(plan_manager: PlanilhaManager) -> None:
                     gasto = row[config.ColunasOrcamentos.GASTO]
                     limite = row[config.ColunasOrcamentos.LIMITE]
                     percentual = (gasto / limite) * 100 if limite > 0 else 0
-
                     st.markdown(
                         f"**{categoria}**: Gasto R$ {gasto:,.2f} de R$ {limite:,.2f}"
                     )
                     st.progress(int(percentual))
             else:
                 st.info("Sem orçamentos mensais ativos.")
-
     else:
         st.info(
             "Seu dashboard está vazio. "
             "Adicione transações usando o chat abaixo para começar."
         )
-
     st.divider()
-
-    # 3. Renderiza o Rodapé com a informação do arquivo
     if "current_planilha_path" in st.session_state:
         st.caption(
             f"Planilha ativa: {st.session_state.current_planilha_path}",
@@ -89,60 +80,46 @@ def _render_dashboard_metrics(plan_manager: PlanilhaManager) -> None:
         )
 
 
-def _render_chat_interface(agent_runner: AgentRunner) -> None:
+def _render_chat_interface(chat_service: ChatService) -> None:  # Recebe o ChatService
     """Renderiza a interface de chat (histórico e input)."""
 
-    # Inicializa o histórico do chat na sessão se não existir
-    if "chat_history" not in st.session_state:
-        st.session_state.chat_history = []
-
-    # Exibe o histórico de mensagens
-    # Usamos .markdown() para corrigir o bug de formatação
-    for message in st.session_state.chat_history:
+    # Exibe o histórico de mensagens (lido do service)
+    for message in chat_service.get_history():
         with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+            st.write(message["content"])  # Usando st.write como pedido
 
     # Input do chat (ancorado no fundo da tela)
     if prompt := st.chat_input(
         "Fale com o BudgetIA... (ex: Adicione R$50 em Alimentação)"
     ):
-        # Adiciona e exibe a mensagem do usuário
-        st.session_state.chat_history.append({"role": "user", "content": prompt})
+        # Exibe o prompt do usuário imediatamente (para UX)
         with st.chat_message("user"):
-            st.markdown(prompt)
+            st.write(prompt)
 
-        # Gera e exibe a resposta da IA
+        # Processa a mensagem
         with st.chat_message("assistant"):
             with st.spinner("Pensando..."):
-                response = agent_runner.interagir(prompt)
-                print(
-                    f"--- DEBUG (Hub): Resposta da IA (bruta via repr): {repr(response)} ---"
-                )
+                # O Service cuida de tudo:
+                # 1. Salva 'prompt' no histórico
+                # 2. Chama 'agent_runner.interagir()'
+                # 3. Salva 'response' no histórico
+                response = chat_service.handle_message(prompt)
 
-                # Usa .markdown() para formatar corretamente a saída
-                st.write(response)
+                # Não precisamos fazer mais nada aqui
 
-                st.session_state.chat_history.append(
-                    {"role": "assistant", "content": response}
-                )
+        # O Rerun vai recarregar a UI, e o loop lá em cima
+        # vai ler o histórico atualizado (incluindo a resposta)
         st.rerun()
 
 
-def render() -> None:
+def render(
+    plan_manager: PlanilhaManager, chat_service: ChatService
+) -> None:  # Assinatura mudou
     """Renderiza o Hub de IA principal, combinando Dashboard e Chat."""
-
-    # Carrega os objetos principais da sessão
-    if "plan_manager" not in st.session_state or "agent_runner" not in st.session_state:
-        st.error("Erro: Sessão não inicializada corretamente.")
-        st.warning("Por favor, recarregue a aplicação.")
-        st.stop()
-
-    plan_manager: PlanilhaManager = st.session_state.plan_manager
-    agent_runner: AgentRunner = st.session_state.agent_runner
 
     # 1. Renderiza o Dashboard no topo
     with st.expander("Ver Dashboard e Métricas 📊", expanded=True):
         _render_dashboard_metrics(plan_manager)
 
     # 2. Renderiza a Interface de Chat abaixo
-    _render_chat_interface(agent_runner)
+    _render_chat_interface(chat_service)

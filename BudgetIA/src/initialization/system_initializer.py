@@ -1,87 +1,88 @@
-# src/initialization/system_initializer.py
+# Em: src/initialization/system_initializer.py
+import json
 import os
 import sys
+from typing import Any
 
-import config
-
-# Adiciona o diretório 'src' ao sys.path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-try:
-    # Importa APENAS o load_persistent_config
-    from web_app.utils import load_persistent_config
-except ImportError as e:
-    print(f"ERRO CRÍTICO: Não foi possível importar 'web_app.utils': {e}.")
-
-    def load_persistent_config() -> dict:
-        return {}
-
-    # PLANILHA_KEY não é necessário aqui, quebrando o ciclo.
-
-from agent_implementations.langchain_agent import IADeFinancas
 from core.agent_runner_interface import AgentRunner
 from core.llm_manager import LLMOrchestrator
 from core.llm_providers.gemini_provider import GeminiProvider
-from finance.excel_handler import ExcelHandler
-from finance.planilha_manager import PlanilhaManager
+from finance.storage.base_storage_handler import BaseStorageHandler
+from finance.storage.google_sheets_storage_handler import GoogleSheetsStorageHandler
+
+# Adiciona o 'src' ao path (seu arquivo já deve ter isso)
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+import config  # noqa: E402
+from agent_implementations.langchain_agent import IADeFinancas  # noqa: E402
+
+# --- FIM DA MUDANÇA ---
+from finance.planilha_manager import PlanilhaManager  # noqa: E402
+
+# --- 1. IMPORTAR AMBOS OS HANDLERS E A INTERFACE ---
+from finance.storage.excel_storage_handler import ExcelHandler  # noqa: E402
+from web_app.utils import (  # noqa: E402
+    load_persistent_config,
+)
+
+
+def _carregar_dados_exemplo(file_path: str) -> list[dict[str, Any]]:
+    """Carrega dados de exemplo de um JSON."""
+    try:
+        with open(file_path, encoding="utf-8") as f:
+            data: dict[str, Any] = json.load(f)
+            transacoes: list[dict[str, Any]] = data.get("transacoes", [])
+            return transacoes
+    except (FileNotFoundError, json.JSONDecodeError):
+        print(f"ERRO: Arquivo de dados de exemplo não encontrado...: {file_path}")
+        return []
 
 
 def initialize_financial_system(
     planilha_path: str,
+    llm_orchestrator: LLMOrchestrator,
 ) -> tuple[PlanilhaManager | None, AgentRunner | None, LLMOrchestrator | None, bool]:
     """
     Inicializa e conecta todos os componentes do sistema financeiro.
-    Retorna a fachada PlanilhaManager (para a UI) e o AgentRunner (com DIP).
     """
-
-    # --- LOG ADICIONADO ---
-    print(
-        f"--- DEBUG (system_initializer): 'initialize_financial_system' recebendo planilha_path: '{planilha_path}' ---"
-    )
-    # --- FIM DO LOG ---
-
     print(f"\n--- DEBUG INITIALIZER: Iniciando para '{planilha_path}' ---")
+
     plan_manager: PlanilhaManager | None = None
     agent_runner: AgentRunner | None = None
-    llm_orchestrator: LLMOrchestrator | None = None
     dados_de_exemplo_foram_adicionados = False
 
     try:
         config_persistente = load_persistent_config()
         mapeamento = config_persistente.get("mapeamento")
 
-        if mapeamento:
-            print("--- DEBUG INITIALIZER: Mapeamento de usuário encontrado! ---")
-        else:
-            print(
-                "--- DEBUG INITIALIZER: Nenhum mapeamento encontrado, usando layout padrão. ---"
+        # --- 2. LÓGICA DE ESCOLHA DO HANDLER ---
+        storage_handler: BaseStorageHandler
+
+        # Verifica se o 'planilha_path' é uma URL do Google Sheets
+        if "docs.google.com/spreadsheets" in planilha_path:
+            print("--- DEBUG INITIALIZER: Detectado Google Sheets. ---")
+            storage_handler = GoogleSheetsStorageHandler(
+                spreadsheet_url_or_key=planilha_path
             )
+        else:
+            print("--- DEBUG INITIALIZER: Detectado arquivo Excel local. ---")
+            storage_handler = ExcelHandler(file_path=planilha_path)
+        # --- FIM DA LÓGICA DE ESCOLHA ---
 
-        # --- LOG ADICIONADO ---
-        print(
-            f"--- DEBUG (system_initializer): Criando 'ExcelHandler' com o file_path: '{planilha_path}' ---"
-        )
-        # --- FIM DO LOG ---
-
-        excel_handler = ExcelHandler(file_path=planilha_path)
-
-        # --- 1. Inicialização do Gerenciador (Fachada) ---
-        print("--- DEBUG INITIALIZER: Criando PlanilhaManager (Fachada)... ---")
+        # --- 3. INJETAR O HANDLER ABSTRATO ---
+        # (Nenhuma mudança daqui para baixo, já está correto)
         plan_manager = PlanilhaManager(
-            excel_handler=excel_handler,
-            mapeamento=mapeamento,
+            storage_handler=storage_handler, mapeamento=mapeamento
         )
         print(
             f"--- DEBUG INITIALIZER: PlanilhaManager criado: {type(plan_manager)} ---"
         )
 
         is_new_file = plan_manager.is_new_file
-
-        # A lógica de popular dados já está no __init__ do PlanilhaManager
+        dados_de_exemplo_foram_adicionados = False
         if is_new_file and mapeamento is None:
-            # Apenas verificamos se os dados foram realmente adicionados
-            # Esta linha agora funciona, pois o plan_manager tem o transaction_repo
-            if not plan_manager.transaction_repo.get_all_transactions().empty:
+            df_transacoes = plan_manager.visualizar_dados(config.NomesAbas.TRANSACOES)
+            if not df_transacoes.empty:
                 dados_de_exemplo_foram_adicionados = True
                 print("--- DEBUG INITIALIZER: Dados de exemplo foram adicionados. ---")
 
@@ -96,8 +97,6 @@ def initialize_financial_system(
             f"--- DEBUG INITIALIZER: Contexto do Perfil injetado no Agente: {contexto_perfil[:50]}... ---"
         )
 
-        # --- PONTO-CHAVE (DIP) ---
-        # O Agente (IADeFinancas) recebe os repositórios, NÃO a fachada.
         agent_runner = IADeFinancas(
             llm_orchestrator=llm_orchestrator,
             contexto_perfil=contexto_perfil,
@@ -108,17 +107,14 @@ def initialize_financial_system(
             profile_repo=plan_manager.profile_repo,
             insight_repo=plan_manager.insight_repo,
         )
-        # --- FIM DO PONTO-CHAVE ---
 
         print("--- DEBUG INITIALIZER: Inicialização BEM SUCEDIDA. ---")
-
         return (
-            plan_manager,  # Retorna a fachada para a UI (Streamlit)
-            agent_runner,  # Retorna o agente para a UI (Streamlit)
+            plan_manager,
+            agent_runner,
             llm_orchestrator,
             dados_de_exemplo_foram_adicionados,
         )
-
     except Exception as e:
         print(f"--- DEBUG INITIALIZER ERROR: Erro durante a inicialização: {e} ---")
         import traceback

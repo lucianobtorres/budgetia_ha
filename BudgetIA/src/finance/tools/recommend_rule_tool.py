@@ -4,6 +4,7 @@ from collections.abc import Callable  # Importar Callable
 import pandas as pd
 from pydantic import BaseModel
 
+from config import NomesAbas
 from core.base_tool import BaseTool
 from finance.schemas import RecomendarRegraIdealInput
 
@@ -17,7 +18,7 @@ class RecomendarRegraIdealTool(BaseTool):  # type: ignore[misc]
     def __init__(self, view_data_func: Callable[..., pd.DataFrame]) -> None:
         super().__init__()
         self.visualizar_dados = view_data_func
-        self.aba_perfil = "Perfil Financeiro"
+        self.aba_perfil = NomesAbas.PERFIL_FINANCEIRO
 
     # --- FIM DA MUDANÇA ---
 

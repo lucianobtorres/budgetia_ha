@@ -5,124 +5,86 @@ import pandas as pd
 
 import config
 
-# Import relativo para "subir" um nível
-from ..excel_handler import ExcelHandler
-
-# --- IMPORTAÇÕES ADICIONADAS ---
+# --- 1. REMOVER O IMPORT CONCRETO ---
+# from finance.excel_handler import ExcelHandler
+# --- 2. ADICIONAR O IMPORT DA INTERFACE ---
+from ..storage.base_storage_handler import BaseStorageHandler
 from ..strategies.base_strategy import BaseMappingStrategy
 from ..strategies.custom_json_strategy import CustomJsonStrategy
 from ..strategies.default_strategy import DefaultStrategy
 
-# --- FIM DAS IMPORTAÇÕES ADICIONADAS ---
-
 
 class FinancialDataContext:
     """
-    Unidade de Trabalho (Unit of Work).
-    Responsabilidade Única: Gerenciar o estado dos DataFrames em memória (self.dfs)
-    e coordenar a persistência (leitura/escrita) através do ExcelHandler.
+    Mantém o estado dos dados em memória e coordena com o
+    Handler de armazenamento (Excel, GSheets, etc.) e a Estratégia
+    de Mapeamento (Default, Custom).
     """
 
     def __init__(
         self,
-        excel_handler: ExcelHandler,
+        # --- 3. MUDAR O TIPO DA DEPENDÊNCIA ---
+        storage_handler: BaseStorageHandler,
+        # (O nome do argumento muda de 'excel_handler' para 'storage_handler')
         mapeamento: dict[str, Any] | None = None,
     ) -> None:
         """
-        Inicializa o contexto, carregando os dados da planilha para a memória.
+        Inicializa o contexto.
+
+        Args:
+            storage_handler (BaseStorageHandler): O handler de armazenamento
+                (Ex: ExcelHandler).
+            mapeamento (dict | None): O mapa de usuário (se existir).
         """
-        self.excel_handler = excel_handler
-        self.strategy: BaseMappingStrategy
+        # --- 4. RENOMEAR O ATRIBUTO INTERNO ---
+        self.storage = storage_handler
+        self.layout_config = config.LAYOUT_PLANILHA
 
-        # --- LOG ADICIONADO ---
-        print(
-            f"--- DEBUG (DataContext): Chamando 'excel_handler.load_sheets' para '{excel_handler.file_path}' ---"
-        )
-        # --- FIM DO LOG ---
-
-        # --- LÓGICA DA ESTRATÉGIA (O FIX) ---
-        # Decidimos qual estratégia usar com base no mapeamento
         if mapeamento:
-            print(
-                "--- DEBUG (DataContext): Mapeamento encontrado. Usando CustomJSONStrategy. ---"
+            print("--- [LOG DataContext] Mapeamento customizado encontrado. ---")
+            self.strategy: BaseMappingStrategy = CustomJsonStrategy(
+                config.LAYOUT_PLANILHA, mapeamento
             )
-            # Se temos um mapa, usamos a estratégia de JSON customizada
-            self.strategy = CustomJsonStrategy(config.LAYOUT_PLANILHA, mapeamento)
         else:
-            print(
-                "--- DEBUG (DataContext): Mapeamento NULO. Usando DefaultStrategy. ---"
+            print("--- [LOG DataContext] Usando estratégia padrão. ---")
+            self.strategy: BaseMappingStrategy = DefaultStrategy(
+                config.LAYOUT_PLANILHA, mapeamento
             )
-            # Se não, usamos a estratégia padrão
-            self.strategy = DefaultStrategy(config.LAYOUT_PLANILHA, mapeamento)
-        # --- FIM DO FIX ---
 
-        self.dfs, self.is_new_file = self.excel_handler.load_sheets(
-            config.LAYOUT_PLANILHA, self.strategy
+        self.data: dict[str, pd.DataFrame] = {}
+        self.is_new_file = self._load_data()
+
+    def _load_data(self) -> bool:
+        """
+        Usa o handler e a estratégia para carregar os dados.
+        """
+        # --- 5. USAR O NOVO ATRIBUTO 'self.storage' ---
+        dataframes, is_new_file = self.storage.load_sheets(
+            self.layout_config, self.strategy
         )
+        self.data = dataframes
+        return bool(is_new_file)
 
-        # --- LOG ADICIONADO ---
-        print(
-            f"--- DEBUG (DataContext): 'load_sheets' retornou. 'self.is_new_file' agora é: {self.is_new_file} ---"
-        )
-        # --- FIM DO LOG ---
-
-        print("LOG: FinancialDataContext inicializado.")
-
-    def get_dataframe(self, aba_nome: str) -> pd.DataFrame:
+    def get_dataframe(self, sheet_name: str) -> pd.DataFrame:
         """
-        Retorna uma CÓPIA do DataFrame solicitado para leitura/análise segura.
-        Cria um DataFrame vazio em memória se a aba for conhecida mas não existir.
+        Obtém um DataFrame do contexto pelo nome padrão (interno).
         """
-        if aba_nome not in self.dfs:
-            if aba_nome in config.LAYOUT_PLANILHA:
-                print(
-                    f"AVISO: Tentando acessar aba '{aba_nome}' que não foi carregada. Criando em memória."
-                )
-                self.dfs[aba_nome] = pd.DataFrame(
-                    columns=config.LAYOUT_PLANILHA[aba_nome]
-                )
-            else:
-                print(f"ERRO: Tentando acessar aba desconhecida '{aba_nome}'.")
-                return pd.DataFrame()
+        if sheet_name not in self.data:
+            raise ValueError(f"Aba '{sheet_name}' não encontrada no contexto.")
+        return self.data[sheet_name].copy()
 
-        # Retorna uma cópia para evitar mutações inesperadas do estado
-        return self.dfs.get(aba_nome, pd.DataFrame()).copy()
-
-    def update_dataframe(self, aba_nome: str, new_df: pd.DataFrame) -> None:
+    def update_dataframe(self, sheet_name: str, new_df: pd.DataFrame) -> None:
         """
-        Atualiza um DataFrame inteiro na memória (na Unidade de Trabalho).
-        As mudanças só serão persistidas quando .save() for chamado.
+        Atualiza um DataFrame no contexto pelo nome padrão (interno).
         """
-        if aba_nome in self.dfs:
-            # Garante que as colunas e ordem estejam corretas
-            if aba_nome in config.LAYOUT_PLANILHA:
-                colunas_layout = config.LAYOUT_PLANILHA[aba_nome]
-                # Adiciona colunas do layout que estão faltando no new_df
-                for col in colunas_layout:
-                    if col not in new_df.columns:
-                        new_df[col] = pd.NA
-                # Reordena e filtra para bater exatamente com o layout
-                try:
-                    new_df = new_df[colunas_layout]
-                except KeyError as e:
-                    print(
-                        f"ERRO: Colunas do DataFrame '{aba_nome}' não batem com o LAYOUT. {e}"
-                    )
-                    # Não atualiza se as colunas estiverem erradas
-                    return
-
-            self.dfs[aba_nome] = new_df
-        else:
-            print(
-                f"ERRO: Tentativa de atualizar aba '{aba_nome}' que não existe no self.dfs."
-            )
+        if sheet_name not in self.data:
+            raise ValueError(f"Aba '{sheet_name}' não pode ser atualizada.")
+        self.data[sheet_name] = new_df
 
     def save(self, add_intelligence: bool = False) -> None:
         """
-        Persiste TODOS os DataFrames da memória de volta ao arquivo Excel.
+        Salva TODOS os DataFrames em memória de volta no
+        arquivo de origem (Excel), usando o handler.
         """
-        print(
-            f"LOG: Solicitando salvamento ao ExcelHandler para '{self.excel_handler.file_path}'"
-        )
-        # Passa o 'self.dfs' para o handler salvar
-        self.excel_handler.save_sheets(self.dfs, self.strategy, add_intelligence)
+        # --- 6. USAR O NOVO ATRIBUTO 'self.storage' ---
+        self.storage.save_sheets(self.data, self.strategy, add_intelligence)

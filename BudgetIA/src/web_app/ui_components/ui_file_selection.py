@@ -48,7 +48,7 @@ def render(
                 st.error(message)
             st.rerun()  # Vai para GENERATING_STRATEGY
 
-        st.markdown("--- OU ---")
+        st.write("--- OU ---")
         path_input = st.text_input("Insira o caminho completo:", key="path_input")
         if st.button("Usar por Caminho", key="usar_path"):
             success, message = manager.set_planilha_from_path(path_input)

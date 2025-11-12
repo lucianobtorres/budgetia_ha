@@ -5,6 +5,7 @@ import pandas as pd
 from pydantic import BaseModel, Field
 from tabulate import tabulate
 
+from config import ColunasTransacoes, NomesAbas
 from core.base_tool import BaseTool
 
 
@@ -32,20 +33,22 @@ class VisualizarUltimasTransacoesTool(BaseTool):  # type: ignore[misc]
     def run(self, n: int = 5, tipo: str | None = None) -> str:
         try:
             # --- DIP: Chama a função injetada ---
-            df = self.visualizar_dados("Visão Geral e Transações").copy()
+            df = self.visualizar_dados(NomesAbas.TRANSACOES).copy()
             if df.empty:
                 return "Não há transações registradas na planilha."
 
             # Tenta converter 'Data' para datetime
-            if "Data" in df.columns:
-                df["Data"] = pd.to_datetime(df["Data"], errors="coerce")
-                df.dropna(subset=["Data"], inplace=True)
+            if ColunasTransacoes.DATA in df.columns:
+                df[ColunasTransacoes.DATA] = pd.to_datetime(
+                    df[ColunasTransacoes.DATA], errors="coerce"
+                )
+                df.dropna(subset=[ColunasTransacoes.DATA], inplace=True)
             else:
                 return "Erro: A aba de transações não possui uma coluna 'Data'."
 
             if tipo:
                 df_filtrado = df[
-                    df["Tipo (Receita/Despesa)"].astype(str).str.lower() == tipo.lower()
+                    df[ColunasTransacoes.TIPO].astype(str).str.lower() == tipo.lower()
                 ]
             else:
                 df_filtrado = df
@@ -55,18 +58,18 @@ class VisualizarUltimasTransacoesTool(BaseTool):  # type: ignore[misc]
                 return f"Não foram encontradas transações{tipo_str}."
 
             ultimas_transacoes = df_filtrado.sort_values(
-                by="Data", ascending=False
+                by=ColunasTransacoes.DATA, ascending=False
             ).head(n)
 
             if ultimas_transacoes.empty:
                 return "Não há transações para mostrar com os filtros aplicados."
 
             headers = [
-                "Data",
-                "Tipo (Receita/Despesa)",
-                "Categoria",
-                "Descricao",
-                "Valor",
+                ColunasTransacoes.DATA,
+                ColunasTransacoes.TIPO,
+                ColunasTransacoes.CATEGORIA,
+                ColunasTransacoes.DESCRICAO,
+                ColunasTransacoes.VALOR,
             ]
             # Filtra colunas que realmente existem no DF
             colunas_para_mostrar = [

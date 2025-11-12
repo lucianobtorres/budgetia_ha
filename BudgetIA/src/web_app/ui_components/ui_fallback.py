@@ -12,7 +12,7 @@ def render(manager: OnboardingManager) -> None:
     )
     st.subheader("Você tem estas opções para continuar:")
 
-    st.markdown("**Opção 1 (Recomendado): Importação Guiada (Plano B)**")
+    st.write("**Opção 1 (Recomendado): Importação Guiada (Plano B)**")
     st.write(
         "Nós criaremos uma `planilha_mestra.xlsx` nova para você e faremos uma importação guiada dos seus dados antigos."
     )
@@ -22,9 +22,9 @@ def render(manager: OnboardingManager) -> None:
         # manager.set_state("GUIDED_IMPORT_MAPPING")
         # st.rerun()
 
-    st.markdown("**Opção 2 (Avançado): Estratégia Manual (Plano C)**")
+    st.write("**Opção 2 (Avançado): Estratégia Manual (Plano C)**")
     with st.expander("Instruções para desenvolvedores"):
-        st.markdown(
+        st.write(
             "Você pode escrever seu próprio script de estratégia em Python."
             "1. Abra a pasta `src/finance/strategies/`."
             "2. Copie `default_strategy.py` para `minha_estrategia.py`."

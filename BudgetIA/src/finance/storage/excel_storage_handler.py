@@ -1,14 +1,23 @@
-# Em: src/finance/excel_handler.py
+# Em: src/finance/storage/excel_storage_handler.py
 import os
 
 import pandas as pd
 
 import config  # Importar config para NomesAbas
+from config import (
+    ColunasDividas,
+    ColunasMetas,
+    ColunasOrcamentos,
+    ColunasTransacoes,
+)
 
-from .strategies.base_strategy import BaseMappingStrategy
+# --- 1. IMPORTAR A INTERFACE CORRIGIDA ---
+from finance.storage.base_storage_handler import BaseStorageHandler
+from finance.strategies.base_strategy import BaseMappingStrategy
 
 
-class ExcelHandler:
+# --- 2. FAZER A CLASSE HERDAR DA INTERFACE ---
+class ExcelHandler(BaseStorageHandler):
     """Classe especialista em ler e escrever DataFrames para um arquivo Excel."""
 
     def __init__(self, file_path: str) -> None:
@@ -27,6 +36,7 @@ class ExcelHandler:
         )
         # --- FIM DO LOG ---
 
+        # --- 3. DEFINIÇÃO DO ATRIBUTO (PERFEITO, NÃO PRECISA MUDAR) ---
         # A flag is_new_file será determinada pelo load_sheets
         self.is_new_file = not os.path.exists(self.file_path)
 
@@ -200,17 +210,17 @@ class ExcelHandler:
         for col_num, value in enumerate(df.columns.values):
             worksheet.write(0, col_num, value, header_format)
             if value in [
-                "Valor",
-                "Valor Limite Mensal",
-                "Valor Gasto Atual",
-                "Valor Original",
-                "Saldo Devedor Atual",
-                "Valor Parcela",
-                "Valor Alvo",
-                "Valor Atual",
+                ColunasTransacoes.VALOR,
+                ColunasOrcamentos.LIMITE,
+                ColunasOrcamentos.GASTO,
+                ColunasDividas.VALOR_ORIGINAL,
+                ColunasDividas.SALDO_DEVEDOR,
+                ColunasDividas.VALOR_PARCELA,
+                ColunasMetas.VALOR_ALVO,
+                ColunasMetas.VALOR_ATUAL,
             ]:
                 worksheet.set_column(col_num, col_num, 15, currency_format)
-            elif value == "Porcentagem Gasta (%)":
+            elif value == ColunasOrcamentos.PERCENTUAL:
                 worksheet.set_column(col_num, col_num, 15, percentage_format)
             else:
                 worksheet.set_column(col_num, col_num, 15)
