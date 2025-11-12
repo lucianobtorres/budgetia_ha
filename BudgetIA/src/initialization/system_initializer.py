@@ -28,6 +28,7 @@ from finance.planilha_manager import PlanilhaManager
 
 def initialize_financial_system(
     planilha_path: str,
+    llm_orchestrator: LLMOrchestrator,
 ) -> tuple[PlanilhaManager | None, AgentRunner | None, LLMOrchestrator | None, bool]:
     """
     Inicializa e conecta todos os componentes do sistema financeiro.

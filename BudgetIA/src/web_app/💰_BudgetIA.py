@@ -5,7 +5,10 @@ import streamlit as st
 
 # Imports do seu projeto
 import config
-from core.agent_runner_interface import AgentRunner
+from app.chat_history_manager import StreamlitHistoryManager
+
+# --- NOVOS IMPORTS DA CAMADA DE SERVIÇO ---
+from app.chat_service import ChatService
 from core.llm_manager import LLMOrchestrator
 from core.llm_providers.gemini_provider import GeminiProvider
 from finance.planilha_manager import PlanilhaManager
@@ -21,6 +24,8 @@ from web_app.ui_components import (
     ui_strategy_generation,
 )
 
+# --- FIM NOVOS IMPORTS ---
+
 
 # --- Função de Carregamento do Sistema (Cache) ---
 @st.cache_resource
@@ -33,12 +38,20 @@ def load_financial_system(
     """
     print(f"\n--- DEBUG: Entrando em load_financial_system para '{planilha_path}' ---")
     try:
-        plan_manager, agent_runner, llm_orchestrator, dados_adicionados = (
-            initialize_financial_system(planilha_path)
+        # --- MODIFICAÇÃO: Passar o LLM Orchestrator para o inicializador ---
+        plan_manager, agent_runner, llm_orchestrator_loaded, dados_adicionados = (
+            initialize_financial_system(
+                planilha_path, _llm_orchestrator
+            )  # Passa o 'llm_orchestrator'
         )
-        if plan_manager and agent_runner and llm_orchestrator:
+        if plan_manager and agent_runner and llm_orchestrator_loaded:
             print("--- DEBUG: load_financial_system retornando objetos válidos. ---")
-            return plan_manager, agent_runner, llm_orchestrator, dados_adicionados
+            return (
+                plan_manager,
+                agent_runner,
+                llm_orchestrator_loaded,
+                dados_adicionados,
+            )
         else:
             st.error("Falha interna ao inicializar componentes.")
             st.stop()
@@ -108,15 +121,34 @@ elif current_state == "SETUP_COMPLETE":
         st.stop()
 
     # --- Carregamento do Sistema ---
-    if "plan_manager" not in st.session_state:
+    # --- MODIFICAÇÃO: Criar ChatService ---
+    if "chat_service" not in st.session_state:
+        print("--- DEBUG APP: 'chat_service' não está na sessão. Inicializando... ---")
         plan_manager, agent_runner, llm_orchestrator_loaded, dados_adicionados = (
             load_financial_system(current_planilha_path, llm_orchestrator)
         )
         if plan_manager and agent_runner and llm_orchestrator_loaded:
+            # Colocamos os objetos base na sessão para as outras páginas
             st.session_state.plan_manager = plan_manager
             st.session_state.agent_runner = agent_runner
             st.session_state.llm_orchestrator = llm_orchestrator_loaded
             st.session_state.current_planilha_path = current_planilha_path
+
+            # 1. Criar os History Managers Abstraídos
+            onboarding_history = StreamlitHistoryManager("onboarding_messages")
+            main_chat_history = StreamlitHistoryManager("chat_history")
+
+            # 2. Criar os Chat Services
+            # O 'profile_chat_service' usará o histórico de onboarding
+            st.session_state.profile_chat_service = ChatService(
+                agent_runner=agent_runner, history_manager=onboarding_history
+            )
+            # O 'main_chat_service' usará o histórico principal
+            st.session_state.main_chat_service = ChatService(
+                agent_runner=agent_runner, history_manager=main_chat_history
+            )
+            print("--- DEBUG APP: ChatServices criados e salvos na sessão. ---")
+
             if (
                 dados_adicionados
                 and "dados_exemplo_msg_mostrada" not in st.session_state
@@ -131,15 +163,21 @@ elif current_state == "SETUP_COMPLETE":
                 st.rerun()
             st.stop()
 
+    # Recupera os objetos da sessão
     plan_manager: PlanilhaManager = st.session_state.plan_manager
-    agent_runner: AgentRunner = st.session_state.agent_runner
+    # Recupera os NOVOS services
+    profile_chat_service: ChatService = st.session_state.profile_chat_service
+    main_chat_service: ChatService = st.session_state.main_chat_service
+    # --- FIM DA MODIFICAÇÃO ---
 
     # --- Roteamento FASE 2: Setup do Perfil ---
     if not manager.verificar_perfil_preenchido(plan_manager):
         print("--- DEBUG APP: FASE 2 (Profile Setup) ---")
-        ui_profile_setup.render(manager, agent_runner, plan_manager)
+        # --- MODIFICAÇÃO: Passa o profile_chat_service para a UI ---
+        ui_profile_setup.render(manager, profile_chat_service, plan_manager)
 
     # --- Roteamento FASE 3: Home Hub (Onboarding Completo) ---
     else:
         print("--- DEBUG APP: Onboarding completo. Renderizando Home Hub. ---")
-        ui_home_hub.render()
+        # --- MODIFICAÇÃO: Passa o main_chat_service para a UI ---
+        ui_home_hub.render(plan_manager, main_chat_service)
