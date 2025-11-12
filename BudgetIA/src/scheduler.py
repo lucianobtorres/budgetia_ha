@@ -5,9 +5,26 @@ import time
 
 import schedule
 
-# Adiciona 'src' ao sys.path para que possamos importar 'app' e 'config'
-# (Esta é a mágica que faz o backend ser reutilizável)
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+# 1. Encontra o diretório 'src' onde este arquivo está.
+SRC_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# 2. Encontra a raiz do projeto (um nível acima do 'src').
+PROJECT_ROOT = os.path.dirname(SRC_DIR)
+
+# 3. Adiciona a RAIZ do projeto ao sys.path.
+# Isso permite imports como 'from src.core import ...'
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+# 4. Adiciona o PRÓPRIO 'src' ao sys.path.
+# Isso permite imports como 'from core import ...' (embora o 'from src.core' seja mais explícito)
+if SRC_DIR not in sys.path:
+    sys.path.insert(0, SRC_DIR)
+
+print(f"--- DEBUG: SYS.PATH ATUALIZADO (para {__file__}) ---")
+print(f"ROOT: {PROJECT_ROOT}")
+print(f"SRC: {SRC_DIR}")
+print("--- INICIANDO IMPORTS DA APLICAÇÃO ---")
 
 from app import proactive_jobs  # Importa nossa lógica de job
 

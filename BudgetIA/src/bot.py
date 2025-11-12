@@ -4,14 +4,27 @@ import os
 import sys
 from pathlib import Path
 
-# --- 1. Adicionar 'src' ao sys.path (como fizemos no start.py) ---
-BASE_DIR = Path(__file__).resolve().parent.parent
-SRC_DIR = BASE_DIR / "src"
-if str(SRC_DIR) not in sys.path:
-    sys.path.insert(0, str(SRC_DIR))
+# 1. Encontra o diretório 'src' onde este arquivo está.
+SRC_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# --- 2. Imports do nosso Backend ---
-# --- 3. Imports do Telegram ---
+# 2. Encontra a raiz do projeto (um nível acima do 'src').
+PROJECT_ROOT = os.path.dirname(SRC_DIR)
+
+# 3. Adiciona a RAIZ do projeto ao sys.path.
+# Isso permite imports como 'from src.core import ...'
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+# 4. Adiciona o PRÓPRIO 'src' ao sys.path.
+# Isso permite imports como 'from core import ...' (embora o 'from src.core' seja mais explícito)
+if SRC_DIR not in sys.path:
+    sys.path.insert(0, SRC_DIR)
+
+print(f"--- DEBUG: SYS.PATH ATUALIZADO (para {__file__}) ---")
+print(f"ROOT: {PROJECT_ROOT}")
+print(f"SRC: {SRC_DIR}")
+print("--- INICIANDO IMPORTS DA APLICAÇÃO ---")
+
 from telegram import Update
 from telegram.ext import (
     Application,
@@ -43,6 +56,7 @@ print("--- INICIALIZANDO BOT DO TELEGRAM ---")
 # Carrega o token (que você colocou no .env)
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 if not TELEGRAM_TOKEN:
+    TELEGRAM_TOKEN = ""
     raise ValueError("TELEGRAM_TOKEN não encontrado no arquivo .env!")
 
 # Carrega o LLM Orchestrator (global)
