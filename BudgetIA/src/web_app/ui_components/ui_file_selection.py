@@ -23,7 +23,7 @@ def render(
         default_path = str(Path(DATA_DIR) / "planilha_mestra.xlsx")
         novo_path_input = st.text_input("Nome e local:", default_path, key="novo_path")
 
-        if st.button("Criar e Usar", key="criar_nova"):
+        if st.button("Criar e Usar localmente", key="criar_nova"):
             success, message = manager.create_new_planilha(
                 novo_path_input, validation_callback
             )
@@ -49,14 +49,21 @@ def render(
             st.rerun()  # Vai para GENERATING_STRATEGY
 
         st.write("--- OU ---")
-        path_input = st.text_input("Insira o caminho completo:", key="path_input")
-        if st.button("Usar por Caminho", key="usar_path"):
-            success, message = manager.set_planilha_from_path(path_input)
-            if success:
-                st.success(message)
-                time.sleep(1)
+        path_input = st.text_input(
+            "Insira o caminho completo:",
+            key="path_input",
+            placeholder="C:\\...\\financas.xlsx OU https://docs.google.com/...",
+        )
+        if st.button("Usar por Caminho ou link", key="usar_path"):
+            if not path_input:
+                st.warning("O campo não pode estar vazio.")
             else:
-                st.error(message)
-            st.rerun()  # Vai para GENERATING_STRATEGY
+                success, message = manager.set_planilha_from_path(path_input)
+                if success:
+                    st.success(message)
+                    time.sleep(1)
+                else:
+                    st.error(message)
+                st.rerun()  # Vai para GENERATING_STRATEGY
 
     st.stop()

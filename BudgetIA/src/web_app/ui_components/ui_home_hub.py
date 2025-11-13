@@ -10,6 +10,7 @@ from app.chat_service import ChatService
 # Remover 'AgentRunner'
 # --- FIM NOVOS IMPORTS ---
 from finance.planilha_manager import PlanilhaManager
+from web_app.utils import create_excel_export_bytes
 
 
 def _render_dashboard_metrics(plan_manager: PlanilhaManager) -> None:
@@ -103,13 +104,84 @@ def _render_chat_interface(chat_service: ChatService) -> None:  # Recebe o ChatS
                 # 1. Salva 'prompt' no histórico
                 # 2. Chama 'agent_runner.interagir()'
                 # 3. Salva 'response' no histórico
-                response = chat_service.handle_message(prompt)
+                _ = chat_service.handle_message(prompt)
 
                 # Não precisamos fazer mais nada aqui
 
         # O Rerun vai recarregar a UI, e o loop lá em cima
         # vai ler o histórico atualizado (incluindo a resposta)
         st.rerun()
+
+
+def render_sidebar_export() -> None:
+    """Renderiza a funcionalidade 'Salvar Como' na barra lateral."""
+
+    if "plan_manager" not in st.session_state:
+        st.error("Erro: plan_manager não encontrado.")
+        return
+
+    plan_manager: PlanilhaManager = st.session_state.plan_manager
+
+    with st.sidebar:
+        st.subheader("Salvar Como")
+        st.caption("Salve uma cópia local (em .xlsx) de todos os seus dados atuais.")
+
+        # O nome do arquivo agora é usado pelos dois botões
+        file_name = st.text_input(
+            "Nome do arquivo:",
+            value="budgetia_export.xlsx",
+            help="O nome que o arquivo terá no seu computador.",
+        )
+
+        # --- LÓGICA DE PREPARAÇÃO E DOWNLOAD ---
+
+        # 1. Botão de Preparar:
+        # Este botão executa a função pesada e salva os bytes na sessão.
+        if st.button(
+            "Exportar",
+            use_container_width=True,
+            key="prep_download",
+        ):
+            if not file_name:
+                st.warning("Por favor, insira um nome de arquivo.")
+            else:
+                with st.spinner("Gerando seu arquivo Excel..."):
+                    excel_bytes = create_excel_export_bytes(plan_manager)
+                    if excel_bytes:
+                        # Armazena os bytes e o nome do arquivo na sessão
+                        st.session_state.download_data = {
+                            "bytes": excel_bytes,
+                            "file_name": file_name,
+                        }
+                        # O FEEDBACK QUE VOCÊ PEDIU!
+                        st.toast("Arquivo pronto para baixar!", icon="✅")
+                    else:
+                        st.error("Falha ao gerar o arquivo.")
+
+        # 2. Botão de Download:
+        # Este botão SÓ aparece se os dados estiverem prontos na sessão.
+        if "download_data" in st.session_state:
+            download_info = st.session_state.download_data
+
+            # Verifica se o usuário mudou o nome do arquivo APÓS preparar
+            if file_name != download_info["file_name"]:
+                st.warning(
+                    "O nome do arquivo mudou. Clique em 'Preparar' novamente para atualizar."
+                )
+                # Limpa os dados antigos para evitar confusão
+                del st.session_state.download_data
+            else:
+                # O botão de download real
+                st.download_button(
+                    label="Baixar",
+                    data=download_info["bytes"],
+                    file_name=download_info["file_name"],
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                    type="primary",
+                    # Limpa o estado da sessão após o clique
+                    on_click=lambda: st.session_state.pop("download_data"),
+                )
 
 
 def render(
@@ -123,3 +195,6 @@ def render(
 
     # 2. Renderiza a Interface de Chat abaixo
     _render_chat_interface(chat_service)
+
+    # 3. Renderiza a funcionalidade de exportação na sidebar
+    render_sidebar_export()

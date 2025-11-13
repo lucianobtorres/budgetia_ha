@@ -12,6 +12,7 @@ import config
 from core.agent_runner_interface import AgentRunner
 from core.llm_manager import LLMOrchestrator
 from finance.planilha_manager import PlanilhaManager
+from initialization.file_preparer import FileAnalysisPreparer
 
 # --- Importa o novo Gerador ---
 from initialization.strategy_generator import StrategyGenerator
@@ -23,8 +24,6 @@ from web_app.utils import (
     load_persistent_config,
     save_persistent_config,
 )
-
-# (Remove a constante CONFIG_FILE_PATH, pois utils já a conhece)
 
 
 class OnboardingManager:
@@ -144,17 +143,30 @@ class OnboardingManager:
         if not path_str:
             return False, "Erro: Caminho da planilha pendente não encontrado."
 
+        # 1. Delega a preparação do arquivo (download/conversão)
+        preparer = FileAnalysisPreparer(path_str)
+
         try:
+            # 2. Obtém o cminho local (temporário ou original)
+            path_para_analise = preparer.get_local_path()
+
+            # 3. Envia o caminho local para o Gerador
+            print(
+                f"--- DEBUG OB_MGR: Enviando '{path_para_analise}' para o StrategyGenerator... ---"
+            )
             generator = StrategyGenerator(self.llm_orchestrator, self.max_retries)
 
             # 1. GERAR E VALIDAR A ESTRATÉGIA
-            success, result_message = generator.generate_and_validate_strategy(path_str)
+            success, result_message = generator.generate_and_validate_strategy(
+                path_para_analise
+            )
 
             if success:
-                # --- ESTA É A CORREÇÃO CRÍTICA ---
                 mapa_config = json.loads(result_message)
 
                 self.config_data["mapeamento"] = mapa_config  # Salva o dict
+
+                # 4. Salva o caminho/link ORIGINAL
                 self._save_planilha_path(path_str)  # Salva o caminho E o mapa
 
                 self.set_state("SETUP_COMPLETE")
@@ -181,6 +193,10 @@ class OnboardingManager:
             self.set_state("STRATEGY_FAILED_FALLBACK")
             return False, f"Um erro inesperado ocorreu: {e}"
 
+        finally:
+            # 5. Manda o preparador limpar o arquivo temporário (se houver)
+            preparer.cleanup()
+
     # --- 4. CORRIGIR A LÓGICA DE 'set_planilha_from_path' ---
     # (Para aceitar URLs do Google Sheets)
     def set_planilha_from_path(self, path_str: str) -> tuple[bool, str]:
@@ -190,7 +206,7 @@ class OnboardingManager:
         """
 
         # Verifica se é uma URL válida do GSheets
-        if "docs.google.com/spreadsheets" in path_str:
+        if "docs.google.com/" in path_str:
             # É uma URL, então pulamos a verificação .is_file()
             pass
 
@@ -209,12 +225,11 @@ class OnboardingManager:
 
         # --- LÓGICA DE ESCOLHA DE ESTADO ---
         # Se for GSheets, não precisamos gerar estratégia (ainda)
-        if "docs.google.com/spreadsheets" in path_str:
+        if "docs.google.com/" in path_str:
             print(
-                "--- DEBUG OB_MGR: Detectado Google Sheets, pulando geração de estratégia. ---"
+                "--- DEBUG OB_MGR: Detectado Google Sheets, iniciando geração de estratégia. ---"
             )
-            self._save_planilha_path(path_str)  # Salva como caminho final
-            self.set_state("SETUP_COMPLETE")
+            self.set_state("GENERATING_STRATEGY")
             return True, "Usando Planilha Google..."
         else:
             # Apenas define o estado para geração de estratégia

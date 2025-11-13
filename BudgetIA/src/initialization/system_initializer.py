@@ -8,20 +8,19 @@ from core.agent_runner_interface import AgentRunner
 from core.llm_manager import LLMOrchestrator
 from core.llm_providers.gemini_provider import GeminiProvider
 from finance.storage.base_storage_handler import BaseStorageHandler
+from finance.storage.google_drive_handler import GoogleDriveFileHandler
 from finance.storage.google_sheets_storage_handler import GoogleSheetsStorageHandler
 
 # Adiciona o 'src' ao path (seu arquivo já deve ter isso)
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-import config  # noqa: E402
-from agent_implementations.langchain_agent import IADeFinancas  # noqa: E402
-
-# --- FIM DA MUDANÇA ---
-from finance.planilha_manager import PlanilhaManager  # noqa: E402
+import config
+from agent_implementations.langchain_agent import IADeFinancas
+from finance.planilha_manager import PlanilhaManager
 
 # --- 1. IMPORTAR AMBOS OS HANDLERS E A INTERFACE ---
-from finance.storage.excel_storage_handler import ExcelHandler  # noqa: E402
-from web_app.utils import (  # noqa: E402
+from finance.storage.excel_storage_handler import ExcelHandler
+from web_app.utils import (
     load_persistent_config,
 )
 
@@ -58,12 +57,28 @@ def initialize_financial_system(
         # --- 2. LÓGICA DE ESCOLHA DO HANDLER ---
         storage_handler: BaseStorageHandler
 
-        # Verifica se o 'planilha_path' é uma URL do Google Sheets
-        if "docs.google.com/spreadsheets" in planilha_path:
-            print("--- DEBUG INITIALIZER: Detectado Google Sheets. ---")
+        # 1. É um link de ARQUIVO do Drive (nativo .xlsx)?
+        if "drive.google.com/file" in planilha_path:
+            print(
+                "--- DEBUG INITIALIZER: Detectado arquivo Excel no Google Drive (Link Direto). ---"
+            )
+            storage_handler = GoogleDriveFileHandler(file_url=planilha_path)
+
+        # 2. É um link de Google Sheet que aponta para um Excel (modo de compatibilidade)?
+        elif "docs.google.com/" in planilha_path and "sd=true" in planilha_path:
+            print(
+                "--- DEBUG INITIALIZER: Detectado arquivo Excel no Google Drive (Link de Visualização). ---"
+            )
+            storage_handler = GoogleDriveFileHandler(file_url=planilha_path)
+
+        # 3. É um link de Google Sheet (nativo)?
+        elif "docs.google.com/" in planilha_path:
+            print("--- DEBUG INITIALIZER: Detectado Google Sheets (Nativo). ---")
             storage_handler = GoogleSheetsStorageHandler(
                 spreadsheet_url_or_key=planilha_path
             )
+
+        # 4. É um arquivo local?
         else:
             print("--- DEBUG INITIALIZER: Detectado arquivo Excel local. ---")
             storage_handler = ExcelHandler(file_path=planilha_path)
