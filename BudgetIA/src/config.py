@@ -10,9 +10,10 @@ load_dotenv()
 # Define o diretório raiz do projeto de forma robusta
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 DATA_DIR = os.path.join(PROJECT_ROOT, "data")
-GSPREAD_CREDENTIALS_PATH = os.path.join(
-    DATA_DIR, "gen-lang-client-0988185244-c9e312f68267.json"
-)
+
+DEFAULT_CRED_FILENAME = "gen-lang-client-0988185244-c9e312f68267.json"
+GSPREAD_CREDENTIALS_PATH = os.getenv("GSPREAD_CREDENTIALS_PATH")
+
 PROMPTS_DIR = os.path.join(PROJECT_ROOT, "src", "prompts")
 os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(PROMPTS_DIR, exist_ok=True)

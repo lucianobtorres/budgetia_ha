@@ -2,6 +2,7 @@
 import json
 import os
 from collections.abc import Callable
+from enum import Enum, auto
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +12,7 @@ import pandas as pd
 import config
 from core.agent_runner_interface import AgentRunner
 from core.llm_manager import LLMOrchestrator
+from core.user_config_service import UserConfigService
 from finance.planilha_manager import PlanilhaManager
 from initialization.file_preparer import FileAnalysisPreparer
 
@@ -19,11 +21,17 @@ from initialization.strategy_generator import StrategyGenerator
 
 # --- 1. IMPORTAR AS FUNÇÕES DE UTILS ---
 # (Vamos usar as funções centralizadas em vez de duplicá-las)
-from web_app.utils import (
-    get_saved_planilha_path,
-    load_persistent_config,
-    save_persistent_config,
-)
+
+
+class OnboardingState(Enum):
+    """Define os estados da máquina de onboarding."""
+
+    INIT = auto()
+    AWAITING_FILE_SELECTION = auto()
+    GENERATING_STRATEGY = auto()
+    STRATEGY_FAILED_FALLBACK = auto()
+    GUIDED_IMPORT_MAPPING = auto()
+    SETUP_COMPLETE = auto()
 
 
 class OnboardingManager:
@@ -32,84 +40,70 @@ class OnboardingManager:
     de forma independente da interface (Streamlit).
     """
 
-    def __init__(self, llm_orchestrator: LLMOrchestrator):
-        # --- 2. USAR AS FUNÇÕES IMPORTADAS ---
-        self.config_data: dict = load_persistent_config()
-        # Chama a função get_saved_planilha_path() CORRIGIDA do utils.py
-        self.planilha_path: str | None = get_saved_planilha_path()
-        # --- FIM DA MUDANÇA ---
-
+    def __init__(
+        self, llm_orchestrator: LLMOrchestrator, config_service: UserConfigService
+    ):
+        self.config_service = config_service
         self.llm_orchestrator = llm_orchestrator
         self.max_retries: int = 3
-        self.current_state: str = "INIT"
+
+        self.planilha_path: str | None = self.config_service.get_planilha_path()
+
+        # --- 2. TIPO DE ESTADO ATUALIZADO ---
+        self.current_state: OnboardingState = OnboardingState.INIT
+
         self._determine_initial_state()
         print("--- DEBUG OnboardingManager: Instanciado com LLMOrchestrator. ---")
 
     def _determine_initial_state(self) -> None:
-        # (Estado salvo de fallback)
-        if self.config_data.get("onboarding_state") == "STRATEGY_FAILED_FALLBACK":
-            self.current_state = "STRATEGY_FAILED_FALLBACK"
-        elif self.is_planilha_setup_complete():
-            self.current_state = "SETUP_COMPLETE"
+        # Lê a string salva no config
+        saved_state_str = self.config_service.get_onboarding_state()
+
+        if saved_state_str == OnboardingState.STRATEGY_FAILED_FALLBACK.name:
+            self.current_state = OnboardingState.STRATEGY_FAILED_FALLBACK
+        elif self.planilha_path is not None:
+            self.current_state = OnboardingState.SETUP_COMPLETE
         else:
-            self.current_state = "AWAITING_FILE_SELECTION"
-        print(f"--- DEBUG OB_MGR: Estado inicial: {self.current_state} ---")
+            self.current_state = OnboardingState.AWAITING_FILE_SELECTION
 
-    # --- 3. REMOVER AS FUNÇÕES DUPLICADAS ---
-    # (Removido _load_persistent_config)
-    # (Removido _save_persistent_config)
-    # (Removido get_saved_planilha_path)
-    # --- FIM DA REMOÇÃO ---
+        print(f"--- DEBUG OB_MGR: Estado inicial: {self.current_state.name} ---")
 
-    def _save_planilha_path_e_config(self) -> None:
-        """
-        Função helper interna para salvar o config_data
-        (que agora pode conter 'planilha_path', 'mapeamento', etc.)
-        """
-        save_persistent_config(self.config_data)
+    def get_current_state(self) -> OnboardingState:
+        """Retorna o objeto Enum do estado atual."""
+        return self.current_state
+
+    def set_state(self, new_state: OnboardingState) -> None:
+        """Define o estado usando o Enum e salva seu nome (string)."""
+        if not isinstance(new_state, OnboardingState):
+            raise TypeError("set_state deve ser chamado com um membro OnboardingState.")
+
+        print(
+            f"--- DEBUG OB_MGR: Mudando estado de {self.current_state.name} -> {new_state.name} ---"
+        )
+        self.current_state = new_state
+
+        # Salva o NOME (string) do enum no config
+        if new_state == OnboardingState.STRATEGY_FAILED_FALLBACK:
+            self.config_service.save_onboarding_state(new_state.name)
+
+    def get_saved_planilha_path(self) -> str | None:
+        # Delega ao serviço
+        return self.config_service.get_planilha_path()
 
     def _save_planilha_path(self, path_str: str) -> None:
-        """Salva o caminho da planilha na configuração persistente."""
-        print(f"--- DEBUG OB_MGR: Salvando planilha '{path_str}' no config... ---")
-        self.config_data[config.PLANILHA_KEY] = path_str
-        # Limpa o estado de fallback se salvarmos com sucesso
-        self.config_data.pop("onboarding_state", None)
-        self.config_data.pop("pending_planilha_path", None)
-
-        # Usa a função centralizada de save
-        save_persistent_config(self.config_data)
+        """Salva o caminho da planilha usando o serviço."""
+        print(
+            f"--- DEBUG OB_MGR: Salvando planilha '{path_str}' via config service... ---"
+        )
+        self.config_service.save_planilha_path(path_str)
         self.planilha_path = path_str
 
     def reset_config(self) -> None:
         """Limpa a configuração da planilha e o estado."""
         print("--- DEBUG OB_MGR: Resetando configuração. ---")
-        self.config_data = {}  # Limpa tudo
-        save_persistent_config(self.config_data)  # Salva o config vazio
+        self.config_service.clear_config()
         self.planilha_path = None
-        self.set_state("AWAITING_FILE_SELECTION")
-
-    # --- Métodos de Lógica de Estado ---
-
-    def get_current_state(self) -> str:
-        return self.current_state
-
-    def set_state(self, new_state: str) -> None:
-        print(
-            f"--- DEBUG OB_MGR: Mudando estado de {self.current_state} -> {new_state} ---"
-        )
-        self.current_state = new_state
-        # Salva o estado de fallback no config
-        if new_state == "STRATEGY_FAILED_FALLBACK":
-            self.config_data["onboarding_state"] = "STRATEGY_FAILED_FALLBACK"
-            save_persistent_config(self.config_data)  # Salva o estado de fallback
-
-    # --- Fase 1: Lógica de Setup da Planilha ---
-
-    def is_planilha_setup_complete(self) -> bool:
-        """Verifica se a Fase 1 (seleção da planilha) está completa."""
-        # Esta lógica agora funciona, pois self.planilha_path
-        # foi preenchido pela função get_saved_planilha_path() CORRIGIDA
-        return self.planilha_path is not None
+        self.set_state(OnboardingState.AWAITING_FILE_SELECTION)
 
     def create_new_planilha(
         self, path_str: str, validation_callback: Callable[[str], tuple[Any, ...]]
@@ -132,14 +126,14 @@ class OnboardingManager:
             self._save_planilha_path(
                 str(novo_path)
             )  # Salva só o caminho (usará EstrategiaPadrao)
-            self.set_state("SETUP_COMPLETE")
+            self.set_state(OnboardingState.SETUP_COMPLETE)
             return True, f"Planilha criada: '{novo_path}'!"
         except Exception as e:
             return False, f"Erro ao criar ou inicializar planilha: {e}"
 
     def _processar_planilha_customizada(self) -> tuple[bool, str]:
         """Tenta o Plano A (IA) e muda o estado para Fallback (B/C) se falhar."""
-        path_str = self.config_data.get("pending_planilha_path")
+        path_str = self.config_service.get_pending_planilha_path()
         if not path_str:
             return False, "Erro: Caminho da planilha pendente não encontrado."
 
@@ -163,13 +157,12 @@ class OnboardingManager:
 
             if success:
                 mapa_config = json.loads(result_message)
-
-                self.config_data["mapeamento"] = mapa_config  # Salva o dict
+                self.config_service.save_mapeamento(mapa_config)
 
                 # 4. Salva o caminho/link ORIGINAL
                 self._save_planilha_path(path_str)  # Salva o caminho E o mapa
 
-                self.set_state("SETUP_COMPLETE")
+                self.set_state(OnboardingState.SETUP_COMPLETE)
                 return (
                     True,
                     f"Sucesso! A IA criou a estratégia '{mapa_config.get('strategy_module')}'.",
@@ -180,7 +173,7 @@ class OnboardingManager:
                     f"--- DEBUG OB_MGR: Geração de estratégia falhou. Erro: {result_message} ---"
                 )
                 # Ativa o fallback
-                self.set_state("STRATEGY_FAILED_FALLBACK")
+                self.set_state(OnboardingState.STRATEGY_FAILED_FALLBACK)
                 return (
                     False,
                     f"A IA não conseguiu criar um código para sua planilha. Erro: {result_message}",
@@ -190,7 +183,7 @@ class OnboardingManager:
             print(
                 f"--- DEBUG OB_MGR: Erro crítico no _processar_planilha_customizada: {e}"
             )
-            self.set_state("STRATEGY_FAILED_FALLBACK")
+            self.set_state(OnboardingState.STRATEGY_FAILED_FALLBACK)
             return False, f"Um erro inesperado ocorreu: {e}"
 
         finally:
@@ -204,11 +197,14 @@ class OnboardingManager:
         Lógica para usar uma planilha por caminho existente.
         Valida o caminho (arquivo local OU URL GSheets) e define o estado de GERAÇÃO.
         """
+        path_str = path_str.strip().strip('"')
+        if not path_str:
+            return False, "O caminho/link não pode ser vazio."
 
         # Verifica se é uma URL válida do GSheets
-        if "docs.google.com/" in path_str:
-            # É uma URL, então pulamos a verificação .is_file()
-            pass
+        if "docs.google.com/" not in path_str:
+            if not path_str.endswith(".xlsx"):
+                return False, "O arquivo local deve ser .xlsx"
 
         # Se não for URL, trata como arquivo local e verifica
         else:
@@ -220,8 +216,7 @@ class OnboardingManager:
 
         # Salva o caminho que a IA precisa processar
         # (Se for GSheets, o "processamento" será pular a geração de estratégia)
-        self.config_data["pending_planilha_path"] = path_str
-        save_persistent_config(self.config_data)
+        self.config_service.save_pending_planilha_path(path_str)
 
         # --- LÓGICA DE ESCOLHA DE ESTADO ---
         # Se for GSheets, não precisamos gerar estratégia (ainda)
@@ -229,11 +224,11 @@ class OnboardingManager:
             print(
                 "--- DEBUG OB_MGR: Detectado Google Sheets, iniciando geração de estratégia. ---"
             )
-            self.set_state("GENERATING_STRATEGY")
+            self.set_state(OnboardingState.GENERATING_STRATEGY)
             return True, "Usando Planilha Google..."
         else:
             # Apenas define o estado para geração de estratégia
-            self.set_state("GENERATING_STRATEGY")
+            self.set_state(OnboardingState.GENERATING_STRATEGY)
             return True, "Caminho válido. Iniciando geração de estratégia..."
 
     # --- FIM DA CORREÇÃO 4 ---
@@ -253,11 +248,10 @@ class OnboardingManager:
                 f.write(uploaded_file.getbuffer())
 
             # Salva o caminho que a IA precisa processar
-            self.config_data["pending_planilha_path"] = str(save_path)
-            save_persistent_config(self.config_data)
+            self.config_service.save_pending_planilha_path(str(save_path))
 
             # Apenas define o estado. NÃO chama _processar_planilha_customizada.
-            self.set_state("GENERATING_STRATEGY")
+            self.set_state(OnboardingState.GENERATING_STRATEGY)
             return True, "Upload concluído. Iniciando geração de estratégia..."
 
         except Exception as e:
@@ -298,7 +292,6 @@ class OnboardingManager:
             return False
 
     def process_profile_input(self, user_input: str, agent_runner: AgentRunner) -> str:
-        # ... (código idêntico ao anterior) ...
         prompt_guiado = (
             f"O usuário respondeu: '{user_input}'.\n"
             "Seu ÚNICO objetivo é extrair DADOS DE PERFIL (especificamente 'Renda Mensal Média' ou 'Principal Objetivo') desta resposta. "
@@ -319,7 +312,7 @@ class OnboardingManager:
         Plano B: A IA gera um MAPEAMENTO JSON (não um código)
         para importar os dados para a NOSSA planilha padrão.
         """
-        self.set_state("GUIDED_IMPORT_MAPPING")
+        self.set_state(OnboardingState.GUIDED_IMPORT_MAPPING)
         # TODO: Implementar a lógica onde a IA gera o JSON
         # Por enquanto, apenas mudamos o estado
         return (
