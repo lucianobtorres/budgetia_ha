@@ -1,46 +1,30 @@
 # Em: src/initialization/system_initializer.py
-import json
 import os
 import sys
-from typing import Any
 
 from core.agent_runner_interface import AgentRunner
 from core.llm_manager import LLMOrchestrator
 from core.llm_providers.gemini_provider import GeminiProvider
+from core.user_config_service import UserConfigService
 from finance.storage.base_storage_handler import BaseStorageHandler
+from finance.storage.google_drive_handler import GoogleDriveFileHandler
 from finance.storage.google_sheets_storage_handler import GoogleSheetsStorageHandler
 
 # Adiciona o 'src' ao path (seu arquivo já deve ter isso)
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-import config  # noqa: E402
-from agent_implementations.langchain_agent import IADeFinancas  # noqa: E402
-
-# --- FIM DA MUDANÇA ---
-from finance.planilha_manager import PlanilhaManager  # noqa: E402
+import config
+from agent_implementations.langchain_agent import IADeFinancas
+from finance.planilha_manager import PlanilhaManager
 
 # --- 1. IMPORTAR AMBOS OS HANDLERS E A INTERFACE ---
-from finance.storage.excel_storage_handler import ExcelHandler  # noqa: E402
-from web_app.utils import (  # noqa: E402
-    load_persistent_config,
-)
-
-
-def _carregar_dados_exemplo(file_path: str) -> list[dict[str, Any]]:
-    """Carrega dados de exemplo de um JSON."""
-    try:
-        with open(file_path, encoding="utf-8") as f:
-            data: dict[str, Any] = json.load(f)
-            transacoes: list[dict[str, Any]] = data.get("transacoes", [])
-            return transacoes
-    except (FileNotFoundError, json.JSONDecodeError):
-        print(f"ERRO: Arquivo de dados de exemplo não encontrado...: {file_path}")
-        return []
+from finance.storage.excel_storage_handler import ExcelHandler
 
 
 def initialize_financial_system(
     planilha_path: str,
     llm_orchestrator: LLMOrchestrator,
+    config_service: UserConfigService,
 ) -> tuple[PlanilhaManager | None, AgentRunner | None, LLMOrchestrator | None, bool]:
     """
     Inicializa e conecta todos os componentes do sistema financeiro.
@@ -52,18 +36,33 @@ def initialize_financial_system(
     dados_de_exemplo_foram_adicionados = False
 
     try:
-        config_persistente = load_persistent_config()
-        mapeamento = config_persistente.get("mapeamento")
+        mapeamento = config_service.get_mapeamento()
 
         # --- 2. LÓGICA DE ESCOLHA DO HANDLER ---
         storage_handler: BaseStorageHandler
 
-        # Verifica se o 'planilha_path' é uma URL do Google Sheets
-        if "docs.google.com/spreadsheets" in planilha_path:
-            print("--- DEBUG INITIALIZER: Detectado Google Sheets. ---")
+        # 1. É um link de ARQUIVO do Drive (nativo .xlsx)?
+        if "drive.google.com/file" in planilha_path:
+            print(
+                "--- DEBUG INITIALIZER: Detectado arquivo Excel no Google Drive (Link Direto). ---"
+            )
+            storage_handler = GoogleDriveFileHandler(file_url=planilha_path)
+
+        # 2. É um link de Google Sheet que aponta para um Excel (modo de compatibilidade)?
+        elif "docs.google.com/" in planilha_path and "sd=true" in planilha_path:
+            print(
+                "--- DEBUG INITIALIZER: Detectado arquivo Excel no Google Drive (Link de Visualização). ---"
+            )
+            storage_handler = GoogleDriveFileHandler(file_url=planilha_path)
+
+        # 3. É um link de Google Sheet (nativo)?
+        elif "docs.google.com/" in planilha_path:
+            print("--- DEBUG INITIALIZER: Detectado Google Sheets (Nativo). ---")
             storage_handler = GoogleSheetsStorageHandler(
                 spreadsheet_url_or_key=planilha_path
             )
+
+        # 4. É um arquivo local?
         else:
             print("--- DEBUG INITIALIZER: Detectado arquivo Excel local. ---")
             storage_handler = ExcelHandler(file_path=planilha_path)

@@ -1,4 +1,5 @@
 # src/web_app/utils.py
+import io
 import json
 import os
 import sys
@@ -7,6 +8,8 @@ from typing import Any
 
 import pandas as pd
 import streamlit as st
+
+from finance.strategies.base_strategy import BaseMappingStrategy
 
 # Adiciona o diretório 'src' ao sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -53,13 +56,15 @@ def get_saved_planilha_path() -> str | None:
     config_data = load_persistent_config()
     path_str = config_data.get(PLANILHA_KEY)
 
-    print("--- DEBUG CONFIG: get_saved_planilha_path. ---")
+    print(
+        f"--- DEBUG CONFIG: get_saved_planilha_path | {path_str} | {config_data}. ---"
+    )
     if not path_str:
         print("--- DEBUG CONFIG: Nenhuma planilha válida encontrada no config. ---")
         return None
 
     # 1. Primeiro, checa se é uma URL válida do Google Sheets
-    if "docs.google.com/spreadsheets" in path_str:
+    if "docs.google.com/" in path_str:
         print(
             f"--- DEBUG CONFIG: Planilha Google Sheets encontrada em config: {path_str} ---"
         )
@@ -85,68 +90,6 @@ def save_planilha_path(path_str: str) -> None:
     config_data = load_persistent_config()
     config_data[PLANILHA_KEY] = path_str
     save_persistent_config(config_data)
-
-
-# --- ESTADO PÓS-ITERAÇÃO 16 (Original) ---
-def check_and_load_config() -> bool:
-    """
-    Verifica se a configuração da planilha existe e, em caso afirmativo,
-    inicializa o PlanilhaManager e o armazena no st.session_state.
-    """
-    if st.session_state.get("system_loaded", False):
-        return True
-
-    # Puxa o caminho salvo no JSON
-    planilha_path = get_saved_planilha_path()
-
-    if planilha_path and os.path.exists(planilha_path):
-        # Salva no session_state para o onboarding_status
-        st.session_state[PLANILHA_KEY] = planilha_path
-
-        print(
-            f"--- DEBUG UTILS: Configuração encontrada. Carregando sistema para: {planilha_path} ---"
-        )
-        try:
-            # Chama o initializer que retorna a fachada e o agente
-            (
-                plan_manager,
-                agent_runner,
-                llm_orchestrator,
-                dados_populados,
-            ) = initialize_financial_system(planilha_path)
-
-            if plan_manager and agent_runner:
-                # Salva a FACHADA e o AGENTE no session_state
-                st.session_state["plan_manager"] = plan_manager
-                st.session_state["agent_runner"] = agent_runner
-
-                st.session_state.system_loaded = True
-                st.session_state.onboarding_complete = True
-
-                if dados_populados and not st.session_state.get(
-                    "welcome_message_shown", False
-                ):
-                    st.toast("🚀 Planilha populada com dados de exemplo!", icon="🎉")
-                    st.session_state.welcome_message_shown = True
-
-                return True
-            else:
-                st.error(
-                    "Falha ao inicializar o sistema. Verifique o console para erros."
-                )
-                return False
-        except Exception as e:
-            st.error(f"Erro crítico ao carregar a planilha: {e}")
-            st.exception(e)
-            return False
-    else:
-        print("--- DEBUG UTILS: Nenhuma configuração de planilha encontrada. ---")
-        st.session_state.system_loaded = False
-        st.session_state.onboarding_complete = False
-        return False
-
-
-# --- FIM DO ESTADO ---
 
 
 def verificar_perfil_preenchido(plan_manager: PlanilhaManager) -> bool:
@@ -282,3 +225,43 @@ def handle_onboarding_process(llm_orchestrator: LLMOrchestrator) -> None:
         finally:
             # Limpa o arquivo da sessão
             st.session_state.uploaded_file = None
+
+
+def create_excel_export_bytes(plan_manager: PlanilhaManager) -> bytes:
+    """
+    Pega o estado atual do PlanilhaManager e o converte em um
+    arquivo Excel (.xlsx) em memória, retornando os bytes.
+    """
+    try:
+        # Pega os componentes de dentro do PlanilhaManager
+        strategy: BaseMappingStrategy = plan_manager._context.strategy
+        dataframes_internos: dict[str, pd.DataFrame] = plan_manager._context.data
+
+        output_buffer = io.BytesIO()
+
+        with pd.ExcelWriter(output_buffer, engine="openpyxl") as writer:
+            # Reutiliza a mesma lógica de "unmap" que usamos nos handlers
+            for internal_sheet_name, df_interno in dataframes_internos.items():
+                sheet_name_to_save = strategy.get_sheet_name_to_save(
+                    internal_sheet_name
+                )
+
+                df_para_salvar: pd.DataFrame
+
+                if internal_sheet_name == config.NomesAbas.TRANSACOES:
+                    df_para_salvar = strategy.unmap_transactions(df_interno)
+                else:
+                    df_para_salvar = strategy.map_other_sheet(
+                        df_interno, internal_sheet_name
+                    )
+
+                df_para_salvar.to_excel(
+                    writer, sheet_name=sheet_name_to_save, index=False
+                )
+
+        # Retorna o conteúdo do buffer em memória
+        return output_buffer.getvalue()
+
+    except Exception as e:
+        st.error(f"Erro ao gerar o arquivo Excel: {e}")
+        return b""  # Retorna bytes vazios em caso de falha
