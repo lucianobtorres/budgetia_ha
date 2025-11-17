@@ -1,4 +1,5 @@
 # src/config.py
+import json
 import os
 
 from dotenv import load_dotenv
@@ -13,6 +14,17 @@ DATA_DIR = os.path.join(PROJECT_ROOT, "data")
 
 DEFAULT_CRED_FILENAME = "gen-lang-client-0988185244-c9e312f68267.json"
 GSPREAD_CREDENTIALS_PATH = os.getenv("GSPREAD_CREDENTIALS_PATH")
+
+# --- NOVAS CHAVES PARA O LOGIN DE USUÁRIO (OAUTH 2.0) ---
+GOOGLE_OAUTH_CLIENT_ID = os.getenv("GOOGLE_OAUTH_CLIENT_ID")
+GOOGLE_OAUTH_CLIENT_SECRET = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET")
+
+# O URI de redirecionamento que você configurou no Google Console
+GOOGLE_OAUTH_REDIRECT_URI = "http://localhost:8501"
+
+# Os "escopos" (permissões) que pediremos ao usuário.
+# Precisamos de acesso total ao Drive para listar, compartilhar e ler.
+GOOGLE_OAUTH_SCOPES = ["https://www.googleapis.com/auth/drive"]
 
 PROMPTS_DIR = os.path.join(PROJECT_ROOT, "src", "prompts")
 os.makedirs(DATA_DIR, exist_ok=True)
@@ -36,7 +48,22 @@ DEFAULT_GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 DEFAULT_GEMINI_MODEL2 = "gemini-1.5-flash"
 DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
 
-# --- 3. Constantes da Aplicação (Nossas "Strings Centralizadas") ---
+SERVICE_ACCOUNT_EMAIL = None
+try:
+    if GSPREAD_CREDENTIALS_PATH is not None:
+        with open(GSPREAD_CREDENTIALS_PATH) as f:
+            creds_json = json.load(f)
+            SERVICE_ACCOUNT_EMAIL = creds_json.get("client_email")
+            if not SERVICE_ACCOUNT_EMAIL:
+                print(
+                    f"AVISO CRÍTICO: 'client_email' não encontrado em {GSPREAD_CREDENTIALS_PATH}"
+                )
+except FileNotFoundError:
+    print(
+        f"AVISO CRÍTICO: Arquivo de credenciais GSpread não encontrado em {GSPREAD_CREDENTIALS_PATH}"
+    )
+except Exception as e:
+    print(f"AVISO CRÍTICO: Falha ao ler 'client_email' do JSON de credenciais: {e}")
 
 
 class SummaryKeys:

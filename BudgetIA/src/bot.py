@@ -2,7 +2,23 @@
 import logging
 import os
 import sys
-from pathlib import Path
+
+from telegram import Update
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    ContextTypes,
+    MessageHandler,
+    filters,
+)
+
+import config
+from app.chat_history_manager import JsonHistoryManager
+from app.chat_service import ChatService
+from core.llm_manager import LLMOrchestrator
+from core.llm_providers.gemini_provider import GeminiProvider
+from core.user_config_service import UserConfigService
+from initialization.system_initializer import initialize_financial_system
 
 # 1. Encontra o diretório 'src' onde este arquivo está.
 SRC_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -25,30 +41,13 @@ print(f"ROOT: {PROJECT_ROOT}")
 print(f"SRC: {SRC_DIR}")
 print("--- INICIANDO IMPORTS DA APLICAÇÃO ---")
 
-from telegram import Update
-from telegram.ext import (
-    Application,
-    CommandHandler,
-    ContextTypes,
-    MessageHandler,
-    filters,
-)
-
-import config
-
-# --- CORREÇÃO: Importar do seu arquivo correto ---
-from app.chat_history_manager import JsonHistoryManager
-from app.chat_service import ChatService
-from core.llm_manager import LLMOrchestrator
-from core.llm_providers.gemini_provider import GeminiProvider
-from initialization.system_initializer import initialize_financial_system
-from web_app.utils import load_persistent_config
-
 # Configura o logging
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 logger = logging.getLogger(__name__)
+
+BOT_USERNAME = "jsmith"
 
 # --- 4. Carregar o "Cérebro" (Backend) UMA VEZ ---
 print("--- INICIALIZANDO BOT DO TELEGRAM ---")
@@ -64,33 +63,39 @@ primary_provider = GeminiProvider(default_model=config.DEFAULT_GEMINI_MODEL)
 llm_orchestrator = LLMOrchestrator(primary_provider=primary_provider)
 llm_orchestrator.get_configured_llm()
 
-# Carrega a configuração do usuário (para saber qual planilha usar)
-user_config = load_persistent_config()
-planilha_path = user_config.get("planilha_path")
-if not planilha_path:
-    raise ValueError("Nenhum 'planilha_path' encontrado no user_config.json!")
+print(f"BOT: Carregando sistema para o usuário '{BOT_USERNAME}'...")
 
-print(f"BOT: Carregando sistema para a planilha: {planilha_path}")
-plan_manager, agent_runner, _, _ = initialize_financial_system(
-    planilha_path, llm_orchestrator
-)
-if not agent_runner or not plan_manager:
-    raise RuntimeError("Falha ao inicializar o sistema financeiro para o bot.")
+try:
+    # Instancia o serviço para o usuário específico
+    config_service = UserConfigService(BOT_USERNAME)
+    planilha_path = config_service.get_planilha_path()
+    if not planilha_path:
+        raise ValueError(
+            f"Planilha não configurada para o usuário '{BOT_USERNAME}' no UserConfigService."
+        )
 
-# --- A CORREÇÃO ESTÁ AQUI ---
-# Precisamos converter config.DATA_DIR (que é str) para um Path()
-bot_history_path = Path(config.DATA_DIR) / "telegram_chat_history.json"
-# --- FIM DA CORREÇÃO ---
+    print(f"BOT: Carregando sistema para a planilha: {planilha_path}")
+    plan_manager, agent_runner, _, _ = initialize_financial_system(
+        planilha_path, llm_orchestrator, config_service=config_service
+    )
+    if not agent_runner or not plan_manager:
+        raise RuntimeError("Falha ao inicializar o sistema financeiro para o bot.")
 
-bot_history_manager = JsonHistoryManager(str(bot_history_path))
-print(f"BOT: Usando arquivo de histórico: {bot_history_path}")
+    # --- A CORREÇÃO ESTÁ AQUI ---
+    # Precisamos converter config.DATA_DIR (que é str) para um Path()
+    bot_history_path = config_service.config_dir / "telegram_chat_history.json"
+    # --- FIM DA CORREÇÃO ---
 
-# Cria o ChatService GLOBAL para o bot
-bot_chat_service = ChatService(agent_runner, bot_history_manager)
+    bot_history_manager = JsonHistoryManager(str(bot_history_path))
+    print(f"BOT: Usando arquivo de histórico: {bot_history_path}")
+
+    # Cria o ChatService GLOBAL para o bot
+    bot_chat_service = ChatService(agent_runner, bot_history_manager)
+except Exception as e:
+    logger.critical(f"ERRO FATAL AO INICIAR O BOT: {e}", exc_info=True)
+    sys.exit(1)  # Impede o bot de rodar se o sistema não carregar
 
 print("--- BOT PRONTO E OUVINDO ---")
-
-# --- 5. Handlers do Telegram ---
 
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

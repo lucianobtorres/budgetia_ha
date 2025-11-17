@@ -224,3 +224,9 @@ class ExcelHandler(BaseStorageHandler):
                 worksheet.set_column(col_num, col_num, 15, percentage_format)
             else:
                 worksheet.set_column(col_num, col_num, 15)
+
+    def ping(self) -> tuple[bool, str]:
+        """Verifica se o arquivo .xlsx local ainda existe."""
+        if not os.path.exists(self.file_path):
+            return False, f"Arquivo não encontrado: {self.file_path}"
+        return True, "Arquivo local acessível."

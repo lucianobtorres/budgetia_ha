@@ -1,0 +1,8 @@
+A tentativa anterior falhou. Erro: {erro_log}
+Analise o erro e o schema do usuário e gere um novo código Python corrigido.
+
+Schema do Usuário:
+{schema_usuario}
+
+Lembre-se das REGRAS CRÍTICAS (imports absolutos, nome da classe, __init__)!
+Gere apenas o código.

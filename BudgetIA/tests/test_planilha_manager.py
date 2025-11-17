@@ -5,6 +5,7 @@ import pandas as pd
 import pytest
 
 from BudgetIA.src import config
+from BudgetIA.src.core.user_config_service import UserConfigService
 from finance.planilha_manager import PlanilhaManager
 from finance.storage.excel_storage_handler import ExcelHandler
 
@@ -32,20 +33,23 @@ def mock_excel_handler() -> MagicMock:
 def plan_manager(mock_excel_handler: MagicMock) -> PlanilhaManager:
     """
     Cria um PlanilhaManager real para testes, com um handler mockado
-    e um estado 100% limpo (sem dados de exemplo).
     """
+    # Cria um mock do UserConfigService
+    mock_config_service = MagicMock(spec=UserConfigService)
+    # Garante que ele não vai tentar carregar uma estratégia customizada
+    mock_config_service.get_mapeamento.return_value = None
 
     # Pula o 'recalculate_budgets' que é chamado no 'else' do __init__
     with patch.object(PlanilhaManager, "recalculate_budgets", return_value=None):
-        pm = PlanilhaManager(storage_handler=mock_excel_handler)
+        pm = PlanilhaManager(
+            storage_handler=mock_excel_handler,
+            config_service=mock_config_service,  # Passa o mock
+        )
 
         pm.save = MagicMock()
         pm.recalculate_budgets = MagicMock()
 
         return pm
-
-
-# --- TESTES REATORADOS ---
 
 
 def test_get_summary_calcula_saldo_corretamente(plan_manager: PlanilhaManager) -> None:

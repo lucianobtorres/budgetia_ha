@@ -1,17 +1,11 @@
 # src/finance/repositories/data_context.py
-from typing import Any
 
 import pandas as pd
 
 import config
 
-# --- 1. REMOVER O IMPORT CONCRETO ---
-# from finance.excel_handler import ExcelHandler
-# --- 2. ADICIONAR O IMPORT DA INTERFACE ---
 from ..storage.base_storage_handler import BaseStorageHandler
 from ..strategies.base_strategy import BaseMappingStrategy
-from ..strategies.custom_json_strategy import CustomJsonStrategy
-from ..strategies.default_strategy import DefaultStrategy
 
 
 class FinancialDataContext:
@@ -23,10 +17,8 @@ class FinancialDataContext:
 
     def __init__(
         self,
-        # --- 3. MUDAR O TIPO DA DEPENDÊNCIA ---
         storage_handler: BaseStorageHandler,
-        # (O nome do argumento muda de 'excel_handler' para 'storage_handler')
-        mapeamento: dict[str, Any] | None = None,
+        strategy: BaseMappingStrategy,  # <-- Aceita a ESTRATÉGIA, não o 'mapeamento'
     ) -> None:
         """
         Inicializa o contexto.
@@ -40,16 +32,10 @@ class FinancialDataContext:
         self.storage = storage_handler
         self.layout_config = config.LAYOUT_PLANILHA
 
-        if mapeamento:
-            print("--- [LOG DataContext] Mapeamento customizado encontrado. ---")
-            self.strategy: BaseMappingStrategy = CustomJsonStrategy(
-                config.LAYOUT_PLANILHA, mapeamento
-            )
-        else:
-            print("--- [LOG DataContext] Usando estratégia padrão. ---")
-            self.strategy: BaseMappingStrategy = DefaultStrategy(
-                config.LAYOUT_PLANILHA, mapeamento
-            )
+        self.strategy = strategy  # <-- Salva a estratégia injetada
+        print(
+            f"--- [LOG DataContext] Usando estratégia injetada: '{type(self.strategy).__name__}'."
+        )
 
         self.data: dict[str, pd.DataFrame] = {}
         self.is_new_file = self._load_data()

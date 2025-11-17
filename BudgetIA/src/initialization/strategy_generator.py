@@ -1,9 +1,8 @@
-import importlib
+import importlib.util
 import json
 import os
-import shutil
+import re
 import sys
-import time
 from pathlib import Path
 from typing import Any
 
@@ -12,17 +11,28 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 import config
 
-# (Removido import da base para evitar confusão)
-
-# Define um local seguro para as estratégias geradas
-STRATEGY_PATH = Path("src/finance/strategies")
-# Define um nome de arquivo temporário para o sandbox
-TEMP_STRATEGY_MODULE = "temp_strategy_module"
-TEMP_STRATEGY_FILE = STRATEGY_PATH / f"{TEMP_STRATEGY_MODULE}.py"
-# Nome padrão da classe que a IA deve gerar
+TEMPLATE_STRATEGY_PATH = Path("src/finance/strategies")
 GENERATED_CLASS_NAME = "CustomStrategy"
-# Nome da classe base que a IA deve importar
 BASE_CLASS_NAME = "BaseMappingStrategy"
+
+try:
+    with open(
+        os.path.join(config.PROMPTS_DIR, "strategy_system_prompt.txt"), encoding="utf-8"
+    ) as f:
+        SYSTEM_PROMPT_TEMPLATE = f.read()
+    with open(
+        os.path.join(config.PROMPTS_DIR, "strategy_human_prompt.txt"), encoding="utf-8"
+    ) as f:
+        HUMAN_PROMPT_TEMPLATE = f.read()
+    with open(
+        os.path.join(config.PROMPTS_DIR, "strategy_retry_prompt.txt"), encoding="utf-8"
+    ) as f:
+        RETRY_PROMPT_TEMPLATE = f.read()
+except FileNotFoundError:
+    print(
+        "ERRO CRÍTICO: Arquivos de prompt de estratégia não encontrados na pasta 'src/prompts/'."
+    )
+    raise
 
 
 class StrategyGenerator:
@@ -38,27 +48,27 @@ class StrategyGenerator:
     def _get_planilha_schema(self, file_path: str) -> str:
         """Lê os metadados de uma planilha Excel para a IA analisar."""
         try:
-            xls = pd.ExcelFile(file_path)
-            abas = xls.sheet_names
-            schema_str = "Esquema da Planilha do Usuário:\n"
-            abas_para_analisar = abas[:5]
+            with pd.ExcelFile(file_path) as xls:
+                abas = xls.sheet_names
+                schema_str = "Esquema da Planilha do Usuário:\n"
+                abas_para_analisar = abas[:5]
 
-            for aba in abas_para_analisar:
-                try:
-                    df = pd.read_excel(xls, sheet_name=aba, nrows=5)
-                    schema_str += f"\n--- Aba: '{aba}' ---\n"
-                    schema_str += f"Colunas: {df.columns.to_list()}\n"
-                    schema_str += "Exemplos de Dados (primeiras 5 linhas):\n"
-                    schema_str += df.to_string(index=False) + "\n"
-                except Exception as e:
-                    schema_str += (
-                        f"\n--- Aba: '{aba}' (Não foi possível ler: {e}) ---\n"
-                    )
+                for aba in abas_para_analisar:
+                    try:
+                        df = pd.read_excel(xls, sheet_name=aba, nrows=5)
+                        schema_str += f"\n--- Aba: '{aba}' ---\n"
+                        schema_str += f"Colunas: {df.columns.to_list()}\n"
+                        schema_str += "Exemplos de Dados (primeiras 5 linhas):\n"
+                        schema_str += df.to_string(index=False) + "\n"
+                    except Exception as e:
+                        schema_str += (
+                            f"\n--- Aba: '{aba}' (Não foi possível ler: {e}) ---\n"
+                        )
 
-            if len(abas) > 5:
-                schema_str += f"\n... (e mais {len(abas) - 5} abas)"
+                if len(abas) > 5:
+                    schema_str += f"\n... (e mais {len(abas) - 5} abas)"
 
-            return schema_str
+                return schema_str
         except Exception as e:
             print(f"Erro ao ler schema da planilha: {e}")
             raise OSError(f"Não foi possível ler os metadados do arquivo: {e}")
@@ -66,8 +76,8 @@ class StrategyGenerator:
     def _get_base_templates(self) -> str:
         """Carrega os arquivos de estratégia base como texto para dar de exemplo ao LLM."""
         try:
-            base_strategy_path = STRATEGY_PATH / "base_strategy.py"
-            padrao_strategy_path = STRATEGY_PATH / "default_strategy.py"
+            base_strategy_path = TEMPLATE_STRATEGY_PATH / "base_strategy.py"
+            padrao_strategy_path = TEMPLATE_STRATEGY_PATH / "default_strategy.py"
 
             with open(base_strategy_path, encoding="utf-8") as f:
                 base_code = f.read()
@@ -89,49 +99,55 @@ class StrategyGenerator:
             raise e
 
     def _get_system_prompt(self) -> str:
-        """Cria o prompt de sistema focado em GERAÇÃO DE CÓDIGO."""
+        """Cria o prompt de sistema lendo o template."""
         layout_str = json.dumps(config.LAYOUT_PLANILHA, indent=2)
-
-        return (
-            "Você é um engenheiro de software Python sênior, especialista em Pandas e ETL.\n"
-            "Sua única tarefa é escrever um arquivo de estratégia em Python para traduzir"
-            "a planilha de um usuário (com formato desconhecido) para um formato de sistema interno.\n"
-            "\n"
-            "O FORMATO INTERNO (Seu objetivo) é este dicionário de DataFrames:\n"
-            f"{layout_str}\n"
-            "\n"
-            "REGRAS CRÍTICAS PARA O CÓDIGO GERADO:\n"
-            "1. IMPORTS: Use APENAS imports relativos para módulos locais."
-            f"   - CORRETO: `from .base_strategy import {BASE_CLASS_NAME}`\n"
-            "   - ERRADO: `from src.finance.strategies...` ou `from src.strategies...`\n"
-            "   - IMPORTE `config` diretamente: `import config`\n"
-            f"2. CLASSE: O nome da classe DEVE ser `{GENERATED_CLASS_NAME}`.\n"
-            f"3. HERANÇA: A classe DEVE herdar de `{BASE_CLASS_NAME}`.\n"
-            "4. __INIT__: O `__init__` DEVE seguir a assinatura da classe base. Você pode definir `self.mapeamento` dentro dele, se precisar (ex: para `get_sheet_name_to_save`).\n"
-            "5. MÉTODOS: Implemente `map_transactions` e `unmap_transactions`."
-            "\n"
-            "Responda APENAS com o código Python completo. Não inclua markdown (```python) ou qualquer outra explicação."
-        )
+        return SYSTEM_PROMPT_TEMPLATE.format(layout_sistema=layout_str)
 
     def _sandbox_test_strategy(
-        self, file_path_usuario: str, layout_config: dict
+        self, strategy_file_path: Path, file_path_usuario: str, layout_config: dict
     ) -> tuple[bool, str]:
         """
         Tenta carregar e executar o `temp_strategy_module.py` em um sandbox.
         Retorna (Sucesso, MensagemDeErro)
         """
-        print(f"--- DEBUG SANDBOX: Testando estratégia em {TEMP_STRATEGY_FILE}...")
+        print(f"--- DEBUG SANDBOX: Testando estratégia em {strategy_file_path}...")
         falhou = False
+
+        # O 'strategy_file_path' é o caminho completo (ex: data/users/jsmith/user_strategy.py)
+        module_name = strategy_file_path.stem  # (ex: "user_strategy")
+
         try:
-            if str(STRATEGY_PATH.resolve()) not in sys.path:
-                sys.path.insert(0, str(STRATEGY_PATH.resolve()))
+            codigo_gerado = strategy_file_path.read_text(encoding="utf-8")
 
-            module_to_load = f"finance.strategies.{TEMP_STRATEGY_MODULE}"
+            # --- Verificação de imports/funções proibidas ---
+            imports_proibidos = [
+                r"\bimport\s+os\b",
+                r"\bimport\s+sys\b",
+                r"\bimport\s+subprocess\b",
+                r"\bimport\s+shutil\b",
+                r"__import__\s*\(",
+                r"\beval\s*\(",
+                r"\bexec\s*\(",
+            ]
 
-            if module_to_load in sys.modules:
-                module = importlib.reload(sys.modules[module_to_load])
-            else:
-                module = importlib.import_module(module_to_load)
+            for proibido in imports_proibidos:
+                if re.search(proibido, codigo_gerado):
+                    erro = f"Import/Função perigosa detectada: '{proibido}'"
+                    print(f"--- DEBUG SANDBOX: FALHA! {erro} ---")
+                    falhou = True  # Garante a limpeza do arquivo
+                    return False, erro
+
+            # --- Lógica de importlib (para carregar de qualquer lugar) ---
+            spec = importlib.util.spec_from_file_location(
+                module_name, strategy_file_path
+            )
+            if spec is None:
+                raise ImportError(
+                    f"Não foi possível criar spec para {strategy_file_path}"
+                )
+
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
 
             strategy_class = getattr(module, GENERATED_CLASS_NAME)
 
@@ -143,12 +159,12 @@ class StrategyGenerator:
 
             # 2. Lê os dados brutos (como o ExcelHandler faria)
             try:
-                xls = pd.ExcelFile(file_path_usuario)
-                # Tenta adivinhar a aba de transações (ou usa a primeira)
-                aba_transacoes_bruta = xls.sheet_names[0]
-                if config.NomesAbas.TRANSACOES in xls.sheet_names:
-                    aba_transacoes_bruta = config.NomesAbas.TRANSACOES
-                df_bruto = pd.read_excel(xls, sheet_name=aba_transacoes_bruta)
+                # Usar 'with' garante que o 'xls' será fechado
+                with pd.ExcelFile(file_path_usuario) as xls:
+                    aba_transacoes_bruta = xls.sheet_names[0]
+                    if config.NomesAbas.TRANSACOES in xls.sheet_names:
+                        aba_transacoes_bruta = config.NomesAbas.TRANSACOES
+                    df_bruto = pd.read_excel(xls, sheet_name=aba_transacoes_bruta)
             except Exception as e:
                 raise OSError(f"Sandbox falhou ao ler o arquivo Excel: {e}")
 
@@ -179,21 +195,42 @@ class StrategyGenerator:
             falhou = True
             return False, str(e)
         finally:
-            if module_to_load in sys.modules:
-                del sys.modules[module_to_load]
-            if os.path.exists(TEMP_STRATEGY_FILE):
+            # Limpa o módulo do cache
+            if module_name in sys.modules:
+                del sys.modules[module_name]
+
+            # Se falhou, apaga o .py quebrado (CICLO DE VIDA)
+            if falhou and strategy_file_path.exists():
                 try:
-                    if falhou:
-                        os.remove(TEMP_STRATEGY_FILE)
+                    os.remove(strategy_file_path)
                 except Exception:
                     pass
 
+    def validate_existing_strategy(
+        self, strategy_file_path: Path, file_path_usuario: str
+    ) -> tuple[bool, str]:
+        """
+        Interface pública para testar uma estratégia .py existente.
+        """
+        if not strategy_file_path.exists():
+            return False, "Arquivo de estratégia não encontrado."
+
+        print(
+            f"--- DEBUG GENERATOR: Validando estratégia existente em {strategy_file_path}... ---"
+        )
+        layout_config = config.LAYOUT_PLANILHA
+
+        # Reutiliza o seu sandbox!
+        return self._sandbox_test_strategy(
+            strategy_file_path, file_path_usuario, layout_config
+        )
+
     def generate_and_validate_strategy(
-        self, file_path_usuario: str
+        self, file_path_usuario: str, strategy_save_path: Path
     ) -> tuple[bool, str]:
         """
         Orquestra o processo de geração e validação da estratégia.
-        Retorna (Sucesso, NomeDoModuloJson) ou (Falha, MensagemDeErro)
+        Salva o .py final no 'strategy_save_path' fornecido.
         """
         try:
             schema_usuario = self._get_planilha_schema(file_path_usuario)
@@ -201,31 +238,22 @@ class StrategyGenerator:
             layout_config = config.LAYOUT_PLANILHA  # Passado para o sandbox
             system_prompt = self._get_system_prompt()
 
-            human_prompt = (
-                f"{base_templates}\n\n"
-                f"Aqui está o schema da planilha do usuário:\n{schema_usuario}\n\n"
-                f"Gere o código Python completo para a classe `{GENERATED_CLASS_NAME}` "
-                "conforme as instruções no prompt de sistema. "
-                "Lembre-se das regras de import relativo e do __init__!"
-            )
-
             erro_log = ""
             for i in range(self.max_retries):
                 print(f"--- DEBUG GENERATOR: Tentativa {i + 1}/{self.max_retries} ---")
 
                 if erro_log:
-                    prompt_com_erro = (
-                        f"A tentativa anterior falhou. Erro: {erro_log}\n"
-                        "Analise o erro e o schema do usuário e gere um novo código Python corrigido.\n"
-                        f"Schema do Usuário:\n{schema_usuario}\n"
-                        "Lembre-se das REGRAS CRÍTICAS (imports relativos, nome da classe, __init__)!"
-                        "Gere apenas o código."
+                    prompt_com_erro = RETRY_PROMPT_TEMPLATE.format(
+                        erro_log=erro_log, schema_usuario=schema_usuario
                     )
                     messages = [
                         SystemMessage(content=system_prompt),
                         HumanMessage(content=prompt_com_erro),
                     ]
                 else:
+                    human_prompt = HUMAN_PROMPT_TEMPLATE.format(
+                        base_templates=base_templates, schema_usuario=schema_usuario
+                    )
                     messages = [
                         SystemMessage(content=system_prompt),
                         HumanMessage(content=human_prompt),
@@ -248,30 +276,24 @@ class StrategyGenerator:
                 )
 
                 try:
-                    with open(TEMP_STRATEGY_FILE, "w", encoding="utf-8") as f:
+                    with open(strategy_save_path, "w", encoding="utf-8") as f:
                         f.write(codigo_gerado)
                 except Exception as e:
                     erro_log = f"Falha ao salvar arquivo temporário: {e}"
                     continue
 
                 success, result = self._sandbox_test_strategy(
-                    file_path_usuario, layout_config
+                    strategy_save_path,  # Testa o arquivo final
+                    file_path_usuario,
+                    layout_config,
                 )
-
                 if success:
-                    novo_nome_modulo = f"strategy_user_{int(time.time())}"
-                    novo_arquivo = STRATEGY_PATH / f"{novo_nome_modulo}.py"
-                    shutil.move(TEMP_STRATEGY_FILE, novo_arquivo)
-
+                    module_name = strategy_save_path.stem
                     print(
-                        f"--- DEBUG GENERATOR: Estratégia validada e salva como '{novo_nome_modulo}' ---"
+                        f"--- DEBUG GENERATOR: Estratégia validada e salva como '{module_name}' ---"
                     )
-
-                    # A IA deve ter definido o mapeamento internamente
-                    # Vamos apenas salvar o nome do módulo.
-                    mapa_para_salvar = {"strategy_module": novo_nome_modulo}
-
-                    return True, json.dumps(mapa_para_salvar)  # Retorna o JSON
+                    mapa_para_salvar = {"strategy_module": module_name}
+                    return True, json.dumps(mapa_para_salvar)
                 else:
                     erro_log = str(result)
 

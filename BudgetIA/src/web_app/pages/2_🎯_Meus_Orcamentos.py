@@ -9,7 +9,15 @@ try:
     from ..ui_components.common_ui import setup_page
 except ImportError:
     from web_app.ui_components.common_ui import setup_page
+from web_app.utils import initialize_session_auth
 
+is_logged_in, username, config_service, llm_orchestrator = initialize_session_auth()
+
+if not is_logged_in or not config_service or "plan_manager" not in st.session_state:
+    st.warning(
+        "Você precisa estar logado e ter uma planilha configurada para acessar esta página."
+    )
+    st.stop()
 plan_manager, agent_runner = setup_page(
     title="Meus Orçamentos",
     icon="🎯",

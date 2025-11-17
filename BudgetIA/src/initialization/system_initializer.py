@@ -21,6 +21,29 @@ from finance.planilha_manager import PlanilhaManager
 from finance.storage.excel_storage_handler import ExcelHandler
 
 
+def _create_storage_handler(planilha_path: str) -> BaseStorageHandler:
+    """Fábrica (Factory) para decidir qual Handler de armazenamento usar."""
+    # (Esta função que criamos está correta e permanece a mesma)
+    print(f"--- DEBUG INITIALIZER: Criando handler para: {planilha_path} ---")
+
+    if "drive.google.com/file" in planilha_path:
+        print(
+            "--- DEBUG INITIALIZER: Detectado arquivo Excel no Google Drive (Link Direto). ---"
+        )
+        return GoogleDriveFileHandler(file_url=planilha_path)
+    elif "docs.google.com/spreadsheets" in planilha_path and "sd=true" in planilha_path:
+        print(
+            "--- DEBUG INITIALIZER: Detectado arquivo Excel no Google Drive (Link de Visualização). ---"
+        )
+        return GoogleDriveFileHandler(file_url=planilha_path)
+    elif "docs.google.com/spreadsheets" in planilha_path:
+        print("--- DEBUG INITIALIZER: Detectado Google Sheets (Nativo). ---")
+        return GoogleSheetsStorageHandler(spreadsheet_url_or_key=planilha_path)
+    else:
+        print("--- DEBUG INITIALIZER: Detectado arquivo Excel local. ---")
+        return ExcelHandler(file_path=planilha_path)
+
+
 def initialize_financial_system(
     planilha_path: str,
     llm_orchestrator: LLMOrchestrator,
@@ -36,42 +59,12 @@ def initialize_financial_system(
     dados_de_exemplo_foram_adicionados = False
 
     try:
-        mapeamento = config_service.get_mapeamento()
-
-        # --- 2. LÓGICA DE ESCOLHA DO HANDLER ---
-        storage_handler: BaseStorageHandler
-
-        # 1. É um link de ARQUIVO do Drive (nativo .xlsx)?
-        if "drive.google.com/file" in planilha_path:
-            print(
-                "--- DEBUG INITIALIZER: Detectado arquivo Excel no Google Drive (Link Direto). ---"
-            )
-            storage_handler = GoogleDriveFileHandler(file_url=planilha_path)
-
-        # 2. É um link de Google Sheet que aponta para um Excel (modo de compatibilidade)?
-        elif "docs.google.com/" in planilha_path and "sd=true" in planilha_path:
-            print(
-                "--- DEBUG INITIALIZER: Detectado arquivo Excel no Google Drive (Link de Visualização). ---"
-            )
-            storage_handler = GoogleDriveFileHandler(file_url=planilha_path)
-
-        # 3. É um link de Google Sheet (nativo)?
-        elif "docs.google.com/" in planilha_path:
-            print("--- DEBUG INITIALIZER: Detectado Google Sheets (Nativo). ---")
-            storage_handler = GoogleSheetsStorageHandler(
-                spreadsheet_url_or_key=planilha_path
-            )
-
-        # 4. É um arquivo local?
-        else:
-            print("--- DEBUG INITIALIZER: Detectado arquivo Excel local. ---")
-            storage_handler = ExcelHandler(file_path=planilha_path)
-        # --- FIM DA LÓGICA DE ESCOLHA ---
+        storage_handler = _create_storage_handler(planilha_path)
 
         # --- 3. INJETAR O HANDLER ABSTRATO ---
         # (Nenhuma mudança daqui para baixo, já está correto)
         plan_manager = PlanilhaManager(
-            storage_handler=storage_handler, mapeamento=mapeamento
+            storage_handler=storage_handler, config_service=config_service
         )
         print(
             f"--- DEBUG INITIALIZER: PlanilhaManager criado: {type(plan_manager)} ---"
@@ -79,7 +72,8 @@ def initialize_financial_system(
 
         is_new_file = plan_manager.is_new_file
         dados_de_exemplo_foram_adicionados = False
-        if is_new_file and mapeamento is None:
+
+        if is_new_file:
             df_transacoes = plan_manager.visualizar_dados(config.NomesAbas.TRANSACOES)
             if not df_transacoes.empty:
                 dados_de_exemplo_foram_adicionados = True

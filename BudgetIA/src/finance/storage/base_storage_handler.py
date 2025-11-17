@@ -46,3 +46,11 @@ class BaseStorageHandler(ABC):
         para "traduzir de volta" para o formato do usuário.
         """
         pass
+
+    @abstractmethod
+    def ping(self) -> tuple[bool, str]:
+        """
+        Verifica se o recurso de armazenamento (arquivo/link) está acessível.
+        Retorna (True, "Sucesso") ou (False, "Mensagem de Erro").
+        """
+        pass

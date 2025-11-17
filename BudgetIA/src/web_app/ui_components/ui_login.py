@@ -7,8 +7,7 @@ import yaml
 from yaml.loader import SafeLoader
 
 
-# --- 1. FUNÇÃO DE CARREGAMENTO (SEM CACHE) ---
-# REMOVIDO: @st.cache_data(show_spinner=False)
+# A função de carregar o config (sem cache) está correta
 def load_auth_config() -> dict[str, Any]:
     """Carrega o arquivo de configuração YAML."""
     try:
@@ -23,7 +22,6 @@ def load_auth_config() -> dict[str, Any]:
         st.stop()
 
 
-# --- 2. FUNÇÃO RENDER ATUALIZADA (COM REGISTRO) ---
 def render() -> tuple[bool, str | None]:
     """
     Renderiza o componente de login E registro.
@@ -38,8 +36,17 @@ def render() -> tuple[bool, str | None]:
         config["cookie"]["expiry_days"],
     )
 
-    # --- 3. RENDERIZAÇÃO DO FORMULÁRIO DE LOGIN E REGISTRO ---
-    # Usamos st.tabs para separar o Login do Registro
+    # --- 1. CORREÇÃO DE UX: VERIFICAR O ESTADO ANTES DE RENDERIZAR ---
+    # Se o usuário JÁ ESTÁ logado, apenas renderize o 'logout' e retorne True.
+    if st.session_state["authentication_status"] is True:
+        username = st.session_state["username"]
+        authenticator.logout("Sair", "sidebar")
+        st.sidebar.title(f"Bem-vindo, {st.session_state['name']}!")
+        return True, username
+    # --- FIM DA CORREÇÃO DE UX ---
+
+    # --- 2. RENDERIZAÇÃO (Se não estiver logado) ---
+    # Se não estava logado, mostre as abas de Login/Registro
     tab_login, tab_register = st.tabs(["Login", "Criar Nova Conta"])
 
     with tab_login:
@@ -47,9 +54,11 @@ def render() -> tuple[bool, str | None]:
 
     with tab_register:
         try:
-            if authenticator.register_user(preauthorization=False):
+            # --- 3. CORREÇÃO DO ERRO 'preauthorization' ---
+            # Removemos o argumento que causou o TypeError
+            if authenticator.register_user():
+                # --- FIM DA CORREÇÃO DO ERRO ---
                 # Se o registro for bem-sucedido, salvamos o config ATUALIZADO
-                # de volta no arquivo YAML
                 with open("data/users.yaml", "w") as file:
                     yaml.dump(config, file, default_flow_style=False)
                 st.success(
@@ -57,22 +66,11 @@ def render() -> tuple[bool, str | None]:
                 )
         except Exception as e:
             st.error(e)
-    # --- FIM DO FORMULÁRIO ---
 
-    # --- 4. LÓGICA DE VERIFICAÇÃO DE ESTADO (sem mudanças) ---
+    # --- 4. VERIFICAÇÃO DE ESTADO PÓS-INTERAÇÃO ---
     if st.session_state["authentication_status"] is False:
         st.error("Usuário ou senha incorretos.")
         return False, None
-    elif st.session_state["authentication_status"] is None:
-        # Este é o estado "aguardando login", não mostramos aviso
-        return False, None
-    elif st.session_state["authentication_status"] is True:
-        # Usuário logado
-        username = st.session_state["username"]
 
-        authenticator.logout("Sair", "sidebar")
-        st.sidebar.title(f"Bem-vindo, {st.session_state['name']}!")
-
-        return True, username
-
+    # Se o status for None (aguardando login), não é um erro.
     return False, None

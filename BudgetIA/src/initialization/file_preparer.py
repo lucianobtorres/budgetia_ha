@@ -2,6 +2,7 @@
 import os
 from pathlib import Path
 
+import magic
 import pandas as pd
 from googleapiclient.http import MediaIoBaseDownload
 from gspread_dataframe import get_as_dataframe
@@ -98,6 +99,37 @@ class FileAnalysisPreparer:
             # CASO C: Arquivo Local
             self._local_path_to_analyze = self.path_str
 
+        # --- INÍCIO DA CAMADA DE SEGURANÇA ---
+        try:
+            if not Path(self._local_path_to_analyze).exists():
+                raise ValueError(
+                    "Arquivo local não encontrado (pode ter falhado o download)."
+                )
+
+            # Lê os "magic bytes" para ver o tipo real do arquivo
+            mime_type = magic.from_file(self._local_path_to_analyze, mime=True)
+
+            tipos_permitidos = [
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",  # .xlsx
+                "application/zip",  # .xlsx às vezes é visto como zip
+            ]
+
+            if mime_type not in tipos_permitidos:
+                raise ValueError(
+                    f"Tipo de arquivo inseguro ou inválido detectado: {mime_type}"
+                )
+
+            print(
+                f"--- DEBUG Preparer: Verificação de arquivo OK. MIME: {mime_type} ---"
+            )
+
+        except Exception as e:
+            # Se falhar, limpa o temporário (se houver) e levanta o erro
+            self.cleanup()
+            raise ValueError(f"Falha na preparação do arquivo: {e}")
+        # --- FIM DA CAMADA DE SEGURANÇA ---
+
+        return self._local_path_to_analyze
         return self._local_path_to_analyze
 
     def cleanup(self) -> None:

@@ -61,11 +61,18 @@ def _render_dashboard_metrics(plan_manager: PlanilhaManager) -> None:
                     categoria = row[config.ColunasOrcamentos.CATEGORIA]
                     gasto = row[config.ColunasOrcamentos.GASTO]
                     limite = row[config.ColunasOrcamentos.LIMITE]
-                    percentual = (gasto / limite) * 100 if limite > 0 else 0
-                    st.markdown(
+                    percentual_real = (gasto / limite) * 100 if limite > 0 else 0
+
+                    percentual_para_barra = min(percentual_real, 100)
+                    label_texto = (
                         f"**{categoria}**: Gasto R$ {gasto:,.2f} de R$ {limite:,.2f}"
                     )
-                    st.progress(int(percentual))
+
+                    if percentual_real > 100:
+                        label_texto += f" ⚠️ **({percentual_real:.0f}%)**"
+
+                    st.markdown(label_texto)  # Usa o novo texto
+                    st.progress(int(percentual_para_barra))
             else:
                 st.info("Sem orçamentos mensais ativos.")
     else:

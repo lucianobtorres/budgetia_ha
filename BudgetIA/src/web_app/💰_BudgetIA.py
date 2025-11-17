@@ -8,6 +8,8 @@ import streamlit as st
 from app.chat_history_manager import StreamlitHistoryManager
 from app.chat_service import ChatService
 from config import DEFAULT_GEMINI_MODEL
+from core.agent_runner_interface import AgentRunner
+from core.google_auth_service import GoogleAuthService
 from core.llm_manager import LLMOrchestrator
 from core.llm_providers.gemini_provider import GeminiProvider
 from core.user_config_service import UserConfigService
@@ -17,13 +19,49 @@ from web_app.onboarding_manager import OnboardingManager, OnboardingState
 
 # --- Imports dos Novos Módulos de UI ---
 from web_app.ui_components import (
+    ui_consent,
     ui_fallback,
     ui_file_selection,
     ui_home_hub,
-    ui_login,
     ui_profile_setup,
     ui_strategy_generation,
 )
+from web_app.utils import initialize_session_auth
+
+is_logged_in, username, config_service, llm_orchestrator = initialize_session_auth()
+if not is_logged_in or not config_service or not llm_orchestrator:
+    st.stop()
+
+query_params = st.query_params
+if "code" in query_params:
+    code = query_params["code"]
+
+    # (Usamos st.empty() para mostrar o status enquanto processamos)
+    status_placeholder = st.empty()
+    status_placeholder.info("Autenticação com Google recebida. Processando...")
+
+    try:
+        auth_service = GoogleAuthService(config_service)
+        auth_service.exchange_code_for_tokens(code)
+
+        # Limpa o 'code' da URL
+        st.query_params.clear()
+
+        status_placeholder.success(
+            "Conta Google conectada com sucesso! Recarregando..."
+        )
+        st.balloons()
+
+        # --- A CORREÇÃO ---
+        # Usamos st.rerun() para forçar a recarga do script com a URL limpa.
+        st.rerun()
+        # --- FIM DA CORREÇÃO ---
+
+    except Exception as e:
+        status_placeholder.error(f"Falha ao processar a autenticação do Google: {e}")
+
+    # Paramos o script aqui de qualquer forma, pois o rerun foi chamado
+    st.stop()
 
 
 # --- Função de Carregamento do Sistema (Cache) ---
@@ -83,9 +121,6 @@ def get_llm_orchestrator() -> LLMOrchestrator:
 
 
 llm_orchestrator = get_llm_orchestrator()
-is_logged_in, username = ui_login.render()
-if not is_logged_in or not username:
-    st.stop()
 
 
 @st.cache_data(show_spinner=False)
@@ -103,16 +138,26 @@ if "onboarding_manager" not in st.session_state:
 
 manager: OnboardingManager = st.session_state.onboarding_manager
 
-# --- ROTEADOR PRINCIPAL DA APLICAÇÃO ---
+
+def load_financial_system_cached(
+    _llm_orchestrator: LLMOrchestrator, _config_service: UserConfigService
+) -> tuple[PlanilhaManager | None, AgentRunner | None, LLMOrchestrator | None, bool]:
+    path = _config_service.get_planilha_path()
+    if not path:
+        return None, None, None, False
+
+    print(
+        f"\n--- DEBUG CACHE: Carregando sistema para usuário '{_config_service.username}' ---"
+    )
+    return initialize_financial_system(path, _llm_orchestrator, _config_service)
+
 
 current_state = manager.get_current_state()
 print(f"--- DEBUG APP: Estado atual do OnboardingManager: {current_state.name} ---")
 
-# Define o callback de validação que os módulos de UI precisarão
 validation_callback = lambda path: initialize_financial_system(
     path, llm_orchestrator, config_service
 )
-
 
 # --- ROTEAMENTO DE ESTADO ---
 
@@ -123,6 +168,13 @@ if current_state == OnboardingState.AWAITING_FILE_SELECTION:
 
 elif current_state == OnboardingState.GENERATING_STRATEGY:
     ui_strategy_generation.render(manager)
+    st.stop()
+
+elif current_state == OnboardingState.AWAITING_BACKEND_CONSENT:
+    # Instancia o serviço de autenticação
+    auth_service = GoogleAuthService(config_service)
+    # Renderiza a nova tela
+    ui_consent.render(manager, auth_service)
     st.stop()
 
 elif current_state == OnboardingState.STRATEGY_FAILED_FALLBACK:
@@ -141,84 +193,90 @@ elif current_state == OnboardingState.SETUP_COMPLETE:
         st.stop()
 
     # --- Carregamento do Sistema ---
-    # --- MODIFICAÇÃO: Criar ChatService ---
-    if "chat_service" not in st.session_state:
-        print("--- DEBUG APP: 'chat_service' não está na sessão. Inicializando... ---")
-        plan_manager, agent_runner, llm_orchestrator_loaded, dados_adicionados = (
-            load_financial_system(
-                current_planilha_path, llm_orchestrator, config_service
+    try:
+        if "chat_service" not in st.session_state:
+            print(
+                "--- DEBUG APP: 'chat_service' não está na sessão. Inicializando... ---"
             )
+            plan_manager, agent_runner, llm_orchestrator_loaded, dados_adicionados = (
+                load_financial_system(
+                    current_planilha_path, llm_orchestrator, config_service
+                )
+            )
+            if plan_manager and agent_runner and llm_orchestrator_loaded:
+                # Colocamos os objetos base na sessão para as outras páginas
+                st.session_state.plan_manager = plan_manager
+                st.session_state.agent_runner = agent_runner
+                st.session_state.llm_orchestrator = llm_orchestrator_loaded
+                st.session_state.current_planilha_path = current_planilha_path
+
+                # 1. Criar os History Managers Abstraídos
+                onboarding_history = StreamlitHistoryManager("onboarding_messages")
+                main_chat_history = StreamlitHistoryManager("chat_history")
+
+                # 2. Criar os Chat Services
+                # O 'profile_chat_service' usará o histórico de onboarding
+                st.session_state.profile_chat_service = ChatService(
+                    agent_runner=agent_runner, history_manager=onboarding_history
+                )
+                # O 'main_chat_service' usará o histórico principal
+                st.session_state.main_chat_service = ChatService(
+                    agent_runner=agent_runner, history_manager=main_chat_history
+                )
+                print("--- DEBUG APP: ChatServices criados e salvos na sessão. ---")
+
+                if (
+                    dados_adicionados
+                    and "dados_exemplo_msg_mostrada" not in st.session_state
+                ):
+                    st.success("Dados de exemplo foram carregados na sua planilha!")
+                    st.session_state.dados_exemplo_msg_mostrada = True
+            else:
+                st.error("Falha crítica ao carregar componentes do sistema.")
+                if st.button("Tentar Novamente (Limpar Configuração)"):
+                    manager.reset_config()
+                    st.cache_resource.clear()
+                    st.cache_data.clear()
+                    st.rerun()
+                st.stop()
+
+        # Recupera os objetos da sessão
+        plan_manager: PlanilhaManager = st.session_state.plan_manager
+        # Recupera os NOVOS services
+        profile_chat_service: ChatService = st.session_state.profile_chat_service
+        main_chat_service: ChatService = st.session_state.main_chat_service
+
+    except Exception as e:
+        # Captura a falha de inicialização (como o HttpError 403)
+        st.error("🔴 Erro Crítico ao Carregar sua Planilha!", icon="🔥")
+        st.warning(f"**Detalhe:** {e}")
+        st.info(
+            "Isso geralmente acontece se o arquivo está corrompido ou se o BudgetIA não tem mais permissão de *Escrita* nele."
         )
-        if plan_manager and agent_runner and llm_orchestrator_loaded:
-            # Colocamos os objetos base na sessão para as outras páginas
-            st.session_state.plan_manager = plan_manager
-            st.session_state.agent_runner = agent_runner
-            st.session_state.llm_orchestrator = llm_orchestrator_loaded
-            st.session_state.current_planilha_path = current_planilha_path
 
-            # 1. Criar os History Managers Abstraídos
-            onboarding_history = StreamlitHistoryManager("onboarding_messages")
-            main_chat_history = StreamlitHistoryManager("chat_history")
+        if st.button("Tentar reconfigurar (Usar outra planilha)"):
+            manager.reset_config()
+            st.cache_resource.clear()
+            st.cache_data.clear()
+            st.rerun()
 
-            # 2. Criar os Chat Services
-            # O 'profile_chat_service' usará o histórico de onboarding
-            st.session_state.profile_chat_service = ChatService(
-                agent_runner=agent_runner, history_manager=onboarding_history
-            )
-            # O 'main_chat_service' usará o histórico principal
-            st.session_state.main_chat_service = ChatService(
-                agent_runner=agent_runner, history_manager=main_chat_history
-            )
-            print("--- DEBUG APP: ChatServices criados e salvos na sessão. ---")
+        st.stop()
 
-            if (
-                dados_adicionados
-                and "dados_exemplo_msg_mostrada" not in st.session_state
-            ):
-                st.success("Dados de exemplo foram carregados na sua planilha!")
-                st.session_state.dados_exemplo_msg_mostrada = True
-        else:
-            st.error("Falha crítica ao carregar componentes do sistema.")
-            if st.button("Tentar Novamente (Limpar Configuração)"):
-                manager.reset_config()
-                st.cache_resource.clear()
-                st.rerun()
-            st.stop()
-
-    if "plan_manager" not in st.session_state:
-        plan_manager, agent_runner, llm_orchestrator_loaded, dados_adicionados = (
-            load_financial_system(
-                current_planilha_path, llm_orchestrator, config_service
-            )
+    is_connected, error_message = plan_manager.check_connection()
+    if not is_connected:
+        st.error("🔴 **Erro de Conexão com a Planilha!**", icon="📡")
+        st.warning(f"**Detalhe:** {error_message}")
+        st.info(
+            "Isso geralmente acontece se o arquivo foi movido, excluído ou se a permissão de compartilhamento foi revogada."
         )
 
-        if plan_manager and agent_runner and llm_orchestrator_loaded:
-            st.session_state.plan_manager = plan_manager
-            st.session_state.agent_runner = agent_runner
-            st.session_state.llm_orchestrator = llm_orchestrator_loaded
-            st.session_state.current_planilha_path = current_planilha_path
+        if st.button("Tentar reconfigurar (Usar outra planilha)"):
+            manager.reset_config()
+            st.cache_resource.clear()
+            st.cache_data.clear()
+            st.rerun()
 
-            if (
-                dados_adicionados
-                and "dados_exemplo_msg_mostrada" not in st.session_state
-            ):
-                st.success("Dados de exemplo foram carregados na sua planilha!")
-                st.session_state.dados_exemplo_msg_mostrada = True
-        else:
-            st.error("Falha crítica ao carregar componentes do sistema.")
-            if st.button("Tentar Novamente (Limpar Configuração)"):
-                manager.reset_config()
-                st.cache_resource.clear()
-                st.cache_data.clear()
-                st.rerun()
-            st.stop()
-
-    # Recupera os objetos da sessão
-    plan_manager: PlanilhaManager = st.session_state.plan_manager
-    # Recupera os NOVOS services
-    profile_chat_service: ChatService = st.session_state.profile_chat_service
-    main_chat_service: ChatService = st.session_state.main_chat_service
-    # --- FIM DA MODIFICAÇÃO ---
+        st.stop()
 
     # --- Roteamento FASE 2: Setup do Perfil ---
     if not manager.verificar_perfil_preenchido(plan_manager):

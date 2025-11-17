@@ -38,6 +38,7 @@ class UserConfigService:
         self.config_dir = Path(config.DATA_DIR) / "users" / self.username
         self.config_file_path = self.config_dir / "user_config.json"
         self.strategy_file_path = self.config_dir / "user_strategy.py"
+        self.strategy_module_name = self.strategy_file_path.stem
         self._ensure_dir_exists()
 
     def _ensure_dir_exists(self) -> None:
@@ -129,12 +130,14 @@ class UserConfigService:
         config_data = self.load_config()
         return config_data.get("mapeamento")
 
-    def save_mapeamento(
-        self, mapeamento: dict[str, Any], strategy_module_name: str
-    ) -> None:
+    def save_mapeamento(self, mapeamento: dict[str, Any]) -> None:
         """Salva o mapeamento E o nome do módulo da estratégia."""
         config_data = self.load_config()
-        mapeamento["strategy_module"] = strategy_module_name
+        if "strategy_module" not in mapeamento:
+            print("AVISO: save_mapeamento chamado sem 'strategy_module' no dict.")
+            # Adiciona o nome do módulo padrão por segurança
+            mapeamento["strategy_module"] = self.strategy_module_name
+
         config_data["mapeamento"] = mapeamento
         self.save_config(config_data)
 
@@ -157,18 +160,45 @@ class UserConfigService:
         self.save_config(config_data)
 
     def clear_config(self) -> None:
-        """Limpa a configuração (reseta o onboarding) E a estratégia customizada."""
-        print(f"--- DEBUG ConfigService: Limpando config para {self.username} ---")
-        # 1. Apaga o config.json (criptografado)
-        if self.config_file_path.exists():
-            try:
-                os.remove(self.config_file_path)
-            except OSError as e:
-                print(f"AVISO: Falha ao limpar {self.config_file_path}: {e}")
+        """
+        Reseta o *onboarding da planilha*, mas MANTÉM as
+        configurações de identidade do usuário (ex: tokens do Google).
+        """
+        print(
+            f"--- DEBUG ConfigService: Resetando (clear) config da planilha para {self.username} ---"
+        )
 
-        # 2. Apaga a estratégia .py customizada (CICLO DE VIDA)
+        # 1. Carrega a configuração atual
+        config_data = self.load_config()
+
+        # 2. Lista de chaves a *manter* (identidade)
+        keys_to_keep = [
+            "google_oauth_tokens"
+            # (No futuro, 'openfinance_tokens', etc. entrariam aqui)
+        ]
+
+        # 3. Cria um novo dict SÓ com as chaves de identidade
+        new_config_data = {
+            key: config_data[key] for key in keys_to_keep if key in config_data
+        }
+
+        # 4. Salva o config "limpo" (só com a identidade)
+        self.save_config(new_config_data)
+
+        # 5. Apaga a estratégia .py customizada (CICLO DE VIDA LGPD)
         if self.strategy_file_path.exists():
             try:
                 os.remove(self.strategy_file_path)
             except OSError as e:
                 print(f"AVISO: Falha ao limpar {self.strategy_file_path}: {e}")
+
+    def save_google_oauth_tokens(self, token_json_str: str) -> None:
+        """Salva os tokens OAuth 2.0 do usuário (como JSON string) no config."""
+        config_data = self.load_config()
+        config_data["google_oauth_tokens"] = token_json_str
+        self.save_config(config_data)
+
+    def get_google_oauth_tokens(self) -> str | None:
+        """Carrega os tokens OAuth 2.0 do usuário (como JSON string)."""
+        config_data = self.load_config()
+        return config_data.get("google_oauth_tokens")

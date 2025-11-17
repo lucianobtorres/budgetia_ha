@@ -14,11 +14,13 @@ import config
 from app.notification_sender import TelegramSender  # O "Carteiro"
 from core.llm_manager import LLMOrchestrator
 from core.llm_providers.gemini_provider import GeminiProvider
+from core.user_config_service import UserConfigService
 from initialization.system_initializer import initialize_financial_system
-from web_app.utils import load_persistent_config
 
 
-def check_missing_daily_transport() -> None:
+def check_missing_daily_transport(
+    config_service: UserConfigService, llm_orchestrator: LLMOrchestrator
+) -> None:
     """
     Verifica se o usuário lançou despesa de 'Transporte' nas últimas 48h
     e envia uma notificação proativa via Telegram.
@@ -28,9 +30,8 @@ def check_missing_daily_transport() -> None:
 
     try:
         # 1. Carregar configuração
-        user_config = load_persistent_config()
-        planilha_path = user_config.get(config.PLANILHA_KEY)
-
+        user_config = config_service.load_config()
+        planilha_path = config_service.get_planilha_path()
         # --- 2. CARREGAR CONFIGS DE COMUNICAÇÃO ---
         comms_config = user_config.get("comunicacao", {})
         telegram_chat_id = comms_config.get("telegram_chat_id")
@@ -48,7 +49,9 @@ def check_missing_daily_transport() -> None:
             return
 
         if not planilha_path or not Path(planilha_path).exists():
-            print(f"ERRO JOB: Planilha não encontrada em {planilha_path}. Pulando.")
+            print(
+                f"ERRO JOB: Planilha não encontrada para {config_service.username}. Pulando."
+            )
             return
         # --- FIM CARREGAR CONFIGS ---
 
@@ -58,7 +61,7 @@ def check_missing_daily_transport() -> None:
         llm_orchestrator.get_configured_llm()
 
         plan_manager, _, _, _ = initialize_financial_system(
-            planilha_path, llm_orchestrator
+            planilha_path, llm_orchestrator, config_service=config_service
         )
 
         if not plan_manager:

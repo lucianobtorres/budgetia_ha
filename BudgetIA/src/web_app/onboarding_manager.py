@@ -28,6 +28,7 @@ class OnboardingState(Enum):
 
     INIT = auto()
     AWAITING_FILE_SELECTION = auto()
+    AWAITING_BACKEND_CONSENT = auto()
     GENERATING_STRATEGY = auto()
     STRATEGY_FAILED_FALLBACK = auto()
     GUIDED_IMPORT_MAPPING = auto()
@@ -139,45 +140,68 @@ class OnboardingManager:
 
         # 1. Delega a preparação do arquivo (download/conversão)
         preparer = FileAnalysisPreparer(path_str)
+        generator = StrategyGenerator(self.llm_orchestrator, self.max_retries)
 
+        path_para_analise = ""
+        strategy_path = self.config_service.strategy_file_path
         try:
-            # 2. Obtém o cminho local (temporário ou original)
             path_para_analise = preparer.get_local_path()
 
-            # 3. Envia o caminho local para o Gerador
-            print(
-                f"--- DEBUG OB_MGR: Enviando '{path_para_analise}' para o StrategyGenerator... ---"
-            )
-            generator = StrategyGenerator(self.llm_orchestrator, self.max_retries)
+            # --- 1. SEU INSIGHT DE REUTILIZAÇÃO ---
+            if strategy_path.exists():
+                print(
+                    f"--- DEBUG OB_MGR: Testando estratégia existente em {strategy_path}... ---"
+                )
 
-            # 1. GERAR E VALIDAR A ESTRATÉGIA
-            success, result_message = generator.generate_and_validate_strategy(
-                path_para_analise
+                # Chama o novo método público do generator
+                success, msg = generator.validate_existing_strategy(
+                    strategy_path, path_para_analise
+                )
+                if success:
+                    print(
+                        "--- DEBUG OB_MGR: Estratégia existente é válida! Reutilizando. ---"
+                    )
+
+                    # O mapeamento já deve existir, mas salvamos o path
+                    # para garantir que o 'mapeamento' no config está correto
+                    mapa_config = {"strategy_module": strategy_path.stem}
+                    self.config_service.save_mapeamento(mapa_config)
+
+                    self._save_planilha_path(path_str)  # Salva o link da planilha
+                    self.set_state(OnboardingState.SETUP_COMPLETE)
+                    return True, "Sucesso! A IA reutilizou sua estratégia existente."
+                else:
+                    print(
+                        f"--- DEBUG OB_MGR: Estratégia existente falhou ({msg}). Gerando uma nova... ---"
+                    )
+            # --- FIM DA REUTILIZAÇÃO ---
+
+            # --- 2. FLUXO NORMAL DE GERAÇÃO ---
+            print(
+                f"--- DEBUG OB_MGR: Enviando '{path_para_analise}' para o StrategyGenerator (Salvar em: {strategy_path})... ---"
+            )
+
+            success, result_message_json = generator.generate_and_validate_strategy(
+                path_para_analise,
+                strategy_path,  # Passa o caminho de salvamento do usuário
             )
 
             if success:
-                mapa_config = json.loads(result_message)
+                # O result_message_json é o JSON: {"strategy_module": "user_strategy"}
+                mapa_config = json.loads(result_message_json)
+
+                # Salva o mapeamento (que contém o nome do módulo)
                 self.config_service.save_mapeamento(mapa_config)
 
-                # 4. Salva o caminho/link ORIGINAL
-                self._save_planilha_path(path_str)  # Salva o caminho E o mapa
-
+                self._save_planilha_path(path_str)
                 self.set_state(OnboardingState.SETUP_COMPLETE)
                 return (
                     True,
                     f"Sucesso! A IA criou a estratégia '{mapa_config.get('strategy_module')}'.",
                 )
-
-            else:  # 3. FALHA (PLANO A falhou)
-                print(
-                    f"--- DEBUG OB_MGR: Geração de estratégia falhou. Erro: {result_message} ---"
-                )
-                # Ativa o fallback
+            else:
                 self.set_state(OnboardingState.STRATEGY_FAILED_FALLBACK)
-                return (
-                    False,
-                    f"A IA não conseguiu criar um código para sua planilha. Erro: {result_message}",
-                )
+                return False, result_message_json  # Retorna o erro da IA
 
         except Exception as e:
             print(
@@ -187,7 +211,6 @@ class OnboardingManager:
             return False, f"Um erro inesperado ocorreu: {e}"
 
         finally:
-            # 5. Manda o preparador limpar o arquivo temporário (se houver)
             preparer.cleanup()
 
     # --- 4. CORRIGIR A LÓGICA DE 'set_planilha_from_path' ---
@@ -201,37 +224,12 @@ class OnboardingManager:
         if not path_str:
             return False, "O caminho/link não pode ser vazio."
 
-        # Verifica se é uma URL válida do GSheets
-        if "docs.google.com/" not in path_str:
-            if not path_str.endswith(".xlsx"):
-                return False, "O arquivo local deve ser .xlsx"
-
-        # Se não for URL, trata como arquivo local e verifica
-        else:
-            path_obj = Path(path_str)
-            if not path_obj.is_file():
-                return False, f"Arquivo não encontrado: {path_str}"
-            if not path_obj.name.endswith(".xlsx"):
-                return False, "O arquivo deve ser .xlsx"
-
         # Salva o caminho que a IA precisa processar
-        # (Se for GSheets, o "processamento" será pular a geração de estratégia)
         self.config_service.save_pending_planilha_path(path_str)
 
-        # --- LÓGICA DE ESCOLHA DE ESTADO ---
-        # Se for GSheets, não precisamos gerar estratégia (ainda)
-        if "docs.google.com/" in path_str:
-            print(
-                "--- DEBUG OB_MGR: Detectado Google Sheets, iniciando geração de estratégia. ---"
-            )
-            self.set_state(OnboardingState.GENERATING_STRATEGY)
-            return True, "Usando Planilha Google..."
-        else:
-            # Apenas define o estado para geração de estratégia
-            self.set_state(OnboardingState.GENERATING_STRATEGY)
-            return True, "Caminho válido. Iniciando geração de estratégia..."
-
-    # --- FIM DA CORREÇÃO 4 ---
+        # O estado é SEMPRE 'GENERATING_STRATEGY' (que agora também testa re-uso)
+        self.set_state(OnboardingState.GENERATING_STRATEGY)
+        return True, "Caminho salvo. Iniciando análise e geração de estratégia..."
 
     def handle_uploaded_planilha(
         self,
@@ -319,3 +317,21 @@ class OnboardingManager:
             True,
             "Vamos iniciar a importação guiada. Por favor, me ajude a mapear suas colunas.",
         )
+
+    def set_google_file_selection(self, file_url: str) -> None:
+        """
+        Chamado quando o usuário seleciona um arquivo do Google Drive.
+        Salva o arquivo e transiciona para a tela de consentimento.
+
+        Args:
+            file_url (str): A URL (webViewLink) do arquivo selecionado.
+        """
+        print(
+            f"--- DEBUG OB_MGR: Usuário selecionou o arquivo Google URL: {file_url} ---"
+        )
+
+        # 1. Salva a URL para o FileAnalysisPreparer usar depois
+        self.config_service.save_pending_planilha_path(file_url)
+
+        # 2. Muda o estado (NÃO chama st.rerun() aqui)
+        self.set_state(OnboardingState.AWAITING_BACKEND_CONSENT)

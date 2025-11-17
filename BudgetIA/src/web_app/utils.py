@@ -8,14 +8,18 @@ from typing import Any
 
 import pandas as pd
 import streamlit as st
+import streamlit_authenticator as stauth
+import yaml
+from yaml.loader import SafeLoader
 
+from core.user_config_service import UserConfigService
 from finance.strategies.base_strategy import BaseMappingStrategy
 
 # Adiciona o diretório 'src' ao sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import config
-from config import DATA_DIR, PLANILHA_KEY
+from config import DATA_DIR, DEFAULT_GEMINI_MODEL, PLANILHA_KEY
 from core.llm_manager import LLMOrchestrator
 from core.llm_providers.gemini_provider import GeminiProvider
 
@@ -26,6 +30,37 @@ from finance.planilha_manager import PlanilhaManager
 from initialization.strategy_generator import StrategyGenerator
 
 CONFIG_FILE_PATH = Path(DATA_DIR) / "user_config.json"
+
+
+@st.cache_resource
+def get_llm_orchestrator() -> LLMOrchestrator:
+    """Cria e cacheia o LLMOrchestrator."""
+    print("--- DEBUG APP: Criando LLMOrchestrator (cache_resource)... ---")
+    primary_provider = GeminiProvider(default_model=DEFAULT_GEMINI_MODEL)
+    orchestrator = LLMOrchestrator(primary_provider=primary_provider)
+    orchestrator.get_configured_llm()
+    return orchestrator
+
+
+@st.cache_data(show_spinner=False)
+def get_user_config_service(username: str) -> UserConfigService:
+    print(f"--- DEBUG APP: Criando UserConfigService para '{username}' ---")
+    return UserConfigService(username)
+
+
+@st.cache_data
+def load_auth_config() -> dict[str, Any]:
+    """Carrega o arquivo de configuração YAML."""
+    try:
+        with open("data/users.yaml") as file:
+            config = yaml.load(file, Loader=SafeLoader)
+            return config
+    except FileNotFoundError:
+        st.error("Arquivo 'data/users.yaml' não encontrado.")
+        st.stop()
+    except Exception as e:
+        st.error(f"Erro ao ler 'data/users.yaml': {e}")
+        st.stop()
 
 
 def load_persistent_config() -> dict[str, Any]:
@@ -265,3 +300,57 @@ def create_excel_export_bytes(plan_manager: PlanilhaManager) -> bytes:
     except Exception as e:
         st.error(f"Erro ao gerar o arquivo Excel: {e}")
         return b""  # Retorna bytes vazios em caso de falha
+
+
+def initialize_session_auth() -> tuple[
+    bool, str | None, UserConfigService | None, LLMOrchestrator | None
+]:
+    """
+    Função MESTRE. Deve ser chamada no topo de CADA página.
+    Renderiza o login, gerencia o estado e inicializa os serviços.
+    Retorna (is_logged_in, username, config_service, llm_orchestrator)
+    """
+
+    auth_config = load_auth_config()
+    llm_orchestrator = get_llm_orchestrator()
+
+    authenticator = stauth.Authenticate(
+        auth_config["credentials"],
+        auth_config["cookie"]["name"],
+        auth_config["cookie"]["key"],
+        auth_config["cookie"]["expiry_days"],
+    )
+
+    # Renderiza o widget de login na *sidebar* para não travar a página
+    # ou use st.empty() se preferir no centro
+    with st.container():
+        authenticator.login()
+
+    if st.session_state["authentication_status"] is True:
+        # --- USUÁRIO LOGADO ---
+        username = st.session_state["username"]
+        authenticator.logout("Sair", "sidebar")
+        st.sidebar.title(f"Bem-vindo, {st.session_state['name']}!")
+
+        # Inicializa os serviços
+        config_service = get_user_config_service(username)
+        return True, username, config_service, llm_orchestrator
+
+    elif st.session_state["authentication_status"] is False:
+        st.error("Usuário ou senha incorretos.")
+        return False, None, None, None
+    else:
+        # (authentication_status is None)
+        # --- NOVO FLUXO DE REGISTRO ---
+        # (Movido do ui_login.py para cá)
+        try:
+            if authenticator.register_user(preauthorization=False):
+                with open("data/users.yaml", "w") as file:
+                    yaml.dump(auth_config, file, default_flow_style=False)
+                st.success("Usuário registrado com sucesso! Por favor, faça o login.")
+        except Exception as e:
+            st.error(e)
+        # --- FIM DO FLUXO DE REGISTRO ---
+
+        st.warning("Por favor, faça o login ou crie uma conta para acessar o BudgetIA.")
+        return False, None, None, None

@@ -230,3 +230,24 @@ class GoogleDriveFileHandler(BaseStorageHandler):
         except Exception as e:
             print(f"Erro ao salvar (upload) o arquivo para o Google Drive: {e}")
             raise
+
+    def ping(self) -> tuple[bool, str]:
+        """Verifica se o arquivo GDrive está acessível."""
+        try:
+            # Uma chamada 'get' apenas de metadados é a mais leve possível
+            self.drive_service.files().get(fileId=self.file_id, fields="id").execute()
+            return True, "Arquivo Google Drive acessível."
+        except HttpError as e:
+            if e.resp.status == 403:
+                return (
+                    False,
+                    "Erro de Permissão (403): O arquivo no Google Drive não está mais compartilhado com o BudgetIA.",
+                )
+            elif e.resp.status == 404:
+                return (
+                    False,
+                    "Erro (404): O arquivo no Google Drive foi movido ou excluído.",
+                )
+            return False, f"Erro HTTP do Google Drive: {e}"
+        except Exception as e:
+            return False, f"Erro inesperado de conexão com GDrive: {e}"

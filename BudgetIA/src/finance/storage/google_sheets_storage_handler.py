@@ -170,3 +170,20 @@ class GoogleSheetsStorageHandler(BaseStorageHandler):
 
         except Exception as e:
             print(f"ERRO CRÍTICO ao salvar no Google Sheets: {e}")
+
+    def ping(self) -> tuple[bool, str]:
+        """Verifica se a planilha GSheet está acessível e compartilhada."""
+        try:
+            # A chamada .title é uma chamada de API leve que
+            # falhará se não tivermos mais permissão.
+            _ = self.spreadsheet.title
+            return True, "Planilha Google acessível."
+        except gspread.exceptions.APIError as e:
+            if e.response.status_code == 403:
+                return (
+                    False,
+                    "Erro de Permissão (403): A Planilha Google não está mais compartilhada com o BudgetIA.",
+                )
+            return False, f"Erro de API do Google: {e}"
+        except Exception as e:
+            return False, f"Erro inesperado de conexão com GSheets: {e}"

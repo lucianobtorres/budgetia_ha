@@ -1,28 +1,70 @@
 # src/finance/planilha_manager.py
 import datetime
-import logging
+
+# --- NOVOS IMPORTS NECESSÁRIOS ---
+import importlib.util
+import sys
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
 
-from config import DADOS_EXEMPLO_PATH, ColunasOrcamentos, ColunasTransacoes, NomesAbas
+# --- FIM NOVOS IMPORTS ---
+from config import (
+    DADOS_EXEMPLO_PATH,
+    LAYOUT_PLANILHA,
+    ColunasOrcamentos,
+    ColunasTransacoes,
+    NomesAbas,
+)
 
+# --- IMPORT DO CONFIG SERVICE ---
+from core.user_config_service import UserConfigService
+
+# --- FIM IMPORT ---
 from .financial_calculator import FinancialCalculator
 from .repositories.budget_repository import BudgetRepository
+
+# --- DATA CONTEXT AGORA É IMPORTADO ASSIM ---
 from .repositories.data_context import FinancialDataContext
+
+# --- FIM IMPORT ---
 from .repositories.debt_repository import DebtRepository
 from .repositories.insight_repository import InsightRepository
 from .repositories.profile_repository import ProfileRepository
 from .repositories.transaction_repository import TransactionRepository
-
-# --- 1. REMOVER O IMPORT CONCRETO ---
-# from .excel_handler import ExcelHandler
-# --- 2. ADICIONAR O IMPORT DA INTERFACE ---
 from .storage.base_storage_handler import BaseStorageHandler
+
+# --- IMPORTS DE ESTRATÉGIA (BASE E DEFAULT) ---
+from .strategies.base_strategy import BaseMappingStrategy
+from .strategies.default_strategy import DefaultStrategy
 from .utils import _carregar_dados_exemplo
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# --- FIM IMPORTS ---
+
+
+def _load_strategy_from_file(
+    strategy_path: Path, module_name: str
+) -> type[BaseMappingStrategy]:  # Retorna a *classe*
+    """Carrega dinamicamente a classe de estratégia do arquivo .py do usuário."""
+    try:
+        spec = importlib.util.spec_from_file_location(module_name, strategy_path)
+        if spec is None:
+            raise ImportError(f"Não foi possível criar spec para {strategy_path}")
+
+        strategy_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(strategy_module)
+
+        # (Remove o módulo do cache para garantir que carregamos o certo)
+        sys.modules.pop(module_name, None)
+
+        # O nome da classe é padronizado pelo StrategyGenerator
+        StrategyClass = getattr(strategy_module, "CustomStrategy")
+        return StrategyClass
+    except Exception as e:
+        print(f"ERRO CRÍTICO: Falha ao carregar estratégia de '{strategy_path}': {e}")
+        # Retorna a Padrão como fallback de segurança
+        return DefaultStrategy
 
 
 class PlanilhaManager:
@@ -34,18 +76,39 @@ class PlanilhaManager:
 
     def __init__(
         self,
-        # --- 3. MUDAR O TIPO DA DEPENDÊNCIA ---
         storage_handler: BaseStorageHandler,
-        # (O nome do argumento muda de 'excel_handler' para 'storage_handler')
-        mapeamento: dict[str, Any] | None = None,
+        config_service: UserConfigService,  # <-- Injeta o ConfigService
+        # (Removido 'mapeamento')
     ) -> None:
         """
         Inicializa o gerenciador, o DataContext e todos os Repositórios.
         """
-        # --- 4. INJETAR O HANDLER ABSTRATO NO DATACONTEXT ---
+        mapeamento = config_service.get_mapeamento()
+        strategy_instance: BaseMappingStrategy
+
+        if mapeamento and mapeamento.get("strategy_module"):
+            module_name = mapeamento["strategy_module"]
+            strategy_path = (
+                config_service.strategy_file_path
+            )  # (ex: data/users/jsmith/user_strategy.py)
+
+            print(
+                f"--- DEBUG PM: Carregando estratégia customizada '{module_name}' de {strategy_path} ---"
+            )
+
+            StrategyClass = _load_strategy_from_file(strategy_path, module_name)
+            strategy_instance = StrategyClass(LAYOUT_PLANILHA, mapeamento)
+        else:
+            print(
+                "--- DEBUG PM: Mapeamento não encontrado. Usando DefaultStrategy. ---"
+            )
+            strategy_instance = DefaultStrategy(LAYOUT_PLANILHA, None)
+
         self._context = FinancialDataContext(
-            storage_handler=storage_handler, mapeamento=mapeamento
+            storage_handler=storage_handler, strategy=strategy_instance
         )
+        self.is_new_file = self._context.is_new_file
+
         self.calculator = FinancialCalculator()
         self.is_new_file = self._context.is_new_file
 
@@ -87,9 +150,6 @@ class PlanilhaManager:
         else:
             print("LOG: Arquivo existente carregado. Recalculando orçamentos...")
             self.recalculate_budgets()
-
-    # --- O RESTO DO ARQUIVO (TODOS OS MÉTODOS DELEGADOS) ---
-    # --- PERMANECE EXATAMENTE IGUAL ---
 
     # ... (save) ...
     def save(self, add_intelligence: bool = False) -> None:
@@ -285,3 +345,10 @@ class PlanilhaManager:
             self.profile_repo.save_profile_field("Renda Mensal Média", None)
         if "principal objetivo" not in campos_existentes:
             self.profile_repo.save_profile_field("Principal Objetivo", None)
+
+    def check_connection(self) -> tuple[bool, str]:
+        """
+        Delega a verificação de conexão para o handler de armazenamento.
+        """
+        print("--- DEBUG PM: Verificando saúde da conexão com o armazenamento... ---")
+        return self._context.storage.ping()
