@@ -3,15 +3,12 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pandas as pd
 import pytest
 from cryptography.fernet import Fernet
 
-import config
 from core.user_config_service import UserConfigService
 from finance.planilha_manager import PlanilhaManager
-from finance.repositories.data_context import FinancialDataContext
-from finance.storage.excel_storage_handler import ExcelHandler
+from finance.storage.base_storage_handler import BaseStorageHandler
 
 # --- INÍCIO DA CORREÇÃO: Adicionar a Raiz do Projeto ao sys.path ---
 
@@ -33,43 +30,35 @@ TEST_ENCRYPTION_KEY = Fernet.generate_key()
 
 
 @pytest.fixture
-def plan_manager_para_ferramentas() -> PlanilhaManager:
-    """
-    Cria um PlanilhaManager "dummy" em memória para os testes das ferramentas.
-    Simula a nova estrutura interna com todos os repositórios reais.
-    """
+def mock_storage_handler() -> MagicMock:
+    """Cria um mock genérico do BaseStorageHandler."""
+    # (Usamos 'autospec=True' para garantir que ele só tenha
+    # métodos que a interface real tem)
+    handler = MagicMock(spec=BaseStorageHandler)
 
-    # 1. Mockar o ExcelHandler (como antes)
-    handler_teste = MagicMock(spec=ExcelHandler)
-    handler_teste.file_path = "dummy_tool_test.xlsx"
-    mock_dfs = {
-        aba: pd.DataFrame(columns=colunas)
-        for aba, colunas in config.LAYOUT_PLANILHA.items()
-    }
-    # Força o caminho de "novo arquivo" no PlanilhaManager
-    handler_teste.load_sheets.return_value = (mock_dfs, True)
+    # Define valores de retorno padrão para o 'load_sheets'
+    # (dados vazios, não é um arquivo novo)
+    handler.load_sheets.return_value = ({}, False)
+    return handler
 
-    # 2. Mockar o ConfigService (para isolar o teste)
+
+@pytest.fixture
+def plan_manager_para_ferramentas(
+    mock_storage_handler: MagicMock,
+) -> PlanilhaManager:
+    """Fixture do PlanilhaManager para injetar nas ferramentas."""
+
+    # Cria um mock do UserConfigService
     mock_config_service = MagicMock(spec=UserConfigService)
-    # Garante que ele não vai tentar carregar uma estratégia customizada
+    mock_config_service.username = "tool_test_user"
     mock_config_service.get_mapeamento.return_value = None
 
-    # 3. Pular a lógica de 'populate' e 'save' no __init__
-    # para ter um ambiente 100% limpo e controlado
-    with (
-        patch.object(PlanilhaManager, "_populate_initial_data", return_value=None),
-        patch.object(FinancialDataContext, "save", return_value=None),
-    ):
-        # 4. Criar o PlanilhaManager real, que vai construir
-        # seus próprios componentes internos
+    # Pula o 'recalculate_budgets'
+    with patch.object(PlanilhaManager, "recalculate_budgets", return_value=None):
         plan_manager = PlanilhaManager(
-            storage_handler=handler_teste, config_service=mock_config_service
+            storage_handler=mock_storage_handler,
+            config_service=mock_config_service,  # Passa o mock
         )
-
-    # 5. Mockar métodos de alto nível para isolar as ferramentas
-    plan_manager.save = MagicMock()
-    plan_manager.recalculate_budgets = MagicMock()
-
     return plan_manager
 
 

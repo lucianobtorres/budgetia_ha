@@ -136,7 +136,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             raise Exception("ChatService não foi inicializado.")
 
         # --- A MÁGICA ACONTECE AQUI ---
-        response = bot_chat_service.handle_message(user_text)
+        user_id_key = f"{BOT_USERNAME}:{chat_id}"
+        response = bot_chat_service.handle_message(user_text, user_id_key)
         # --- FIM DA MÁGICA ---
 
         await update.message.reply_text(response)

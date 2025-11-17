@@ -223,6 +223,22 @@ with st.container(border=True):
 st.divider()
 st.subheader("Configurações Avançadas")
 
+with st.container(border=True):
+    st.subheader("Sincronização de Cache")
+    st.caption(
+        "Se você editou sua planilha por fora do app (direto no Google Sheets) e o Bot está com dados antigos, use este botão."
+    )
+    if st.button(
+        "Forçar Sincronização",
+        help="Limpa o cache do Redis e força a releitura do arquivo Google.",
+    ):
+        with st.spinner("Limpando cache e recarregando dados da nuvem..."):
+            plan_manager.clear_cache()
+        st.success(
+            "Sincronização concluída! O app e o bot agora têm os dados mais recentes."
+        )
+        st.rerun()
+
 with st.expander("Zona de Perigo"):
     st.warning(
         "Atenção: A ação abaixo irá desconfigurar sua planilha atual e reiniciar o BudgetIA, pedindo uma nova planilha na próxima vez que você abrir o app."

@@ -3,6 +3,7 @@
 import pandas as pd
 
 import config
+from core.cache_service import CacheService
 
 from ..storage.base_storage_handler import BaseStorageHandler
 from ..strategies.base_strategy import BaseMappingStrategy
@@ -18,7 +19,9 @@ class FinancialDataContext:
     def __init__(
         self,
         storage_handler: BaseStorageHandler,
-        strategy: BaseMappingStrategy,  # <-- Aceita a ESTRATÉGIA, não o 'mapeamento'
+        strategy: BaseMappingStrategy,
+        cache_service: CacheService,
+        cache_key: str,
     ) -> None:
         """
         Inicializa o contexto.
@@ -32,11 +35,14 @@ class FinancialDataContext:
         self.storage = storage_handler
         self.layout_config = config.LAYOUT_PLANILHA
 
-        self.strategy = strategy  # <-- Salva a estratégia injetada
+        self.strategy = strategy
+        self.cache = cache_service
+        self.cache_key = cache_key
         print(
             f"--- [LOG DataContext] Usando estratégia injetada: '{type(self.strategy).__name__}'."
         )
 
+        self.is_cache_hit = False
         self.data: dict[str, pd.DataFrame] = {}
         self.is_new_file = self._load_data()
 
@@ -44,11 +50,36 @@ class FinancialDataContext:
         """
         Usa o handler e a estratégia para carregar os dados.
         """
-        # --- 5. USAR O NOVO ATRIBUTO 'self.storage' ---
+        cached_data, cached_timestamp = self.cache.get_dfs(self.cache_key)
+        source_timestamp = self.storage.get_source_modified_time()
+
+        # --- 3. DECIDIR (O SEU INSIGHT) ---
+        if cached_data is not None and cached_timestamp == source_timestamp:
+            print(
+                "--- [LOG DataContext] Cache HIT (Timestamps correspondem). Carregando dados do Redis. ---"
+            )
+            self.data = cached_data
+            self.is_cache_hit = True
+            return False
+
+        if cached_data is not None:
+            print(
+                f"--- [LOG DataContext] Cache STALE (Timestamps diferem: {cached_timestamp} != {source_timestamp}). ---"
+            )
+        else:
+            print("--- [LOG DataContext] Cache MISS (Vazio). ---")
+
+        print("Lendo do armazenamento (GSheets/Excel)...")
         dataframes, is_new_file = self.storage.load_sheets(
             self.layout_config, self.strategy
         )
         self.data = dataframes
+
+        self.is_cache_hit = False
+        if not is_new_file:
+            final_source_timestamp = self.storage.get_source_modified_time()
+            self.cache.set_dfs(self.cache_key, self.data, final_source_timestamp)
+
         return bool(is_new_file)
 
     def get_dataframe(self, sheet_name: str) -> pd.DataFrame:
@@ -65,6 +96,7 @@ class FinancialDataContext:
         """
         if sheet_name not in self.data:
             raise ValueError(f"Aba '{sheet_name}' não pode ser atualizada.")
+
         self.data[sheet_name] = new_df
 
     def save(self, add_intelligence: bool = False) -> None:
@@ -72,5 +104,22 @@ class FinancialDataContext:
         Salva TODOS os DataFrames em memória de volta no
         arquivo de origem (Excel), usando o handler.
         """
-        # --- 6. USAR O NOVO ATRIBUTO 'self.storage' ---
+        # 1. Salva no GDrive/Excel (lento)
+        print("LOG: Salvando no armazenamento persistente (StorageHandler)...")
         self.storage.save_sheets(self.data, self.strategy, add_intelligence)
+
+        try:
+            # Espera 1s para garantir que o GDrive atualize seus metadados
+            import time
+
+            time.sleep(1)
+        except:
+            pass  # (Não é crítico se o sleep falhar)
+
+        final_source_timestamp = self.storage.get_source_modified_time()
+
+        # 3. Atualiza o cache (rápido)
+        print("LOG: Atualizando o cache (CacheService)...")
+        self.cache.set_dfs(self.cache_key, self.data, final_source_timestamp)
+
+        print("LOG: Salvamento e atualização de cache concluídos.")

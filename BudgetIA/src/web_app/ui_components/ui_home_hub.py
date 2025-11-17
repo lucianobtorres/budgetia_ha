@@ -111,8 +111,8 @@ def _render_chat_interface(chat_service: ChatService) -> None:  # Recebe o ChatS
                 # 1. Salva 'prompt' no histórico
                 # 2. Chama 'agent_runner.interagir()'
                 # 3. Salva 'response' no histórico
-                _ = chat_service.handle_message(prompt)
-
+                user_id_key = st.session_state.get("username", "default_user")
+                _ = chat_service.handle_message(prompt, user_id_key)
                 # Não precisamos fazer mais nada aqui
 
         # O Rerun vai recarregar a UI, e o loop lá em cima

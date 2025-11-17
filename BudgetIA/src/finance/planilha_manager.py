@@ -17,6 +17,7 @@ from config import (
     ColunasTransacoes,
     NomesAbas,
 )
+from core.cache_service import CacheService
 
 # --- IMPORT DO CONFIG SERVICE ---
 from core.user_config_service import UserConfigService
@@ -83,14 +84,23 @@ class PlanilhaManager:
         """
         Inicializa o gerenciador, o DataContext e todos os Repositórios.
         """
+        print(
+            f"--- DEBUG PM: PlanilhaManager inicializado para usuário '{config_service.username}' ---"
+        )
+
+        # --- 2. INSTANCIAR O CACHE SERVICE ---
+        # (O CacheService já lê o config.UPSTASH_REDIS_URL)
+        self.cache_service = CacheService()
+        # Define uma chave de cache única para este usuário
+        self.cache_key = f"dfs:{config_service.username}"
+        # --- FIM DA INSTANCIAÇÃO ---
+
         mapeamento = config_service.get_mapeamento()
         strategy_instance: BaseMappingStrategy
 
         if mapeamento and mapeamento.get("strategy_module"):
             module_name = mapeamento["strategy_module"]
-            strategy_path = (
-                config_service.strategy_file_path
-            )  # (ex: data/users/jsmith/user_strategy.py)
+            strategy_path = config_service.strategy_file_path
 
             print(
                 f"--- DEBUG PM: Carregando estratégia customizada '{module_name}' de {strategy_path} ---"
@@ -105,8 +115,12 @@ class PlanilhaManager:
             strategy_instance = DefaultStrategy(LAYOUT_PLANILHA, None)
 
         self._context = FinancialDataContext(
-            storage_handler=storage_handler, strategy=strategy_instance
+            storage_handler=storage_handler,
+            strategy=strategy_instance,
+            cache_service=self.cache_service,
+            cache_key=self.cache_key,
         )
+
         self.is_new_file = self._context.is_new_file
 
         self.calculator = FinancialCalculator()
@@ -147,9 +161,13 @@ class PlanilhaManager:
                     "--- DEBUG PM: Arquivo mapeado/novo. Salvando abas do sistema... ---"
                 )
                 self._context.save(add_intelligence=False)
-        else:
-            print("LOG: Arquivo existente carregado. Recalculando orçamentos...")
+        elif not self._context.is_cache_hit:
+            print(
+                "LOG: Arquivo existente carregado do Storage. Recalculando orçamentos..."
+            )
             self.recalculate_budgets()
+        else:
+            print("LOG: Arquivo existente carregado do Cache. Startup rápido.")
 
     # ... (save) ...
     def save(self, add_intelligence: bool = False) -> None:
@@ -352,3 +370,13 @@ class PlanilhaManager:
         """
         print("--- DEBUG PM: Verificando saúde da conexão com o armazenamento... ---")
         return self._context.storage.ping()
+
+    def clear_cache(self) -> None:
+        """
+        Força a invalidação (deleção) do cache deste usuário no Redis.
+        A próxima leitura será forçada a buscar do Google Drive.
+        """
+        print(
+            f"--- DEBUG PM: Forçando invalidação de cache para '{self.cache_key}' ---"
+        )
+        self._context.cache.delete(self.cache_key)

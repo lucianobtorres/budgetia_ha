@@ -1,5 +1,6 @@
 # Em: src/finance/storage/excel_storage_handler.py
 import os
+from datetime import datetime
 
 import pandas as pd
 
@@ -230,3 +231,12 @@ class ExcelHandler(BaseStorageHandler):
         if not os.path.exists(self.file_path):
             return False, f"Arquivo não encontrado: {self.file_path}"
         return True, "Arquivo local acessível."
+
+    def get_source_modified_time(self) -> str | None:
+        """Retorna o timestamp de modificação do arquivo local."""
+        try:
+            timestamp = os.path.getmtime(self.file_path)
+            # Converte para o mesmo formato ISO que o Google usa (com 'Z' UTC)
+            return datetime.fromtimestamp(timestamp).isoformat() + "Z"
+        except OSError:
+            return None

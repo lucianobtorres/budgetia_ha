@@ -4,12 +4,12 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import Any
 
 import pandas as pd
 from langchain_core.messages import HumanMessage, SystemMessage
 
 import config
+from core.llm_manager import LLMOrchestrator
 
 TEMPLATE_STRATEGY_PATH = Path("src/finance/strategies")
 GENERATED_CLASS_NAME = "CustomStrategy"
@@ -41,8 +41,8 @@ class StrategyGenerator:
     dinamicamente um módulo de estratégia em Python para lê-la e escrevê-la.
     """
 
-    def __init__(self, llm_orchestrator: Any, max_retries: int = 3):
-        self.llm = llm_orchestrator.get_configured_llm(temperature=0.0)
+    def __init__(self, llm_orchestrator: LLMOrchestrator, max_retries: int = 3):
+        self.llm = llm_orchestrator.get_configured_llm()
         self.max_retries = max_retries
 
     def _get_planilha_schema(self, file_path: str) -> str:

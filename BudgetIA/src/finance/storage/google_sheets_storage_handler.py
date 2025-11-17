@@ -187,3 +187,19 @@ class GoogleSheetsStorageHandler(BaseStorageHandler):
             return False, f"Erro de API do Google: {e}"
         except Exception as e:
             return False, f"Erro inesperado de conexão com GSheets: {e}"
+
+    def get_source_modified_time(self) -> str | None:
+        """
+        Retorna o timestamp 'updated' dos metadados da Planilha Google.
+        """
+        try:
+            # Força o gspread a buscar os metadados mais recentes da API
+            self.spreadsheet.fetch_properties()
+
+            # A propriedade 'updated' é uma string ISO 8601 (ex: "2025-11-17T18:00:00.000Z")
+            return self.spreadsheet.updated
+        except Exception as e:
+            print(
+                f"AVISO: Não foi possível obter modifiedTime (updated) do GSheet: {e}"
+            )
+            return None

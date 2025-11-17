@@ -54,3 +54,12 @@ class BaseStorageHandler(ABC):
         Retorna (True, "Sucesso") ou (False, "Mensagem de Erro").
         """
         pass
+
+    @abstractmethod
+    def get_source_modified_time(self) -> str | None:
+        """
+        Retorna o timestamp da "última modificação" do arquivo fonte.
+        Deve ser uma chamada leve (apenas metadados).
+        Retorna uma string (ISO format) ou None se não aplicável.
+        """
+        pass

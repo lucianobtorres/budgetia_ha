@@ -251,3 +251,19 @@ class GoogleDriveFileHandler(BaseStorageHandler):
             return False, f"Erro HTTP do Google Drive: {e}"
         except Exception as e:
             return False, f"Erro inesperado de conexão com GDrive: {e}"
+
+    def get_source_modified_time(self) -> str | None:
+        """Retorna o 'modifiedTime' do Google Drive (chamada leve)."""
+        try:
+            # Pede APENAS o campo 'modifiedTime'
+            file_metadata = (
+                self.drive_service.files()
+                .get(fileId=self.file_id, fields="modifiedTime")
+                .execute()
+            )
+
+            # Retorna a string ISO 8601 (ex: "2025-11-17T18:00:00.000Z")
+            return file_metadata.get("modifiedTime")
+        except Exception as e:
+            print(f"AVISO: Não foi possível obter modifiedTime do GDrive: {e}")
+            return None

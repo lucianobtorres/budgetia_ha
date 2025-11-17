@@ -36,6 +36,10 @@ def plan_manager(mock_excel_handler: MagicMock) -> PlanilhaManager:
     """
     # Cria um mock do UserConfigService
     mock_config_service = MagicMock(spec=UserConfigService)
+
+    # Dê ao mock os atributos que o __init__ espera
+    mock_config_service.username = "test_user"
+
     # Garante que ele não vai tentar carregar uma estratégia customizada
     mock_config_service.get_mapeamento.return_value = None
 

@@ -65,6 +65,12 @@ except FileNotFoundError:
 except Exception as e:
     print(f"AVISO CRÍTICO: Falha ao ler 'client_email' do JSON de credenciais: {e}")
 
+UPSTASH_REDIS_URL = os.getenv("UPSTASH_REDIS_URL")
+
+# Você pode adicionar uma verificação se quiser
+if not UPSTASH_REDIS_URL:
+    print("Aviso: UPSTASH_REDIS_URL não encontrada. O cache não funcionará.")
+
 
 class SummaryKeys:
     """Chaves usadas no dicionário de resumo financeiro."""
