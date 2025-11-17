@@ -159,6 +159,29 @@ class UserConfigService:
         config_data["onboarding_state"] = state
         self.save_config(config_data)
 
+    def save_google_oauth_tokens(self, token_json_str: str) -> None:
+        """Salva os tokens OAuth 2.0 do usuário (como JSON string) no config."""
+        config_data = self.load_config()
+        config_data["google_oauth_tokens"] = token_json_str
+        self.save_config(config_data)
+
+    def get_google_oauth_tokens(self) -> str | None:
+        """Carrega os tokens OAuth 2.0 do usuário (como JSON string)."""
+        config_data = self.load_config()
+        return config_data.get("google_oauth_tokens")
+
+    def save_backend_consent(self, has_consent: bool) -> None:
+        """Salva a decisão do usuário de compartilhar com o backend."""
+        config_data = self.load_config()
+        config_data["backend_consent"] = has_consent
+        self.save_config(config_data)
+
+    def get_backend_consent(self) -> bool:
+        """Verifica se o usuário deu consentimento ao backend."""
+        config_data = self.load_config()
+        # Retorna False por padrão se a chave não existir
+        return config_data.get("backend_consent", False)
+
     def clear_config(self) -> None:
         """
         Reseta o *onboarding da planilha*, mas MANTÉM as
@@ -202,3 +225,22 @@ class UserConfigService:
         """Carrega os tokens OAuth 2.0 do usuário (como JSON string)."""
         config_data = self.load_config()
         return config_data.get("google_oauth_tokens")
+
+    def save_comunicacao_field(self, field_name: str, value: Any) -> None:
+        """
+        Salva um campo (ex: 'telegram_chat_id') na chave 'comunicacao'
+        dentro do user_config.json.
+        """
+        config_data = self.load_config()
+
+        # Garante que a chave 'comunicacao' exista
+        if "comunicacao" not in config_data:
+            config_data["comunicacao"] = {}
+
+        # Só salva se o valor for novo, para evitar escritas desnecessárias
+        if config_data["comunicacao"].get(field_name) != value:
+            config_data["comunicacao"][field_name] = value
+            print(
+                f"--- DEBUG ConfigService: Salvando '{field_name}' ({value}) para {self.username} ---"
+            )
+            self.save_config(config_data)

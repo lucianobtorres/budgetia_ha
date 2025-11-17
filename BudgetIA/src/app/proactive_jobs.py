@@ -5,7 +5,6 @@ import asyncio
 # --- 1. NOVOS IMPORTS ---
 import os
 from datetime import datetime, timedelta
-from pathlib import Path
 
 import pandas as pd
 
@@ -13,7 +12,6 @@ import pandas as pd
 import config
 from app.notification_sender import TelegramSender  # O "Carteiro"
 from core.llm_manager import LLMOrchestrator
-from core.llm_providers.gemini_provider import GeminiProvider
 from core.user_config_service import UserConfigService
 from initialization.system_initializer import initialize_financial_system
 
@@ -26,16 +24,18 @@ def check_missing_daily_transport(
     e envia uma notificação proativa via Telegram.
     """
     print(f"\n--- JOB PROATIVO: {datetime.now()} ---")
-    print("Executando 'check_missing_daily_transport'...")
+    print(
+        f"Executando 'check_missing_daily_transport' para o usuário '{config_service.username}'..."
+    )
 
     try:
         # 1. Carregar configuração
         user_config = config_service.load_config()
         planilha_path = config_service.get_planilha_path()
+
         # --- 2. CARREGAR CONFIGS DE COMUNICAÇÃO ---
         comms_config = user_config.get("comunicacao", {})
         telegram_chat_id = comms_config.get("telegram_chat_id")
-
         telegram_token = os.getenv("TELEGRAM_TOKEN")
 
         if not telegram_token:
@@ -48,17 +48,12 @@ def check_missing_daily_transport(
             )
             return
 
-        if not planilha_path or not Path(planilha_path).exists():
+        if not planilha_path:
             print(
                 f"ERRO JOB: Planilha não encontrada para {config_service.username}. Pulando."
             )
             return
         # --- FIM CARREGAR CONFIGS ---
-
-        # 2. Inicializar o "Cérebro" (Backend)
-        primary_provider = GeminiProvider(default_model=config.DEFAULT_GEMINI_MODEL)
-        llm_orchestrator = LLMOrchestrator(primary_provider=primary_provider)
-        llm_orchestrator.get_configured_llm()
 
         plan_manager, _, _, _ = initialize_financial_system(
             planilha_path, llm_orchestrator, config_service=config_service

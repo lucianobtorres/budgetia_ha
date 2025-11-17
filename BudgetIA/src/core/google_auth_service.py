@@ -1,5 +1,6 @@
 # src/core/google_auth_service.py
 import json  # <-- 1. IMPORTAR JSON
+import re
 from typing import Any
 
 import streamlit as st
@@ -162,3 +163,101 @@ class GoogleAuthService:
         except Exception as e:
             print(f"ERRO GoogleAuth: Falha ao compartilhar arquivo: {e}")
             return False, f"Falha ao compartilhar arquivo: {e}"
+
+    # --- 2. ADICIONAR MÉTODO HELPER ---
+    def _extract_file_id_from_url(self, url: str) -> str | None:
+        """
+        Extrai o ID do arquivo de uma URL do Google Drive
+        (formato /file/ ou /spreadsheets/).
+        """
+        # Padrão: /file/d/ID ou /spreadsheets/d/ID
+        match = re.search(r"/(?:file|spreadsheets)/d/([a-zA-Z0-9_-]+)", url)
+        if match:
+            return match.group(1)
+
+        print(
+            f"--- DEBUG GoogleAuth: Não foi possível extrair File ID da URL: {url} ---"
+        )
+        return None
+
+    # --- 3. MÉTODO DE REVOGAÇÃO NÍVEL 1 -
+    def revoke_file_sharing_from_service_account(
+        self, file_id: str
+    ) -> tuple[bool, str]:
+        """
+        Usa as credenciais OAuth do *usuário* para REMOVER as permissões
+        da *Conta de Serviço* (o "robô").
+        """
+        creds = self.get_user_credentials()
+        if not creds or not config.SERVICE_ACCOUNT_EMAIL:
+            return False, "Credenciais do usuário ou e-mail de serviço não encontrados."
+
+        try:
+            drive_service = build("drive", "v3", credentials=creds)
+
+            # 1. Encontrar o ID da permissão do nosso "robô"
+            print(
+                f"--- DEBUG GoogleAuth: Procurando permissão para {config.SERVICE_ACCOUNT_EMAIL} no arquivo {file_id}... ---"
+            )
+            permission_id_to_delete = None
+            permissions = (
+                drive_service.permissions()
+                .list(fileId=file_id, fields="permissions(id, emailAddress)")
+                .execute()
+            )
+
+            for p in permissions.get("permissions", []):
+                if p.get("emailAddress") == config.SERVICE_ACCOUNT_EMAIL:
+                    permission_id_to_delete = p.get("id")
+                    break
+
+            if not permission_id_to_delete:
+                print(
+                    "--- DEBUG GoogleAuth: Permissão não encontrada (já foi revogada). ---"
+                )
+                return True, "O acesso do back-end já estava revogado."
+
+            # 2. Deletar a permissão
+            print(
+                f"--- DEBUG GoogleAuth: Revogando permissão ID: {permission_id_to_delete}... ---"
+            )
+            drive_service.permissions().delete(
+                fileId=file_id, permissionId=permission_id_to_delete
+            ).execute()
+
+            print("--- DEBUG GoogleAuth: Acesso revogado com sucesso. ---")
+            return True, "Acesso do back-end revogado com sucesso."
+
+        except Exception as e:
+            print(f"ERRO GoogleAuth: Falha ao revogar acesso: {e}")
+            return False, f"Falha ao revogar acesso: {e}"
+
+    # --- 4. MÉTODO DE REVOGAÇÃO NÍVEL 2 (Frontend) ---
+    def revoke_google_oauth_token(self) -> bool:
+        """
+        Revoga o refresh_token do usuário no Google.
+        Isso força o usuário a fazer login novamente.
+        """
+        creds = self.get_user_credentials()
+        if not creds or not creds.refresh_token:
+            print(
+                "--- DEBUG GoogleAuth: Nenhum token para revogar. Limpando localmente. ---"
+            )
+            self.config_service.save_google_oauth_tokens(None)  # Limpa o token local
+            return True
+
+        try:
+            # Tenta revogar o token no servidor do Google
+            creds.revoke(Request())
+            print(
+                f"--- DEBUG GoogleAuth: Token OAuth revogado com sucesso para {self.config_service.username}. ---"
+            )
+        except Exception as e:
+            print(
+                f"AVISO GoogleAuth: Falha ao revogar token no Google (pode já estar expirado): {e}"
+            )
+            # Continua mesmo se a revogação falhar...
+
+        # O mais importante: apaga o token local
+        self.config_service.save_google_oauth_tokens(None)
+        return True

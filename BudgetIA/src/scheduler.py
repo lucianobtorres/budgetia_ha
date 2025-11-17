@@ -1,8 +1,9 @@
 # src/scheduler.py
-import datetime
 import os
 import sys
 import time
+from datetime import datetime
+from pathlib import Path
 
 import schedule
 
@@ -46,13 +47,13 @@ except Exception as e:
     sys.exit(1)
 
 
-def run_proactive_jobs_for_all_users():
+def run_proactive_jobs_for_all_users() -> None:
     """
     Varre a pasta de usuários e dispara os jobs para cada um.
     """
     print(f"\n--- SCHEDULER: Verificando jobs para {datetime.now()} ---")
 
-    users_dir = Path(config.DATA_DIR) / "users"
+    users_dir = Path(os.path.join(config.DATA_DIR, "users"))
     if not users_dir.exists():
         print("SCHEDULER: Pasta 'data/users' não encontrada. Pulando.")
         return
@@ -82,32 +83,9 @@ def run_proactive_jobs_for_all_users():
 
 # Para testar, vamos rodar a cada 1 minuto
 print("Agendando 'check_missing_daily_transport' para rodar a cada 1 minuto.")
-schedule.every(1).minutes.do(proactive_jobs.check_missing_daily_transport)
-
-# (No futuro, você pode mudar para isso)
-# schedule.every().day.at("20:00").do(proactive_jobs.check_missing_daily_transport)
+schedule.every(1).minutes.do(run_proactive_jobs_for_all_users)
 
 print("Jobs agendados. Aguardando para executar...")
-
-
-def run_job(job_func):
-    """Wrapper para carregar o sistema e injetar nos jobs."""
-    print(f"\n--- JOB PROATIVO: {datetime.now()} ---")
-    try:
-        # --- 2. INICIALIZAR OS SERVIÇOS ---
-        print(f"SCHEDULER: Carregando sistema para '{SCHEDULER_USERNAME}'...")
-        config_service = UserConfigService(SCHEDULER_USERNAME)
-
-        primary_provider = GeminiProvider(default_model=config.DEFAULT_GEMINI_MODEL)
-        llm_orchestrator = LLMOrchestrator(primary_provider=primary_provider)
-
-        # --- 3. INJETAR SERVIÇOS NO JOB ---
-        # (Assumindo que seus jobs em 'proactive_jobs'
-        #  agora aceitam 'config_service' e 'llm_orchestrator')
-        job_func(config_service=config_service, llm_orchestrator=llm_orchestrator)
-
-    except Exception as e:
-        print(f"ERRO JOB: {e}")
 
 
 # --- Loop Principal ---
@@ -117,17 +95,3 @@ try:
         time.sleep(1)  # Dorme por 1 segundo para não fritar a CPU
 except KeyboardInterrupt:
     print("\nEncerrando o agendador...")
-
-if __name__ == "__main__":
-    print("--- SERVIÇO DE AGENDAMENTO (Scheduler) ---")
-    print("Inicializando...")
-
-    # --- 4. ATUALIZAR A CHAMADA DO JOB ---
-    # (Precisamos usar 'run_job' para injetar as dependências)
-    schedule.every(1).minutes.do(run_job, proactive_jobs.check_missing_daily_transport)
-    # ... (outros jobs) ...
-
-    print("Jobs agendados. Aguardando para executar...")
-    while True:
-        schedule.run_pending()
-        time.sleep(1)

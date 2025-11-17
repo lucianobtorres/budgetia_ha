@@ -58,49 +58,57 @@ if not TELEGRAM_TOKEN:
     TELEGRAM_TOKEN = ""
     raise ValueError("TELEGRAM_TOKEN não encontrado no arquivo .env!")
 
-# Carrega o LLM Orchestrator (global)
-primary_provider = GeminiProvider(default_model=config.DEFAULT_GEMINI_MODEL)
-llm_orchestrator = LLMOrchestrator(primary_provider=primary_provider)
-llm_orchestrator.get_configured_llm()
 
-print(f"BOT: Carregando sistema para o usuário '{BOT_USERNAME}'...")
+def load_global_services() -> tuple[ChatService | None, UserConfigService | None]:
+    try:
+        # Carrega o LLM Orchestrator (global)
+        primary_provider = GeminiProvider(default_model=config.DEFAULT_GEMINI_MODEL)
+        llm_orchestrator = LLMOrchestrator(primary_provider=primary_provider)
+        llm_orchestrator.get_configured_llm()
 
-try:
-    # Instancia o serviço para o usuário específico
-    config_service = UserConfigService(BOT_USERNAME)
-    planilha_path = config_service.get_planilha_path()
-    if not planilha_path:
-        raise ValueError(
-            f"Planilha não configurada para o usuário '{BOT_USERNAME}' no UserConfigService."
+        print(f"BOT: Carregando sistema para o usuário '{BOT_USERNAME}'...")
+
+        # Instancia o serviço para o usuário específico
+        config_service = UserConfigService(BOT_USERNAME)
+        planilha_path = config_service.get_planilha_path()
+        if not planilha_path:
+            raise ValueError(
+                f"Planilha não configurada para o usuário '{BOT_USERNAME}' no UserConfigService."
+            )
+
+        print(f"BOT: Carregando sistema para a planilha: {planilha_path}")
+        plan_manager, agent_runner, _, _ = initialize_financial_system(
+            planilha_path, llm_orchestrator, config_service=config_service
         )
+        if not agent_runner or not plan_manager:
+            raise RuntimeError("Falha ao inicializar o sistema financeiro para o bot.")
 
-    print(f"BOT: Carregando sistema para a planilha: {planilha_path}")
-    plan_manager, agent_runner, _, _ = initialize_financial_system(
-        planilha_path, llm_orchestrator, config_service=config_service
-    )
-    if not agent_runner or not plan_manager:
-        raise RuntimeError("Falha ao inicializar o sistema financeiro para o bot.")
+        # --- A CORREÇÃO ESTÁ AQUI ---
+        # Precisamos converter config.DATA_DIR (que é str) para um Path()
+        bot_history_path = config_service.config_dir / "telegram_chat_history.json"
+        # --- FIM DA CORREÇÃO ---
 
-    # --- A CORREÇÃO ESTÁ AQUI ---
-    # Precisamos converter config.DATA_DIR (que é str) para um Path()
-    bot_history_path = config_service.config_dir / "telegram_chat_history.json"
-    # --- FIM DA CORREÇÃO ---
+        bot_history_manager = JsonHistoryManager(str(bot_history_path))
+        print(f"BOT: Usando arquivo de histórico: {bot_history_path}")
 
-    bot_history_manager = JsonHistoryManager(str(bot_history_path))
-    print(f"BOT: Usando arquivo de histórico: {bot_history_path}")
+        # Cria o ChatService GLOBAL para o bot
+        bot_chat_service = ChatService(agent_runner, bot_history_manager)
 
-    # Cria o ChatService GLOBAL para o bot
-    bot_chat_service = ChatService(agent_runner, bot_history_manager)
-except Exception as e:
-    logger.critical(f"ERRO FATAL AO INICIAR O BOT: {e}", exc_info=True)
-    sys.exit(1)  # Impede o bot de rodar se o sistema não carregar
+        print("--- BOT PRONTO E OUVINDO ---")
+        return bot_chat_service, config_service
 
-print("--- BOT PRONTO E OUVINDO ---")
+    except Exception as e:
+        logger.critical(f"ERRO FATAL AO INICIAR O BOT: {e}", exc_info=True)
+        return None, None
+
+
+bot_chat_service, config_service = load_global_services()
 
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handler para o comando /start"""
-    bot_history_manager.clear()  # Limpa o histórico
+    if bot_chat_service:
+        bot_chat_service.history_manager.clear()  # Limpa o histórico
     await update.message.reply_text(
         "Olá! Sou seu assistente financeiro. Meu cérebro foi reiniciado e "
         "meu histórico de chat com você foi limpo. Como posso ajudar?"
@@ -112,14 +120,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if not update.message or not update.message.text:
         return
 
-    user_text = update.message.text
     chat_id = update.message.chat_id
+    if config_service:
+        # Salva o chat_id no user_config.json para o scheduler usar
+        config_service.save_comunicacao_field("telegram_chat_id", chat_id)
+
+    user_text = update.message.text
     print(f"BOT: Recebida mensagem de {chat_id}: '{user_text}'")
 
     # Mostra "Digitando..." no Telegram
     await context.bot.send_chat_action(chat_id=chat_id, action="typing")
 
     try:
+        if not bot_chat_service:
+            raise Exception("ChatService não foi inicializado.")
+
         # --- A MÁGICA ACONTECE AQUI ---
         response = bot_chat_service.handle_message(user_text)
         # --- FIM DA MÁGICA ---
@@ -135,6 +150,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 def main() -> None:
     """Função principal para rodar o bot."""
+    if not bot_chat_service or not config_service:
+        logger.critical("Serviços globais não puderam ser carregados. Encerrando bot.")
+        return
+
     application = Application.builder().token(TELEGRAM_TOKEN).build()
 
     # Adiciona os handlers
