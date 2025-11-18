@@ -64,7 +64,7 @@ class VerificarStatusOrcamentoTool(BaseTool):  # type: ignore[misc]
                     f"Gasto Atual: R$ {gasto_f.replace(',', 'X').replace('.', ',').replace('X', '.')}\n"
                     f"Porcentagem Gasta: {pct_f}%\n"
                     f"Status: {orc.get('Status Orçamento', 'N/A')}. "
-                    f"Última atualização: {orc.get('Última Atualização Orçamento', 'N/A')}."
+                    f"Última atualização: {orc.get(ColunasOrcamentos.ATUALIZACAO, 'N/A')}."
                 )
             else:
                 resumo_orcamentos = orcamentos_df[

@@ -4,7 +4,7 @@ import pandas as pd
 import config
 from config import ColunasOrcamentos
 
-from ..financial_calculator import FinancialCalculator
+from ..services.budget_service import BudgetService
 from .data_context import FinancialDataContext
 from .transaction_repository import TransactionRepository
 
@@ -18,14 +18,14 @@ class BudgetRepository:
     def __init__(
         self,
         context: FinancialDataContext,
-        calculator: FinancialCalculator,
+        budget_service: BudgetService,
         transaction_repo: TransactionRepository,
     ) -> None:
         """
         Inicializa o repositório.
         """
         self._context = context
-        self._calculator = calculator
+        self._budget_service = budget_service
         self._transaction_repo = transaction_repo
         self._aba_nome = config.NomesAbas.ORCAMENTOS
 
@@ -109,7 +109,7 @@ class BudgetRepository:
         df_transacoes = self._transaction_repo.get_all_transactions()
         df_orcamentos = self._context.get_dataframe(self._aba_nome)
 
-        df_orcamentos_atualizado = self._calculator.calcular_status_orcamentos(
+        df_orcamentos_atualizado = self._budget_service.calcular_status_orcamentos(
             df_transacoes=df_transacoes,
             df_orcamentos=df_orcamentos,
         )

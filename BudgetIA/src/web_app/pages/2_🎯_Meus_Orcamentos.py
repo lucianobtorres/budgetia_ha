@@ -26,15 +26,39 @@ plan_manager, agent_runner = setup_page(
 aba_orcamentos = NomesAbas.ORCAMENTOS
 
 try:
-    df_orcamentos = plan_manager.visualizar_dados(aba_nome=aba_orcamentos)
     st.info("O sistema irá monitorar seus gastos automaticamente.")
     editor_key_orc = "editor_orcamentos"
+    df_orcamentos = plan_manager.visualizar_dados(aba_nome=aba_orcamentos)
 
-    # --- Conversão de Tipo Preventiva ---
-    if "Última Atualização Orçamento" in df_orcamentos.columns:
-        df_orcamentos["Última Atualização Orçamento"] = pd.to_datetime(
-            df_orcamentos["Última Atualização Orçamento"], errors="coerce"
+    if ColunasOrcamentos.ATUALIZACAO in df_orcamentos.columns:
+        df_orcamentos[ColunasOrcamentos.ATUALIZACAO] = pd.to_datetime(
+            df_orcamentos[ColunasOrcamentos.ATUALIZACAO], errors="coerce"
         )
+
+    if ColunasOrcamentos.CATEGORIA in df_orcamentos.columns:
+        df_orcamentos[ColunasOrcamentos.CATEGORIA] = (
+            df_orcamentos[ColunasOrcamentos.CATEGORIA].astype(str).fillna("")
+        )
+    if ColunasOrcamentos.PERIODO in df_orcamentos.columns:
+        df_orcamentos[ColunasOrcamentos.PERIODO] = (
+            df_orcamentos[ColunasOrcamentos.PERIODO]
+            .astype(str)
+            .fillna("Mensal")  # Preenche padrão
+        )
+    if ColunasOrcamentos.OBS in df_orcamentos.columns:
+        df_orcamentos[ColunasOrcamentos.OBS] = (
+            df_orcamentos[ColunasOrcamentos.OBS].astype(str).fillna("")
+        )
+    # Garante que tipos numéricos também sejam tratados (caso venham como string)
+    if ColunasOrcamentos.LIMITE in df_orcamentos.columns:
+        df_orcamentos[ColunasOrcamentos.LIMITE] = pd.to_numeric(
+            df_orcamentos[ColunasOrcamentos.LIMITE], errors="coerce"
+        ).fillna(0.0)
+
+    cols = [ColunasOrcamentos.ID] + [
+        col for col in df_orcamentos if col != ColunasOrcamentos.ID
+    ]
+    df_orcamentos = df_orcamentos[cols]
 
     # Verifica se há dados editados no estado da sessão (preservar entre reruns)
     if f"{editor_key_orc}_edited_rows" in st.session_state:
@@ -78,13 +102,12 @@ try:
                 max_value=100,  # A barra vai até 100%, mesmo se exceder
             ),
             ColunasOrcamentos.STATUS: st.column_config.TextColumn(disabled=True),
-            "Última Atualização Orçamento": st.column_config.DatetimeColumn(
+            ColunasOrcamentos.ATUALIZACAO: st.column_config.DatetimeColumn(
                 disabled=True, format="YYYY-MM-DD HH:mm:ss"
             ),
         },
         # Esconder colunas calculadas que não são tão úteis na edição direta
         hide_index=True,
-        # column_order = [...] # Opcional: Definir ordem das colunas
         key=editor_key_orc,
     )
 

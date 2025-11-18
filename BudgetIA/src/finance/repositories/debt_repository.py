@@ -7,7 +7,7 @@ from config import (
     ColunasDividas,
 )
 
-from ..financial_calculator import FinancialCalculator
+from ..services.debt_service import DebtService
 from .data_context import FinancialDataContext
 
 
@@ -20,7 +20,7 @@ class DebtRepository:
     def __init__(
         self,
         context: FinancialDataContext,
-        calculator: FinancialCalculator,
+        debt_service: DebtService,
     ) -> None:
         """
         Inicializa o repositório.
@@ -30,7 +30,7 @@ class DebtRepository:
             calculator: O especialista em cálculos.
         """
         self._context = context
-        self._calculator = calculator
+        self.debt_service = debt_service
         self._aba_nome = config.NomesAbas.DIVIDAS
 
     def add_or_update_debt(
@@ -62,7 +62,7 @@ class DebtRepository:
             data_proximo_pgto if data_proximo_pgto is not None else ""
         )
 
-        saldo_devedor_atual = self._calculator.calcular_saldo_devedor_atual(
+        saldo_devedor_atual = self.debt_service.calcular_saldo_devedor_atual(
             valor_parcela=valor_parcela,
             taxa_juros_mensal=taxa_juros_mensal,
             parcelas_totais=parcelas_totais,

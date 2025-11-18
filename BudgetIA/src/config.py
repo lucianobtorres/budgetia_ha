@@ -110,6 +110,7 @@ class ColunasOrcamentos:
     PERIODO = "Período Orçamento"
     STATUS = "Status Orçamento"
     OBS = "Observações"
+    ATUALIZACAO = "Última Atualização Orçamento"
 
 
 class ColunasDividas:

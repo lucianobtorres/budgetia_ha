@@ -1,9 +1,10 @@
-# pages/3_📝_Editar_Transacoes.py
+# pages/1_📝_Editar_Transacoes.py
 import os
 
 # Adiciona o 'src' ao path
 import sys
 
+import pandas as pd
 import streamlit as st
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
@@ -33,6 +34,11 @@ try:
     # Lê os dados usando a fachada
     st.info(f"Gerencie diretamente as transações da sua aba '{aba_transacoes}'.")
     df_transacoes = plan_manager.visualizar_dados(aba_transacoes)
+
+    if ColunasTransacoes.DATA in df_transacoes.columns:
+        df_transacoes[ColunasTransacoes.DATA] = pd.to_datetime(
+            df_transacoes[ColunasTransacoes.DATA], errors="coerce"
+        ).dt.date
 
     # Garante que o ID da Transação seja o primeiro
     cols = [ColunasTransacoes.ID] + [
@@ -70,7 +76,7 @@ try:
         if st.button("Salvar Alterações nas Transações"):
             st.info("Salvando alterações e recalculando...")
             try:
-                if (edited_df["Valor"] < 0).any():
+                if (edited_df[ColunasTransacoes.VALOR] < 0).any():
                     st.warning(
                         "Valores negativos detectados na coluna 'Valor'. Verifique as transações."
                     )

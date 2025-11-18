@@ -5,7 +5,7 @@ import config
 from config import ColunasTransacoes
 
 # Imports relativos para "subir" um nível
-from ..financial_calculator import FinancialCalculator
+from ..services.transaction_service import TransactionService
 from .data_context import FinancialDataContext
 
 
@@ -16,9 +16,7 @@ class TransactionRepository:
     """
 
     def __init__(
-        self,
-        context: FinancialDataContext,
-        calculator: FinancialCalculator,
+        self, context: FinancialDataContext, transaction_service: TransactionService
     ) -> None:
         """
         Inicializa o repositório.
@@ -28,7 +26,7 @@ class TransactionRepository:
             calculator: O especialista em cálculos financeiros puros.
         """
         self._context = context
-        self._calculator = calculator
+        self._transaction_service = transaction_service
         self._aba_nome = config.NomesAbas.TRANSACOES
 
     def get_all_transactions(self) -> pd.DataFrame:
@@ -80,9 +78,9 @@ class TransactionRepository:
     def get_summary(self) -> dict[str, float]:
         """Delega o cálculo do resumo para o FinancialCalculator."""
         df_transacoes = self.get_all_transactions()
-        return self._calculator.get_summary(df_transacoes)
+        return self._transaction_service.get_summary(df_transacoes)
 
     def get_expenses_by_category(self, top_n: int = 5) -> pd.Series:
         """Delega o cálculo das despesas por categoria para o FinancialCalculator."""
         df_transacoes = self.get_all_transactions()
-        return self._calculator.get_expenses_by_category(df_transacoes, top_n)
+        return self._transaction_service.get_expenses_by_category(df_transacoes, top_n)

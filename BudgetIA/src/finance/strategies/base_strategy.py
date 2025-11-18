@@ -63,7 +63,7 @@ class BaseMappingStrategy(ABC):
         """
         if internal_sheet_name == config.NomesAbas.TRANSACOES:
             # Por padrão, pergunta ao mapa (se ele existir)
-            return self.mapeamento.get("aba_transacoes", internal_sheet_name)
+            return str(self.mapeamento.get("aba_transacoes", internal_sheet_name))
         return internal_sheet_name
 
     def map_other_sheet(self, df: pd.DataFrame, aba_nome: str) -> pd.DataFrame:
@@ -80,4 +80,4 @@ class BaseMappingStrategy(ABC):
             if col not in df.columns:
                 df[col] = pd.NA
 
-        return df[colunas_padrao]  # Retorna ordenado e completo
+        return pd.DataFrame(df[colunas_padrao])  # Retorna ordenado e completo

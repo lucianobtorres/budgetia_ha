@@ -1,5 +1,4 @@
 # src/finance/planilha_manager.py
-import datetime
 
 # --- NOVOS IMPORTS NECESSÁRIOS ---
 import importlib.util
@@ -23,7 +22,6 @@ from core.cache_service import CacheService
 from core.user_config_service import UserConfigService
 
 # --- FIM IMPORT ---
-from .financial_calculator import FinancialCalculator
 from .repositories.budget_repository import BudgetRepository
 
 # --- DATA CONTEXT AGORA É IMPORTADO ASSIM ---
@@ -34,6 +32,10 @@ from .repositories.debt_repository import DebtRepository
 from .repositories.insight_repository import InsightRepository
 from .repositories.profile_repository import ProfileRepository
 from .repositories.transaction_repository import TransactionRepository
+from .services.budget_service import BudgetService
+from .services.debt_service import DebtService
+from .services.insight_service import InsightService
+from .services.transaction_service import TransactionService
 from .storage.base_storage_handler import BaseStorageHandler
 
 # --- IMPORTS DE ESTRATÉGIA (BASE E DEFAULT) ---
@@ -76,10 +78,7 @@ class PlanilhaManager:
     """
 
     def __init__(
-        self,
-        storage_handler: BaseStorageHandler,
-        config_service: UserConfigService,  # <-- Injeta o ConfigService
-        # (Removido 'mapeamento')
+        self, storage_handler: BaseStorageHandler, config_service: UserConfigService
     ) -> None:
         """
         Inicializa o gerenciador, o DataContext e todos os Repositórios.
@@ -91,9 +90,9 @@ class PlanilhaManager:
         # --- 2. INSTANCIAR O CACHE SERVICE ---
         # (O CacheService já lê o config.UPSTASH_REDIS_URL)
         self.cache_service = CacheService()
+
         # Define uma chave de cache única para este usuário
         self.cache_key = f"dfs:{config_service.username}"
-        # --- FIM DA INSTANCIAÇÃO ---
 
         mapeamento = config_service.get_mapeamento()
         strategy_instance: BaseMappingStrategy
@@ -123,7 +122,6 @@ class PlanilhaManager:
 
         self.is_new_file = self._context.is_new_file
 
-        self.calculator = FinancialCalculator()
         self.is_new_file = self._context.is_new_file
 
         # --- LOG ADICIONADO ---
@@ -132,21 +130,26 @@ class PlanilhaManager:
         )
         # --- FIM DO LOG ---
 
-        # --- CRIA TODOS OS REPOSITÓRIOS ---
         self.transaction_repo = TransactionRepository(
-            context=self._context, calculator=self.calculator
+            context=self._context, transaction_service=TransactionService()
         )
         self.budget_repo = BudgetRepository(
             context=self._context,
-            calculator=self.calculator,
+            budget_service=BudgetService(),
             transaction_repo=self.transaction_repo,
         )
         self.debt_repo = DebtRepository(
-            context=self._context, calculator=self.calculator
+            context=self._context, debt_service=DebtService()
         )
         self.profile_repo = ProfileRepository(context=self._context)
         self.insight_repo = InsightRepository(context=self._context)
-        # --- FIM DA CRIAÇÃO ---
+
+        print("--- DEBUG PM: Instanciando Serviços de Orquestração (Insight)... ---")
+        self.insight_service = InsightService(
+            transaction_repo=self.transaction_repo,
+            budget_repo=self.budget_repo,
+            insight_repo=self.insight_repo,
+        )
 
         if self.is_new_file:
             print("LOG: Detectado arquivo novo ou abas faltando.")
@@ -169,19 +172,15 @@ class PlanilhaManager:
         else:
             print("LOG: Arquivo existente carregado do Cache. Startup rápido.")
 
-    # ... (save) ...
     def save(self, add_intelligence: bool = False) -> None:
         self._context.save(add_intelligence)
 
-    # ... (visualizar_dados) ...
     def visualizar_dados(self, aba_nome: str) -> pd.DataFrame:
         return self._context.get_dataframe(sheet_name=aba_nome)
 
-    # ... (update_dataframe) ...
     def update_dataframe(self, sheet_name: str, new_df: pd.DataFrame) -> None:
         self._context.update_dataframe(sheet_name, new_df)
 
-    # ... (adicionar_registro) ...
     def adicionar_registro(
         self,
         data: str,
@@ -196,15 +195,12 @@ class PlanilhaManager:
         )
         self.recalculate_budgets()
 
-    # ... (get_summary) ...
     def get_summary(self) -> dict[str, float]:
         return self.transaction_repo.get_summary()
 
-    # ... (get_expenses_by_category) ...
     def get_expenses_by_category(self, top_n: int = 5) -> pd.Series:
         return self.transaction_repo.get_expenses_by_category(top_n)
 
-    # ... (adicionar_ou_atualizar_orcamento) ...
     def adicionar_ou_atualizar_orcamento(
         self,
         categoria: str,
@@ -221,11 +217,9 @@ class PlanilhaManager:
         self.recalculate_budgets()
         return mensagem
 
-    # ... (recalculate_budgets) ...
     def recalculate_budgets(self) -> None:
         self.budget_repo.recalculate_all_budgets()
 
-    # ... (adicionar_ou_atualizar_divida) ...
     def adicionar_ou_atualizar_divida(
         self,
         nome_divida: str,
@@ -248,7 +242,6 @@ class PlanilhaManager:
             observacoes=observacoes,
         )
 
-    # ... (adicionar_insight_ia) ...
     def adicionar_insight_ia(
         self,
         data_insight: str,
@@ -265,38 +258,17 @@ class PlanilhaManager:
             status=status,
         )
 
-    # ... (salvar_dado_perfil) ...
     def salvar_dado_perfil(self, campo: str, valor: Any) -> str:
         return self.profile_repo.save_profile_field(campo=campo, valor=valor)
 
-    # ... (get_perfil_como_texto) ...
     def get_perfil_como_texto(self) -> str:
         return self.profile_repo.get_profile_as_text()
 
-    # ... (analisar_para_insights_proativos) ...
     def analisar_para_insights_proativos(self) -> list[dict[str, Any]]:
-        print("LOG: Orquestrando análise proativa para gerar insights.")
-        self.recalculate_budgets()
-        resumo = self.get_summary()  # Delegado
-        saldo_total = resumo.get("saldo", 0.0)
-        orcamentos_df = self._context.get_dataframe(NomesAbas.ORCAMENTOS)
-        insights_gerados = self.calculator.gerar_analise_proativa(
-            orcamentos_df, saldo_total
-        )
-        if insights_gerados:
-            print(f"LOG: {len(insights_gerados)} insights gerados. Registrando...")
-            for insight in insights_gerados:
-                self.insight_repo.add_insight(
-                    data_insight=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    tipo_insight=insight["tipo_insight"],
-                    titulo_insight=insight["titulo_insight"],
-                    detalhes_recomendacao=insight["detalhes_recomendacao"],
-                )
-        else:
-            print("LOG: Análise proativa concluída. Nenhum insight novo gerado.")
-        return insights_gerados
+        print("LOG (PM): Delegando análise proativa para o InsightService.")
+        # Toda a lógica foi movida. O PM apenas chama.
+        return self.insight_service.run_proactive_analysis_orchestration()
 
-    # ... (_populate_initial_data) ...
     def _populate_initial_data(self) -> None:
         print("--- DEBUG PM: Populando com dados de exemplo... ---")
         if self.visualizar_dados(NomesAbas.ORCAMENTOS).empty:
