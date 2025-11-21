@@ -302,9 +302,9 @@ def create_excel_export_bytes(plan_manager: PlanilhaManager) -> bytes:
         return b""  # Retorna bytes vazios em caso de falha
 
 
-def initialize_session_auth() -> tuple[
-    bool, str | None, UserConfigService | None, LLMOrchestrator | None
-]:
+def initialize_session_auth() -> (
+    tuple[bool, str | None, UserConfigService | None, LLMOrchestrator | None]
+):
     """
     Função MESTRE. Deve ser chamada no topo de CADA página.
     Renderiza o login, gerencia o estado e inicializa os serviços.

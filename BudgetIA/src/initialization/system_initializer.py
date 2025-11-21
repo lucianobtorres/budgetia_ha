@@ -3,45 +3,19 @@ import os
 import sys
 
 from core.agent_runner_interface import AgentRunner
+from core.llm_enums import LLMProviderType
+from core.llm_factory import LLMProviderFactory
 from core.llm_manager import LLMOrchestrator
-from core.llm_providers.gemini_provider import GeminiProvider
 from core.user_config_service import UserConfigService
-from finance.storage.base_storage_handler import BaseStorageHandler
-from finance.storage.google_drive_handler import GoogleDriveFileHandler
-from finance.storage.google_sheets_storage_handler import GoogleSheetsStorageHandler
 
 # Adiciona o 'src' ao path (seu arquivo já deve ter isso)
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import config
-from agent_implementations.langchain_agent import IADeFinancas
+from agent_implementations.factory import AgentFactory
+from finance.factory import FinancialSystemFactory
 from finance.planilha_manager import PlanilhaManager
-
-# --- 1. IMPORTAR AMBOS OS HANDLERS E A INTERFACE ---
-from finance.storage.excel_storage_handler import ExcelHandler
-
-
-def _create_storage_handler(planilha_path: str) -> BaseStorageHandler:
-    """Fábrica (Factory) para decidir qual Handler de armazenamento usar."""
-    # (Esta função que criamos está correta e permanece a mesma)
-    print(f"--- DEBUG INITIALIZER: Criando handler para: {planilha_path} ---")
-
-    if "drive.google.com/file" in planilha_path:
-        print(
-            "--- DEBUG INITIALIZER: Detectado arquivo Excel no Google Drive (Link Direto). ---"
-        )
-        return GoogleDriveFileHandler(file_url=planilha_path)
-    elif "docs.google.com/spreadsheets" in planilha_path and "sd=true" in planilha_path:
-        print(
-            "--- DEBUG INITIALIZER: Detectado arquivo Excel no Google Drive (Link de Visualização). ---"
-        )
-        return GoogleDriveFileHandler(file_url=planilha_path)
-    elif "docs.google.com/spreadsheets" in planilha_path:
-        print("--- DEBUG INITIALIZER: Detectado Google Sheets (Nativo). ---")
-        return GoogleSheetsStorageHandler(spreadsheet_url_or_key=planilha_path)
-    else:
-        print("--- DEBUG INITIALIZER: Detectado arquivo Excel local. ---")
-        return ExcelHandler(file_path=planilha_path)
+from finance.storage.storage_factory import StorageHandlerFactory
 
 
 def initialize_financial_system(
@@ -59,11 +33,12 @@ def initialize_financial_system(
     dados_de_exemplo_foram_adicionados = False
 
     try:
-        storage_handler = _create_storage_handler(planilha_path)
+        # --- 1. Cria o Storage Handler usando a Factory ---
+        print("--- DEBUG INITIALIZER: Criando Storage Handler via Factory... ---")
+        storage_handler = StorageHandlerFactory.create_handler(planilha_path)
 
-        # --- 3. INJETAR O HANDLER ABSTRATO ---
-        # (Nenhuma mudança daqui para baixo, já está correto)
-        plan_manager = PlanilhaManager(
+        # --- 2. Inicializa o PlanilhaManager usando a FinancialSystemFactory ---
+        plan_manager = FinancialSystemFactory.create_manager(
             storage_handler=storage_handler, config_service=config_service
         )
         print(
@@ -79,26 +54,16 @@ def initialize_financial_system(
                 dados_de_exemplo_foram_adicionados = True
                 print("--- DEBUG INITIALIZER: Dados de exemplo foram adicionados. ---")
 
-        # --- 2. Inicialização da IA e do Agente ---
+        # --- 3. Inicialização da IA e do Agente ---
         print("--- DEBUG INITIALIZER: Configurando LLM e Agente... ---")
-        primary_provider = GeminiProvider(default_model=config.DEFAULT_GEMINI_MODEL)
+        primary_provider = LLMProviderFactory.create_provider(
+            LLMProviderType.GEMINI, default_model=config.DEFAULT_GEMINI_MODEL
+        )
         llm_orchestrator = LLMOrchestrator(primary_provider=primary_provider)
         llm_orchestrator.get_configured_llm()
 
-        contexto_perfil = plan_manager.get_perfil_como_texto()
-        print(
-            f"--- DEBUG INITIALIZER: Contexto do Perfil injetado no Agente: {contexto_perfil[:50]}... ---"
-        )
-
-        agent_runner = IADeFinancas(
-            llm_orchestrator=llm_orchestrator,
-            contexto_perfil=contexto_perfil,
-            data_context=plan_manager._context,
-            transaction_repo=plan_manager.transaction_repo,
-            budget_repo=plan_manager.budget_repo,
-            debt_repo=plan_manager.debt_repo,
-            profile_repo=plan_manager.profile_repo,
-            insight_repo=plan_manager.insight_repo,
+        agent_runner = AgentFactory.create_agent(
+            llm_orchestrator=llm_orchestrator, plan_manager=plan_manager
         )
 
         print("--- DEBUG INITIALIZER: Inicialização BEM SUCEDIDA. ---")

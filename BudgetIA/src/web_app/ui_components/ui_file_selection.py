@@ -8,7 +8,7 @@ import streamlit as st
 
 from config import DATA_DIR
 from core.google_auth_service import GoogleAuthService
-from web_app.onboarding_manager import OnboardingManager
+from initialization.onboarding_manager import OnboardingManager
 
 
 def render(

@@ -49,9 +49,11 @@ class CustomJsonStrategy(BaseMappingStrategy):
                 df_mapeado[ColunasTransacoes.TIPO] = df_mapeado[
                     ColunasTransacoes.VALOR
                 ].apply(
-                    lambda x: ValoresTipo.RECEITA
-                    if pd.notna(x) and x > 0
-                    else ValoresTipo.DESPESA
+                    lambda x: (
+                        ValoresTipo.RECEITA
+                        if pd.notna(x) and x > 0
+                        else ValoresTipo.DESPESA
+                    )
                 )
                 df_mapeado[ColunasTransacoes.VALOR] = df_mapeado[
                     ColunasTransacoes.VALOR
@@ -103,9 +105,11 @@ class CustomJsonStrategy(BaseMappingStrategy):
                 and ColunasTransacoes.TIPO in df_para_salvar.columns
             ):
                 df_para_salvar[ColunasTransacoes.VALOR] = df_para_salvar.apply(
-                    lambda row: row[ColunasTransacoes.VALOR] * -1
-                    if row[ColunasTransacoes.TIPO] == ValoresTipo.DESPESA
-                    else row[ColunasTransacoes.VALOR],
+                    lambda row: (
+                        row[ColunasTransacoes.VALOR] * -1
+                        if row[ColunasTransacoes.TIPO] == ValoresTipo.DESPESA
+                        else row[ColunasTransacoes.VALOR]
+                    ),
                     axis=1,
                 )
 

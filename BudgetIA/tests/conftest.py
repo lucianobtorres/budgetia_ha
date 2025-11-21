@@ -7,6 +7,7 @@ import pytest
 from cryptography.fernet import Fernet
 
 from core.user_config_service import UserConfigService
+from finance.factory import FinancialSystemFactory
 from finance.planilha_manager import PlanilhaManager
 from finance.storage.base_storage_handler import BaseStorageHandler
 
@@ -36,9 +37,18 @@ def mock_storage_handler() -> MagicMock:
     # métodos que a interface real tem)
     handler = MagicMock(spec=BaseStorageHandler)
 
+    # --- CORREÇÃO: Retornar DFs vazios, mas inicializados ---
+    import pandas as pd
+    from config import LAYOUT_PLANILHA
+
+    mock_dfs = {
+        aba: pd.DataFrame(columns=colunas)
+        for aba, colunas in LAYOUT_PLANILHA.items()
+    }
+
     # Define valores de retorno padrão para o 'load_sheets'
     # (dados vazios, não é um arquivo novo)
-    handler.load_sheets.return_value = ({}, False)
+    handler.load_sheets.return_value = (mock_dfs, False)
     return handler
 
 
@@ -55,9 +65,9 @@ def plan_manager_para_ferramentas(
 
     # Pula o 'recalculate_budgets'
     with patch.object(PlanilhaManager, "recalculate_budgets", return_value=None):
-        plan_manager = PlanilhaManager(
+        plan_manager = FinancialSystemFactory.create_manager(
             storage_handler=mock_storage_handler,
-            config_service=mock_config_service,  # Passa o mock
+            config_service=mock_config_service,
         )
     return plan_manager
 

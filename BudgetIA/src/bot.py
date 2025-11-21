@@ -15,8 +15,9 @@ from telegram.ext import (
 import config
 from app.chat_history_manager import JsonHistoryManager
 from app.chat_service import ChatService
+from core.llm_enums import LLMProviderType
+from core.llm_factory import LLMProviderFactory
 from core.llm_manager import LLMOrchestrator
-from core.llm_providers.gemini_provider import GeminiProvider
 from core.user_config_service import UserConfigService
 from initialization.system_initializer import initialize_financial_system
 
@@ -62,7 +63,9 @@ if not TELEGRAM_TOKEN:
 def load_global_services() -> tuple[ChatService | None, UserConfigService | None]:
     try:
         # Carrega o LLM Orchestrator (global)
-        primary_provider = GeminiProvider(default_model=config.DEFAULT_GEMINI_MODEL)
+        primary_provider = LLMProviderFactory.create_provider(
+            LLMProviderType.GEMINI, default_model=config.DEFAULT_GEMINI_MODEL
+        )
         llm_orchestrator = LLMOrchestrator(primary_provider=primary_provider)
         llm_orchestrator.get_configured_llm()
 

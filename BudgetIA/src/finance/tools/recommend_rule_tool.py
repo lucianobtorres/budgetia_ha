@@ -11,7 +11,9 @@ from finance.schemas import RecomendarRegraIdealInput
 
 class RecomendarRegraIdealTool(BaseTool):  # type: ignore[misc]
     name: str = "recomendar_regra_ideal"
-    description: str = "Recomenda a melhor Regra de Ouro Financeira (ex: 50/30/20) com base no perfil e momento de vida do usuário."
+    description: str = (
+        "Recomenda a melhor Regra de Ouro Financeira (ex: 50/30/20) com base no perfil e momento de vida do usuário."
+    )
     args_schema: type[BaseModel] = RecomendarRegraIdealInput
 
     # --- DIP: Depende de Callables ---

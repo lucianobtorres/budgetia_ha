@@ -29,9 +29,8 @@ class ChatService:
             # Adiciona ao histórico da UI
             self.history_manager.add_message("assistant", content)
 
-            # Adiciona também à memória do agente
-            if hasattr(self.agent_runner, "memory"):
-                self.agent_runner.memory.chat_memory.add_ai_message(content)
+            # Adiciona também à memória do agente (via interface abstrata)
+            self.agent_runner.add_message("assistant", content)
 
     def get_history(self) -> list[dict[str, str]]:
         """Retorna o histórico de chat da UI."""

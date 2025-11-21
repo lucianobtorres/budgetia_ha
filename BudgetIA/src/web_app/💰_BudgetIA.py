@@ -1,4 +1,8 @@
 # src/web_app/💰_BudgetIA.py
+import os
+
+os.environ["TRANSFORMERS_NO_ADVISORY_WARNINGS"] = "true"
+
 from typing import Any
 
 import streamlit as st
@@ -10,12 +14,13 @@ from app.chat_service import ChatService
 from config import DEFAULT_GEMINI_MODEL
 from core.agent_runner_interface import AgentRunner
 from core.google_auth_service import GoogleAuthService
+from core.llm_enums import LLMProviderType
+from core.llm_factory import LLMProviderFactory
 from core.llm_manager import LLMOrchestrator
-from core.llm_providers.gemini_provider import GeminiProvider
 from core.user_config_service import UserConfigService
 from finance.planilha_manager import PlanilhaManager
+from initialization.onboarding_manager import OnboardingManager, OnboardingState
 from initialization.system_initializer import initialize_financial_system
-from web_app.onboarding_manager import OnboardingManager, OnboardingState
 
 # --- Imports dos Novos Módulos de UI ---
 from web_app.ui_components import (
@@ -114,7 +119,9 @@ st.set_page_config(
 def get_llm_orchestrator() -> LLMOrchestrator:
     """Cria e cacheia o LLMOrchestrator."""
     print("--- DEBUG APP: Criando LLMOrchestrator (cache_resource)... ---")
-    primary_provider = GeminiProvider(default_model=DEFAULT_GEMINI_MODEL)
+    primary_provider = LLMProviderFactory.create_provider(
+        LLMProviderType.GEMINI, default_model=DEFAULT_GEMINI_MODEL
+    )
     orchestrator = LLMOrchestrator(primary_provider=primary_provider)
     orchestrator.get_configured_llm()
     return orchestrator

@@ -179,6 +179,11 @@ class NomesPaginas:
     MEUS_ORCAMENTOS = "Meus Orçamentos"
 
 
+# --- CONSTANTES DE PERFIL ---
+PROFILE_ESSENTIAL_FIELDS = ["Renda Mensal Média", "Principal Objetivo"]
+PROFILE_DESIRED_FIELDS = PROFILE_ESSENTIAL_FIELDS + ["Tolerância a Risco"]
+
+
 # --- 4. Layout da Planilha ---
 # MUDANÇA: Agora o layout usa as constantes que acabamos de criar!
 LAYOUT_PLANILHA: dict[str, list[str]] = {

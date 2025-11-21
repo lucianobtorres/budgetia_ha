@@ -1,176 +1,50 @@
 # src/finance/planilha_manager.py
-
-# --- NOVOS IMPORTS NECESSÁRIOS ---
-import importlib.util
-import sys
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
-# --- FIM NOVOS IMPORTS ---
-from config import (
-    DADOS_EXEMPLO_PATH,
-    LAYOUT_PLANILHA,
-    ColunasOrcamentos,
-    ColunasTransacoes,
-    NomesAbas,
-)
-from core.cache_service import CacheService
-
-# --- IMPORT DO CONFIG SERVICE ---
-from core.user_config_service import UserConfigService
-
-# --- FIM IMPORT ---
-from .repositories.budget_repository import BudgetRepository
-
-# --- DATA CONTEXT AGORA É IMPORTADO ASSIM ---
-from .repositories.data_context import FinancialDataContext
-
-# --- FIM IMPORT ---
-from .repositories.debt_repository import DebtRepository
-from .repositories.insight_repository import InsightRepository
-from .repositories.profile_repository import ProfileRepository
-from .repositories.transaction_repository import TransactionRepository
-from .services.budget_service import BudgetService
-from .services.debt_service import DebtService
-from .services.insight_service import InsightService
-from .services.transaction_service import TransactionService
-from .storage.base_storage_handler import BaseStorageHandler
-
-# --- IMPORTS DE ESTRATÉGIA (BASE E DEFAULT) ---
-from .strategies.base_strategy import BaseMappingStrategy
-from .strategies.default_strategy import DefaultStrategy
-from .utils import _carregar_dados_exemplo
-
-# --- FIM IMPORTS ---
-
-
-def _load_strategy_from_file(
-    strategy_path: Path, module_name: str
-) -> type[BaseMappingStrategy]:  # Retorna a *classe*
-    """Carrega dinamicamente a classe de estratégia do arquivo .py do usuário."""
-    try:
-        spec = importlib.util.spec_from_file_location(module_name, strategy_path)
-        if spec is None:
-            raise ImportError(f"Não foi possível criar spec para {strategy_path}")
-
-        strategy_module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(strategy_module)
-
-        # (Remove o módulo do cache para garantir que carregamos o certo)
-        sys.modules.pop(module_name, None)
-
-        # O nome da classe é padronizado pelo StrategyGenerator
-        StrategyClass = getattr(strategy_module, "CustomStrategy")
-        return StrategyClass
-    except Exception as e:
-        print(f"ERRO CRÍTICO: Falha ao carregar estratégia de '{strategy_path}': {e}")
-        # Retorna a Padrão como fallback de segurança
-        return DefaultStrategy
+if TYPE_CHECKING:
+    from finance.repositories.budget_repository import BudgetRepository
+    from finance.repositories.data_context import FinancialDataContext
+    from finance.repositories.debt_repository import DebtRepository
+    from finance.repositories.insight_repository import InsightRepository
+    from finance.repositories.profile_repository import ProfileRepository
+    from finance.repositories.transaction_repository import TransactionRepository
+    from finance.services.insight_service import InsightService
 
 
 class PlanilhaManager:
     """
     Orquestra os dados financeiros. (Fachada)
-    Sua única responsabilidade é construir os repositórios
-    e delegar chamadas para eles.
+    Sua única responsabilidade é delegar chamadas para os repositórios e serviços.
+    A construção e setup agora são feitos pela FinancialSystemFactory.
     """
 
     def __init__(
-        self, storage_handler: BaseStorageHandler, config_service: UserConfigService
+        self,
+        context: "FinancialDataContext",
+        transaction_repo: "TransactionRepository",
+        budget_repo: "BudgetRepository",
+        debt_repo: "DebtRepository",
+        profile_repo: "ProfileRepository",
+        insight_repo: "InsightRepository",
+        insight_service: "InsightService",
+        cache_key: str,
     ) -> None:
         """
-        Inicializa o gerenciador, o DataContext e todos os Repositórios.
+        Inicializa o gerenciador com as dependências já injetadas.
         """
-        print(
-            f"--- DEBUG PM: PlanilhaManager inicializado para usuário '{config_service.username}' ---"
-        )
+        self._context = context
+        self.transaction_repo = transaction_repo
+        self.budget_repo = budget_repo
+        self.debt_repo = debt_repo
+        self.profile_repo = profile_repo
+        self.insight_repo = insight_repo
+        self.insight_service = insight_service
+        self.cache_key = cache_key
 
-        # --- 2. INSTANCIAR O CACHE SERVICE ---
-        # (O CacheService já lê o config.UPSTASH_REDIS_URL)
-        self.cache_service = CacheService()
-
-        # Define uma chave de cache única para este usuário
-        self.cache_key = f"dfs:{config_service.username}"
-
-        mapeamento = config_service.get_mapeamento()
-        strategy_instance: BaseMappingStrategy
-
-        if mapeamento and mapeamento.get("strategy_module"):
-            module_name = mapeamento["strategy_module"]
-            strategy_path = config_service.strategy_file_path
-
-            print(
-                f"--- DEBUG PM: Carregando estratégia customizada '{module_name}' de {strategy_path} ---"
-            )
-
-            StrategyClass = _load_strategy_from_file(strategy_path, module_name)
-            strategy_instance = StrategyClass(LAYOUT_PLANILHA, mapeamento)
-        else:
-            print(
-                "--- DEBUG PM: Mapeamento não encontrado. Usando DefaultStrategy. ---"
-            )
-            strategy_instance = DefaultStrategy(LAYOUT_PLANILHA, None)
-
-        self._context = FinancialDataContext(
-            storage_handler=storage_handler,
-            strategy=strategy_instance,
-            cache_service=self.cache_service,
-            cache_key=self.cache_key,
-        )
-
+        # Mantido para compatibilidade
         self.is_new_file = self._context.is_new_file
-
-        self.is_new_file = self._context.is_new_file
-
-        # --- LOG ADICIONADO ---
-        print(
-            f"--- DEBUG (PlanilhaManager): 'self.is_new_file' (vindo do context) é: {self.is_new_file} ---"
-        )
-        # --- FIM DO LOG ---
-
-        self.transaction_repo = TransactionRepository(
-            context=self._context, transaction_service=TransactionService()
-        )
-        self.budget_repo = BudgetRepository(
-            context=self._context,
-            budget_service=BudgetService(),
-            transaction_repo=self.transaction_repo,
-        )
-        self.debt_repo = DebtRepository(
-            context=self._context, debt_service=DebtService()
-        )
-        self.profile_repo = ProfileRepository(context=self._context)
-        self.insight_repo = InsightRepository(context=self._context)
-
-        print("--- DEBUG PM: Instanciando Serviços de Orquestração (Insight)... ---")
-        self.insight_service = InsightService(
-            transaction_repo=self.transaction_repo,
-            budget_repo=self.budget_repo,
-            insight_repo=self.insight_repo,
-        )
-
-        if self.is_new_file:
-            print("LOG: Detectado arquivo novo ou abas faltando.")
-            if mapeamento is None:
-                print(
-                    "--- DEBUG PM: Arquivo novo padrão. Populando com dados de exemplo... ---"
-                )
-                self._populate_initial_data()
-                self._context.save(add_intelligence=True)
-            else:
-                print(
-                    "--- DEBUG PM: Arquivo mapeado/novo. Salvando abas do sistema... ---"
-                )
-                self._context.save(add_intelligence=False)
-        elif not self._context.is_cache_hit:
-            print(
-                "LOG: Arquivo existente carregado do Storage. Recalculando orçamentos..."
-            )
-            self.recalculate_budgets()
-        else:
-            print("LOG: Arquivo existente carregado do Cache. Startup rápido.")
 
     def save(self, add_intelligence: bool = False) -> None:
         self._context.save(add_intelligence)
@@ -264,90 +138,18 @@ class PlanilhaManager:
     def get_perfil_como_texto(self) -> str:
         return self.profile_repo.get_profile_as_text()
 
+    def ensure_profile_fields(self, fields: list[str]) -> bool:
+        return self.profile_repo.ensure_fields(fields)
+
     def analisar_para_insights_proativos(self) -> list[dict[str, Any]]:
         print("LOG (PM): Delegando análise proativa para o InsightService.")
-        # Toda a lógica foi movida. O PM apenas chama.
         return self.insight_service.run_proactive_analysis_orchestration()
 
-    def _populate_initial_data(self) -> None:
-        print("--- DEBUG PM: Populando com dados de exemplo... ---")
-        if self.visualizar_dados(NomesAbas.ORCAMENTOS).empty:
-            orcamentos_dicts = [
-                {
-                    ColunasOrcamentos.CATEGORIA: "Alimentação",
-                    ColunasOrcamentos.LIMITE: 600.0,
-                    ColunasOrcamentos.PERIODO: "Mensal",
-                    ColunasOrcamentos.OBS: "",
-                },
-                {
-                    ColunasOrcamentos.CATEGORIA: "Transporte",
-                    ColunasOrcamentos.LIMITE: 250.0,
-                    ColunasOrcamentos.PERIODO: "Mensal",
-                    ColunasOrcamentos.OBS: "",
-                },
-            ]
-            for o in orcamentos_dicts:
-                self.adicionar_ou_atualizar_orcamento(
-                    categoria=o[ColunasOrcamentos.CATEGORIA],
-                    valor_limite=o[ColunasOrcamentos.LIMITE],
-                    periodo=o[ColunasOrcamentos.PERIODO],
-                    observacoes=o.get(ColunasOrcamentos.OBS, ""),
-                )
-        if self.visualizar_dados(NomesAbas.TRANSACOES).empty:
-            transacoes_exemplo = _carregar_dados_exemplo(DADOS_EXEMPLO_PATH)
-            if not transacoes_exemplo:
-                transacoes_exemplo = [
-                    {
-                        ColunasTransacoes.DATA: "2024-07-01",
-                        ColunasTransacoes.TIPO: "Receita",
-                        ColunasTransacoes.CATEGORIA: "Salário",
-                        ColunasTransacoes.DESCRICAO: "Pagamento",
-                        ColunasTransacoes.VALOR: 5000.0,
-                        ColunasTransacoes.STATUS: "Concluído",
-                    },
-                    {
-                        ColunasTransacoes.DATA: "2024-07-05",
-                        ColunasTransacoes.TIPO: "Despesa",
-                        ColunasTransacoes.CATEGORIA: "Moradia",
-                        ColunasTransacoes.DESCRICAO: "Aluguel",
-                        ColunasTransacoes.VALOR: 1500.0,
-                        ColunasTransacoes.STATUS: "Concluído",
-                    },
-                ]
-            for t in transacoes_exemplo:
-                self.transaction_repo.add_transaction(
-                    data=t["data"],
-                    tipo=t["tipo"],
-                    categoria=t[ColunasOrcamentos.CATEGORIA],
-                    descricao=t.get("descricao", ""),
-                    valor=t["valor"],
-                    status=t.get("status", "Concluído"),
-                )
-            self.recalculate_budgets()
-        print("--- DEBUG PM: Garantindo campos de perfil... ---")
-        self_df_perfil = self.visualizar_dados(NomesAbas.PERFIL_FINANCEIRO)
-        campos_existentes = (
-            set(self_df_perfil["Campo"].astype(str).str.lower())
-            if "Campo" in self_df_perfil.columns
-            else set()
-        )
-        if "renda mensal média" not in campos_existentes:
-            self.profile_repo.save_profile_field("Renda Mensal Média", None)
-        if "principal objetivo" not in campos_existentes:
-            self.profile_repo.save_profile_field("Principal Objetivo", None)
-
     def check_connection(self) -> tuple[bool, str]:
-        """
-        Delega a verificação de conexão para o handler de armazenamento.
-        """
         print("--- DEBUG PM: Verificando saúde da conexão com o armazenamento... ---")
         return self._context.storage.ping()
 
     def clear_cache(self) -> None:
-        """
-        Força a invalidação (deleção) do cache deste usuário no Redis.
-        A próxima leitura será forçada a buscar do Google Drive.
-        """
         print(
             f"--- DEBUG PM: Forçando invalidação de cache para '{self.cache_key}' ---"
         )

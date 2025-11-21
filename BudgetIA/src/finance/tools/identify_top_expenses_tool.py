@@ -11,7 +11,9 @@ from finance.schemas import IdentificarMaioresGastosInput
 
 class IdentificarMaioresGastosTool(BaseTool):  # type: ignore[misc]
     name: str = "identificar_maiores_gastos"
-    description: str = "Identifica e retorna as N maiores despesas individuais na planilha, útil para encontrar gastos significativos."
+    description: str = (
+        "Identifica e retorna as N maiores despesas individuais na planilha, útil para encontrar gastos significativos."
+    )
     args_schema: type[BaseModel] = IdentificarMaioresGastosInput
 
     # --- DIP: Depende de Callables ---

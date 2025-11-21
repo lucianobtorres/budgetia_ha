@@ -3,7 +3,7 @@ import time
 
 import streamlit as st
 
-from web_app.onboarding_manager import OnboardingManager
+from initialization.onboarding_manager import OnboardingManager
 
 
 def render(manager: OnboardingManager) -> None:

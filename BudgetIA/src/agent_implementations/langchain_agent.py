@@ -153,3 +153,10 @@ class IADeFinancas(AgentRunner):  # type: ignore[misc]
                 self.memory.chat_memory.add_user_message(item["content"])
             elif item["role"] == "assistant":
                 self.memory.chat_memory.add_ai_message(item["content"])
+
+    def add_message(self, role: str, content: str) -> None:
+        """Adiciona uma mensagem isolada à memória do agente."""
+        if role == "user":
+            self.memory.chat_memory.add_user_message(content)
+        elif role == "assistant":
+            self.memory.chat_memory.add_ai_message(content)

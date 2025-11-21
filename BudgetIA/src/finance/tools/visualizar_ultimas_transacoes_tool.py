@@ -21,7 +21,9 @@ class VisualizarUltimasTransacoesInput(BaseModel):
 
 class VisualizarUltimasTransacoesTool(BaseTool):  # type: ignore[misc]
     name: str = "visualizar_ultimas_transacoes"
-    description: str = "Visualiza as 'n' últimas transações registradas, ordenadas por data. Pode ser filtrado por tipo ('Receita' ou 'Despesa')."
+    description: str = (
+        "Visualiza as 'n' últimas transações registradas, ordenadas por data. Pode ser filtrado por tipo ('Receita' ou 'Despesa')."
+    )
     args_schema = VisualizarUltimasTransacoesInput
 
     # --- DIP: Depende de Callables ---

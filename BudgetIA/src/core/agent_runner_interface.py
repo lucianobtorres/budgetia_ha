@@ -37,3 +37,11 @@ class AgentRunner(ABC):
         Define o histórico de chat.
         """
         pass
+
+    @abstractmethod
+    def add_message(self, role: str, content: str) -> None:
+        """
+        Adiciona uma mensagem isolada à memória do agente.
+        role: 'user' ou 'assistant'
+        """
+        pass

@@ -6,6 +6,7 @@ import pytest
 
 from BudgetIA.src import config
 from BudgetIA.src.core.user_config_service import UserConfigService
+from finance.factory import FinancialSystemFactory
 from finance.planilha_manager import PlanilhaManager
 from finance.storage.excel_storage_handler import ExcelHandler
 
@@ -45,9 +46,9 @@ def plan_manager(mock_excel_handler: MagicMock) -> PlanilhaManager:
 
     # Pula o 'recalculate_budgets' que é chamado no 'else' do __init__
     with patch.object(PlanilhaManager, "recalculate_budgets", return_value=None):
-        pm = PlanilhaManager(
+        pm = FinancialSystemFactory.create_manager(
             storage_handler=mock_excel_handler,
-            config_service=mock_config_service,  # Passa o mock
+            config_service=mock_config_service,
         )
 
         pm.save = MagicMock()

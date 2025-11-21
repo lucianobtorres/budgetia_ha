@@ -9,7 +9,7 @@ from app.chat_service import ChatService
 # Remover 'AgentRunner' - não falamos mais com ele diretamente
 # --- FIM NOVOS IMPORTS ---
 from finance.planilha_manager import PlanilhaManager
-from web_app.onboarding_manager import OnboardingManager
+from initialization.onboarding_manager import OnboardingManager
 
 
 def render(

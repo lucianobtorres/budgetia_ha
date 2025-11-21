@@ -115,9 +115,11 @@ class BudgetService:
         df_orc_atualizado[ColunasOrcamentos.STATUS] = "OK"
         df_orc_atualizado[ColunasOrcamentos.STATUS] = pd.Series(
             df_orc_atualizado.apply(
-                lambda row: "Estourado"
-                if row[ColunasOrcamentos.PERCENTUAL] > 100
-                else ("Alerta" if row[ColunasOrcamentos.PERCENTUAL] > 90 else "OK"),
+                lambda row: (
+                    "Estourado"
+                    if row[ColunasOrcamentos.PERCENTUAL] > 100
+                    else ("Alerta" if row[ColunasOrcamentos.PERCENTUAL] > 90 else "OK")
+                ),
                 axis=1,
             )
         )

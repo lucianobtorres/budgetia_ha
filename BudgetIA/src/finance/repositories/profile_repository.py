@@ -110,3 +110,49 @@ class ProfileRepository:
         except Exception as e:
             print(f"ERRO (Repo) ao ler perfil como texto: {e}")
             return "Não foi possível carregar o perfil do usuário."
+
+    def ensure_fields(self, fields: list[str]) -> bool:
+        """
+        Garante que uma lista de campos exista no perfil.
+        Se não existir, cria com valor vazio.
+        Retorna True se houve alteração.
+        """
+        df_perfil = self.get_profile_dataframe()
+
+        # Se o dataframe estiver vazio ou sem colunas, inicializa
+        if df_perfil.empty or ColunasPerfil.CAMPO not in df_perfil.columns:
+            df_perfil = pd.DataFrame(columns=config.LAYOUT_PLANILHA[self._aba_nome])
+
+        campos_existentes = set()
+        if not df_perfil.empty and ColunasPerfil.CAMPO in df_perfil.columns:
+            # Normaliza para comparação (strip + lower)
+            campos_existentes = set(
+                df_perfil[ColunasPerfil.CAMPO].astype(str).str.strip().str.lower()
+            )
+
+        dados_para_adicionar = []
+        for campo in fields:
+            campo_norm = str(campo).strip().lower()
+            if campo_norm not in campos_existentes:
+                dados_para_adicionar.append(
+                    {
+                        ColunasPerfil.CAMPO: campo,
+                        ColunasPerfil.VALOR: None,
+                        ColunasPerfil.OBS: "",
+                    }
+                )
+
+        if dados_para_adicionar:
+            novo_df = pd.DataFrame(
+                dados_para_adicionar, columns=config.LAYOUT_PLANILHA[self._aba_nome]
+            )
+            df_perfil = pd.concat([df_perfil, novo_df], ignore_index=True)
+
+            self._context.update_dataframe(self._aba_nome, df_perfil)
+            self._context.save()
+            print(
+                f"LOG (Repo): Campos de perfil adicionados: {[d['Campo'] for d in dados_para_adicionar]}"
+            )
+            return True
+
+        return False

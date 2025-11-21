@@ -2,8 +2,14 @@ import os
 
 import pandas as pd
 
-from agent_implementations.langchain_agent import IADeFinancas
-from finance.planilha_manager import PlanilhaManager
+from agent_implementations.factory import AgentFactory
+from config import DEFAULT_GEMINI_MODEL, NomesAbas
+from core.llm_enums import LLMProviderType
+from core.llm_factory import LLMProviderFactory
+from core.llm_manager import LLMOrchestrator
+from core.user_config_service import UserConfigService
+from finance.factory import FinancialSystemFactory
+from finance.storage.excel_storage_handler import ExcelHandler
 
 
 # Esta função ainda é útil para quando a IA precisar VER os dados
@@ -28,43 +34,25 @@ def main() -> None:
     project_root = os.path.abspath(os.path.join(script_dir, os.pardir))
     planilha_path = os.path.join(project_root, "planilha_mestra.xlsx")
 
-    # 1. Inicializa o gerenciador da planilha
-    plan_manager = PlanilhaManager(nome_arquivo=planilha_path)
+    # 1. Setup de Configuração e Storage
+    config_service = UserConfigService("cli_user")  # Usuário padrão para CLI
+    storage_handler = ExcelHandler(file_path=planilha_path)
 
-    # 2. Garante que temos alguns dados na planilha para a IA analisar
-    # Remove a adição automática de dados se já tiver, para evitar duplicação em cada execução.
-    if plan_manager.visualizar_dados().empty:
-        print("Planilha vazia. Adicionando dados de exemplo para demonstração.")
-        plan_manager.adicionar_registro(
-            "2024-07-01", "Receita", "Salário", "Pagamento mensal", 3000.00, "Concluído"
-        )
-        plan_manager.adicionar_registro(
-            "2024-07-05", "Despesa", "Aluguel", "Aluguel Junho", 1200.00, "Concluído"
-        )
-        plan_manager.adicionar_registro(
-            "2024-07-10",
-            "Despesa",
-            "Alimentação",
-            "Compras de supermercado",
-            350.50,
-            "Concluído",
-        )
-        plan_manager.adicionar_registro(
-            "2024-07-12", "Receita", "Extra", "Freelance X", 500.00, "Pendente"
-        )
-        plan_manager.adicionar_registro(
-            "2024-07-15", "Despesa", "Transporte", "Combustível", 150.00, "Concluído"
-        )
-        plan_manager.adicionar_registro(
-            "2024-07-20", "Despesa", "Lazer", "Cinema e Jantar", 100.00, "Pendente"
-        )
-    else:
-        print(
-            f"Planilha existente: {planilha_path}. {len(plan_manager.visualizar_dados())} registros encontrados."
-        )
+    # 2. Inicializa o gerenciador da planilha via Factory
+    plan_manager = FinancialSystemFactory.create_manager(
+        storage_handler=storage_handler, config_service=config_service
+    )
 
-    # 3. Inicializa a IA, passando a instância do PlanilhaManager
-    ia_financas = IADeFinancas(planilha_manager=plan_manager)
+    # 3. Inicializa a IA
+    primary_provider = LLMProviderFactory.create_provider(
+        LLMProviderType.GEMINI, default_model=DEFAULT_GEMINI_MODEL
+    )
+    llm_orchestrator = LLMOrchestrator(primary_provider=primary_provider)
+    llm_orchestrator.get_configured_llm()
+
+    ia_financas = AgentFactory.create_agent(
+        llm_orchestrator=llm_orchestrator, plan_manager=plan_manager
+    )
 
     print("\n--- Conversando com a IA (digite 'sair' para encerrar) ---")
     while True:
@@ -74,14 +62,14 @@ def main() -> None:
             break
 
         print("IA (pensando...):")
-        resposta_ia = ia_financas.interagir_com_usuario(user_input)
+        resposta_ia = ia_financas.interagir(user_input)
         # Ajustado para imprimir apenas a resposta final do agente, evitando duplicação.
         # Os logs internos do agente (verbose=True) já mostram o processo de pensamento.
         print(f"IA: {resposta_ia}")
 
     # Opcional: Visualizar a planilha após a interação para ver se algo foi adicionado
     print("\n--- Dados Finais da Planilha ---")
-    print(plan_manager.visualizar_dados())
+    print(plan_manager.visualizar_dados(NomesAbas.TRANSACOES))
 
 
 if __name__ == "__main__":

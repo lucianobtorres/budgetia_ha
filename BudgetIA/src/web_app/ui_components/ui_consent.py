@@ -2,7 +2,7 @@
 import streamlit as st
 
 from core.google_auth_service import GoogleAuthService
-from web_app.onboarding_manager import OnboardingManager, OnboardingState
+from initialization.onboarding_manager import OnboardingManager, OnboardingState
 
 
 def render(manager: OnboardingManager, auth_service: GoogleAuthService) -> None:
@@ -25,13 +25,15 @@ def render(manager: OnboardingManager, auth_service: GoogleAuthService) -> None:
     st.title("Habilite os Superpoderes do BudgetIA! 🚀")
 
     st.markdown(f"Você selecionou a planilha: **{file_name}**.")
-    st.markdown("""
+    st.markdown(
+        """
     Para que nossos assistentes proativos (como o **Bot do Telegram** e o **Agendador de Insights**) 
     possam analisar suas finanças e ajudá-lo 24h por dia, nosso sistema precisa de 
     permissão de **Leitor** na sua planilha.
 
     **Esta é uma escolha sua:**
-    """)
+    """
+    )
 
     # --- O TEXTO CATIVANTE (Seu Insight) ---
     st.info(
