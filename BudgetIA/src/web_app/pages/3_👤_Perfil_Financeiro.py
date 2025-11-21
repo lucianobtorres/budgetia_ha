@@ -7,7 +7,7 @@ import streamlit as st
 
 from config import PROFILE_DESIRED_FIELDS, ColunasPerfil, NomesAbas
 from core.google_auth_service import GoogleAuthService
-from initialization.onboarding_manager import OnboardingManager
+from initialization.onboarding.orchestrator import OnboardingOrchestrator
 from web_app.utils import (
     create_excel_export_bytes,
     initialize_session_auth,
@@ -26,17 +26,14 @@ except ImportError:
 
 def render_profile_editor(plan_manager: "PlanilhaManager", aba_perfil: str) -> None:
     st.header("Seus Dados de Perfil", divider="blue")
-
     try:
-        # Garante que os campos desejados existam usando a nova lógica centralizada
+        # Ensure desired fields exist
         plan_manager.ensure_profile_fields(PROFILE_DESIRED_FIELDS)
-
         df_perfil = plan_manager.visualizar_dados(aba_nome=aba_perfil)
         st.info(
             "Aqui estão os dados do seu perfil. O Chat com IA usa essas informações."
         )
-
-        # Limpeza visual para o editor
+        # Clean up for editor
         if ColunasPerfil.CAMPO in df_perfil.columns:
             df_perfil[ColunasPerfil.CAMPO] = (
                 df_perfil[ColunasPerfil.CAMPO].astype(str).fillna("")
@@ -49,7 +46,6 @@ def render_profile_editor(plan_manager: "PlanilhaManager", aba_perfil: str) -> N
             df_perfil[ColunasPerfil.OBS] = (
                 df_perfil[ColunasPerfil.OBS].astype(str).fillna("")
             )
-
         editor_key_perfil = "editor_perfil"
         edited_df_perfil = st.data_editor(
             df_perfil,
@@ -67,7 +63,6 @@ def render_profile_editor(plan_manager: "PlanilhaManager", aba_perfil: str) -> N
             hide_index=True,
             key=editor_key_perfil,
         )
-
         if not df_perfil.equals(edited_df_perfil):
             if st.button("Salvar Alterações no Perfil"):
                 st.info("Salvando perfil...")
@@ -78,21 +73,18 @@ def render_profile_editor(plan_manager: "PlanilhaManager", aba_perfil: str) -> N
                     plan_manager.update_dataframe(aba_perfil, edited_df_perfil_cleaned)
                     plan_manager.save()
                     st.success("Perfil Financeiro atualizado com sucesso!")
-
                     if verificar_perfil_preenchido(plan_manager):
                         st.info("Status: Perfil parece completo.")
                     else:
                         st.warning(
                             "Status: Perfil ainda parece incompleto (campos essenciais podem estar vazios ou faltando)."
                         )
-
                     st.rerun()
                 except Exception as e:
                     st.error(f"Erro ao salvar alterações no Perfil: {e}")
                     st.exception(e)
             else:
                 st.warning("Você tem alterações não salvas.")
-
     except Exception as e:
         st.error(f"Erro ao carregar o Perfil Financeiro: {e}")
         st.exception(e)
@@ -107,26 +99,21 @@ def render_advanced_settings(
     st.header("Configurações Avançadas", divider="blue")
     planilha_path = config_service.get_planilha_path()
     is_google_sheet = planilha_path and "docs.google.com" in planilha_path
-
     with st.container(border=True):
         st.subheader("Conexões de Dados")
         st.info(f"**Planilha Ativa:** `{planilha_path}`")
-
         if is_google_sheet:
             st.markdown("**Modo Proativo (Bot & Scheduler)**")
             consent_dado = config_service.get_backend_consent()
             help_text = "Permite que o BudgetIA (via Bot/Scheduler) leia e escreva na sua planilha 24/7, mesmo offline."
-
             if not auth_service.get_user_credentials():
                 help_text = "Você precisa se conectar ao Google (na tela de seleção de arquivo) para gerenciar isso."
-
             novo_consentimento = st.toggle(
                 "Habilitar recursos de back-end",
                 value=consent_dado,
                 help=help_text,
                 disabled=(not auth_service.get_user_credentials()),
             )
-
             if novo_consentimento != consent_dado:
                 file_id = auth_service._extract_file_id_from_url(planilha_path)
                 if not file_id:
@@ -157,7 +144,6 @@ def render_advanced_settings(
                             st.rerun()
                         else:
                             st.error(f"Falha ao desabilitar: {msg}")
-
         st.markdown("**Conexão com a Conta Google**")
         if auth_service.get_user_credentials():
             st.success("Você conectou sua conta Google.")
@@ -175,7 +161,6 @@ def render_advanced_settings(
             st.info(
                 "Você não conectou sua conta Google. Use o botão 'Fazer login com o Google' na tela de seleção de arquivo."
             )
-
     with st.container(border=True):
         st.subheader("Sincronização de Cache")
         st.caption(
@@ -190,22 +175,6 @@ def render_advanced_settings(
             st.success(
                 "Sincronização concluída! O app e o bot agora têm os dados mais recentes."
             )
-            st.rerun()
-
-
-def render_danger_zone(
-    manager: OnboardingManager, plan_manager: "PlanilhaManager"
-) -> None:
-    st.divider()
-    st.subheader(
-        "Configurações Avançadas"
-    )  # Keeping header consistent with original structure if needed, but actually "Zona de Perigo" is better
-
-    with st.expander("Zona de Perigo"):
-        st.warning(
-            "Atenção: A ação abaixo irá desconfigurar sua planilha atual e reiniciar o BudgetIA, pedindo uma nova planilha na próxima vez que você abrir o app."
-        )
-
         excel_bytes = create_excel_export_bytes(plan_manager)
         st.download_button(
             label="Baixar Cópia Local (Salvar Como...)",
@@ -213,15 +182,35 @@ def render_danger_zone(
             file_name="budgetia_backup.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
+            key="download_backup_advanced",
         )
 
+
+def render_danger_zone(
+    orchestrator: OnboardingOrchestrator, plan_manager: "PlanilhaManager"
+) -> None:
+    st.divider()
+    st.subheader("Zona de Perigo")
+    with st.expander("Zona de Perigo"):
+        st.warning(
+            "Atenção: A ação abaixo irá desconfigurar sua planilha atual e reiniciar o BudgetIA, pedindo uma nova planilha na próxima vez que você abrir o app."
+        )
+        excel_bytes = create_excel_export_bytes(plan_manager)
+        st.download_button(
+            label="Baixar Cópia Local (Salvar Como...)",
+            data=excel_bytes,
+            file_name="budgetia_backup.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+            key="download_backup_danger",
+        )
         if st.button(
             "Resetar e Configurar Nova Planilha",
             type="primary",
             use_container_width=True,
             key="reset_onboarding",
         ):
-            manager.reset_config()
+            orchestrator.reset_config()
             st.cache_resource.clear()
             for key in st.session_state.keys():
                 if key not in ["authentication_status", "name", "username"]:
@@ -234,26 +223,22 @@ def render_danger_zone(
 
 def main() -> None:
     is_logged_in, username, config_service, llm_orchestrator = initialize_session_auth()
-
     if not is_logged_in or not config_service or "plan_manager" not in st.session_state:
         st.warning(
             "Você precisa estar logado e ter uma planilha configurada para acessar esta página."
         )
         st.stop()
-
     plan_manager, agent_runner = setup_page(
         title="Perfil Financeiro",
         icon="👤",
         subtitle="Defina seus orçamentos por categoria ",
     )
-
-    manager: OnboardingManager = st.session_state.onboarding_manager
+    orchestrator: OnboardingOrchestrator = st.session_state.onboarding_orchestrator
     aba_perfil = NomesAbas.PERFIL_FINANCEIRO
     auth_service = GoogleAuthService(config_service)
-
     render_profile_editor(plan_manager, aba_perfil)
     render_advanced_settings(config_service, auth_service, plan_manager)
-    render_danger_zone(manager, plan_manager)
+    render_danger_zone(orchestrator, plan_manager)
 
 
 if __name__ == "__main__":

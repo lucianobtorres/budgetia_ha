@@ -15,6 +15,9 @@ from yaml.loader import SafeLoader
 from core.user_config_service import UserConfigService
 from finance.strategies.base_strategy import BaseMappingStrategy
 
+# NOTE: get_user_config_service() is defined in 💰_BudgetIA.py
+# If utils.py needs it, import it or pass it as parameter
+
 # Adiciona o diretório 'src' ao sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -42,10 +45,7 @@ def get_llm_orchestrator() -> LLMOrchestrator:
     return orchestrator
 
 
-@st.cache_data(show_spinner=False)
-def get_user_config_service(username: str) -> UserConfigService:
-    print(f"--- DEBUG APP: Criando UserConfigService para '{username}' ---")
-    return UserConfigService(username)
+
 
 
 @st.cache_data
@@ -333,7 +333,7 @@ def initialize_session_auth() -> (
         st.sidebar.title(f"Bem-vindo, {st.session_state['name']}!")
 
         # Inicializa os serviços
-        config_service = get_user_config_service(username)
+        config_service = UserConfigService(username)  # Direct instantiation (utils.py is deprecated)
         return True, username, config_service, llm_orchestrator
 
     elif st.session_state["authentication_status"] is False:

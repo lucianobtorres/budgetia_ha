@@ -19,17 +19,20 @@ from core.llm_factory import LLMProviderFactory
 from core.llm_manager import LLMOrchestrator
 from core.user_config_service import UserConfigService
 from finance.planilha_manager import PlanilhaManager
-from initialization.onboarding_manager import OnboardingManager, OnboardingState
+
+# --- Imports do Novo Onboarding ---
+from initialization.onboarding.orchestrator import (
+    OnboardingOrchestrator,
+    OnboardingState,
+)
+
+# from initialization.onboarding_manager import OnboardingManager, OnboardingState # DEPRECATED
 from initialization.system_initializer import initialize_financial_system
 
 # --- Imports dos Novos Módulos de UI ---
 from web_app.ui_components import (
-    ui_consent,
-    ui_fallback,
-    ui_file_selection,
     ui_home_hub,
-    ui_profile_setup,
-    ui_strategy_generation,
+    ui_onboarding_chat,
 )
 from web_app.utils import initialize_session_auth
 
@@ -130,20 +133,24 @@ def get_llm_orchestrator() -> LLMOrchestrator:
 llm_orchestrator = get_llm_orchestrator()
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_resource(show_spinner=False)
 def get_user_config_service(username: str) -> UserConfigService:
+    import traceback
     print(f"--- DEBUG APP: Criando UserConfigService para '{username}' ---")
+    print("--- DEBUG APP: Stack trace:")
+    traceback.print_stack()
     return UserConfigService(username)
 
 
 config_service = get_user_config_service(username)
 
-if "onboarding_manager" not in st.session_state:
-    st.session_state.onboarding_manager = OnboardingManager(
-        llm_orchestrator, config_service
+# --- INICIALIZAÇÃO DO NOVO ORCHESTRATOR ---
+if "onboarding_orchestrator" not in st.session_state:
+    st.session_state.onboarding_orchestrator = OnboardingOrchestrator(
+        config_service, llm_orchestrator
     )
 
-manager: OnboardingManager = st.session_state.onboarding_manager
+orchestrator: OnboardingOrchestrator = st.session_state.onboarding_orchestrator
 
 
 def load_financial_system_cached(
@@ -159,44 +166,30 @@ def load_financial_system_cached(
     return initialize_financial_system(path, _llm_orchestrator, _config_service)
 
 
-current_state = manager.get_current_state()
-print(f"--- DEBUG APP: Estado atual do OnboardingManager: {current_state.name} ---")
-
-validation_callback = lambda path: initialize_financial_system(
-    path, llm_orchestrator, config_service
+current_state = orchestrator.get_current_state()
+print(
+    f"--- DEBUG APP: Estado atual do OnboardingOrchestrator: {current_state.name} ---"
 )
 
-# --- ROTEAMENTO DE ESTADO ---
+# --- ROTEAMENTO DE ESTADO (NOVO) ---
 
-if current_state == OnboardingState.AWAITING_FILE_SELECTION:
-    load_financial_system.clear()
-    ui_file_selection.render(manager, validation_callback)
+if current_state != OnboardingState.COMPLETE:
+    # Renderiza a nova UI conversacional para todo o processo de onboarding
+    ui_onboarding_chat.render(orchestrator)
     st.stop()
 
-elif current_state == OnboardingState.GENERATING_STRATEGY:
-    ui_strategy_generation.render(manager)
-    st.stop()
+else:
+    # --- Onboarding Completo: Carrega Home Hub ---
+    print("--- DEBUG APP: Onboarding completo. Carregando sistema... ---")
 
-elif current_state == OnboardingState.AWAITING_BACKEND_CONSENT:
-    # Instancia o serviço de autenticação
-    auth_service = GoogleAuthService(config_service)
-    # Renderiza a nova tela
-    ui_consent.render(manager, auth_service)
-    st.stop()
+    # Tenta recuperar o caminho da planilha (salvo pelo orchestrator no config_service)
+    current_planilha_path = config_service.get_planilha_path()
 
-elif current_state == OnboardingState.STRATEGY_FAILED_FALLBACK:
-    ui_fallback.render(manager)
-    st.stop()
-
-elif current_state == OnboardingState.SETUP_COMPLETE:
-    print("--- DEBUG APP: FASE 1 OK. Carregando sistema... ---")
-    current_planilha_path = manager.planilha_path
     if not current_planilha_path:
         st.error(
             "Erro crítico: Estado completo, mas caminho da planilha não encontrado."
         )
-        manager.reset_config()
-        st.rerun()
+        # TODO: Adicionar método reset no Orchestrator
         st.stop()
 
     # --- Carregamento do Sistema ---
@@ -222,11 +215,9 @@ elif current_state == OnboardingState.SETUP_COMPLETE:
                 main_chat_history = StreamlitHistoryManager("chat_history")
 
                 # 2. Criar os Chat Services
-                # O 'profile_chat_service' usará o histórico de onboarding
                 st.session_state.profile_chat_service = ChatService(
                     agent_runner=agent_runner, history_manager=onboarding_history
                 )
-                # O 'main_chat_service' usará o histórico principal
                 st.session_state.main_chat_service = ChatService(
                     agent_runner=agent_runner, history_manager=main_chat_history
                 )
@@ -241,7 +232,7 @@ elif current_state == OnboardingState.SETUP_COMPLETE:
             else:
                 st.error("Falha crítica ao carregar componentes do sistema.")
                 if st.button("Tentar Novamente (Limpar Configuração)"):
-                    manager.reset_config()
+                    # manager.reset_config() # TODO: Implementar reset no orchestrator
                     st.cache_resource.clear()
                     st.cache_data.clear()
                     st.rerun()
@@ -262,7 +253,7 @@ elif current_state == OnboardingState.SETUP_COMPLETE:
         )
 
         if st.button("Tentar reconfigurar (Usar outra planilha)"):
-            manager.reset_config()
+            # manager.reset_config()
             st.cache_resource.clear()
             st.cache_data.clear()
             st.rerun()
@@ -278,20 +269,13 @@ elif current_state == OnboardingState.SETUP_COMPLETE:
         )
 
         if st.button("Tentar reconfigurar (Usar outra planilha)"):
-            manager.reset_config()
+            # manager.reset_config()
             st.cache_resource.clear()
             st.cache_data.clear()
             st.rerun()
 
         st.stop()
 
-    # --- Roteamento FASE 2: Setup do Perfil ---
-    if not manager.verificar_perfil_preenchido(plan_manager):
-        print("--- DEBUG APP: FASE 2 (Profile Setup) ---")
-        ui_profile_setup.render(manager, profile_chat_service, plan_manager)
-        st.stop()
-
-    # --- Roteamento FASE 3: Home Hub (Onboarding Completo) ---
-    else:
-        print("--- DEBUG APP: Onboarding completo. Renderizando Home Hub. ---")
-        ui_home_hub.render(plan_manager, main_chat_service)
+    # --- Renderiza Home Hub ---
+    print("--- DEBUG APP: Onboarding completo. Renderizando Home Hub. ---")
+    ui_home_hub.render(plan_manager, main_chat_service)

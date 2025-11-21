@@ -8,8 +8,9 @@ from pathlib import Path
 import schedule
 
 import config
+from core.llm_enums import LLMProviderType
+from core.llm_factory import LLMProviderFactory
 from core.llm_manager import LLMOrchestrator
-from core.llm_providers.gemini_provider import GeminiProvider
 from core.user_config_service import UserConfigService
 
 # 1. Encontra o diretório 'src' onde este arquivo está.
@@ -22,7 +23,7 @@ PROJECT_ROOT = os.path.dirname(SRC_DIR)
 # Isso permite imports como 'from src.core import ...'
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
-SCHEDULER_USERNAME = "jsmith"
+
 # 4. Adiciona o PRÓPRIO 'src' ao sys.path.
 # Isso permite imports como 'from core import ...' (embora o 'from src.core' seja mais explícito)
 if SRC_DIR not in sys.path:
@@ -40,8 +41,11 @@ print("Inicializando...")
 
 try:
     print("SCHEDULER: Criando LLMOrchestrator global...")
-    PRIMARY_PROVIDER = GeminiProvider(default_model=config.DEFAULT_GEMINI_MODEL)
-    LLM_ORCHESTRATOR = LLMOrchestrator(primary_provider=PRIMARY_PROVIDER)
+    # Usa Factory Pattern para consistência com resto do codebase
+    primary_provider = LLMProviderFactory.create_provider(
+        provider_type=LLMProviderType.GEMINI, default_model=config.DEFAULT_GEMINI_MODEL
+    )
+    LLM_ORCHESTRATOR = LLMOrchestrator(primary_provider=primary_provider)
 except Exception as e:
     print(f"ERRO FATAL: Falha ao criar LLM Orchestrator. {e}")
     sys.exit(1)

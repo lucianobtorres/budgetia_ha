@@ -64,27 +64,35 @@ class UserConfigService:
 
     def load_config(self) -> dict[str, Any]:
         """Carrega a configuração do arquivo JSON deste usuário."""
+        print(f"[DEBUG load_config] Tentando ler de: {self.config_file_path}")
+        print(f"[DEBUG load_config] Arquivo existe? {self.config_file_path.exists()}")
         if self.config_file_path.exists():
             try:
                 with open(self.config_file_path, "rb") as f:
                     encrypted_data = f.read()  # type: ignore
 
                 if not encrypted_data:
+                    print("[DEBUG load_config] Arquivo vazio!")
                     return {}
 
                 json_string = self._decrypt_data(encrypted_data)
 
                 if json_string:
-                    return json.loads(json_string)
+                    data = json.loads(json_string)
+                    print(f"[DEBUG load_config] Dados carregados: {list(data.keys())}")
+                    return data
                 else:
+                    print("[DEBUG load_config] Falha na descriptografia")
                     return {}
             except (json.JSONDecodeError, OSError) as e:
                 print(f"Erro ao ler config do usuário {self.username}: {e}")
                 return {}
+        print("[DEBUG load_config] Arquivo não existe, retornando {}")
         return {}  # Retorna dict vazio se não existir
 
     def save_config(self, config_data: dict[str, Any]) -> None:
         """Salva a configuração no arquivo JSON deste usuário."""
+        print(f"[DEBUG save_config] Salvando em: {self.config_file_path}")
         self._ensure_dir_exists()
         try:
             json_string = json.dumps(config_data, indent=4)
@@ -92,6 +100,7 @@ class UserConfigService:
 
             with open(self.config_file_path, "wb") as f:
                 f.write(encrypted_data)
+            print(f"[DEBUG save_config] Arquivo salvo com sucesso: {self.config_file_path.exists()}")
         except OSError as e:
             print(f"Erro ao salvar config do usuário {self.username}: {e}")
 
@@ -102,29 +111,41 @@ class UserConfigService:
         config_data = self.load_config()
         path_str = config_data.get(config.PLANILHA_KEY)
 
+        print(f"[DEBUG get_planilha_path] PLANILHA_KEY='{config.PLANILHA_KEY}', path_str='{path_str}'")
+
         if not path_str:
+            print("[DEBUG get_planilha_path] Nenhum caminho encontrado no config")
             return None
 
         # Validação (a mesma que corrigimos antes)
         if "docs.google.com/" in path_str:
+            print(f"[DEBUG get_planilha_path] Google Sheets URL detectada: {path_str}")
             return str(path_str)
 
-        if Path(path_str).is_file():
+        file_exists = Path(path_str).is_file()
+        print(f"[DEBUG get_planilha_path] Arquivo local: '{path_str}' | Existe: {file_exists}")
+        
+        if file_exists:
             return str(path_str)
 
         # O caminho salvo é inválido, vamos limpar
+        print(f"[DEBUG get_planilha_path] Arquivo não existe! Removendo do config.")
         config_data.pop(config.PLANILHA_KEY, None)
         self.save_config(config_data)
         return None
 
     def save_planilha_path(self, path_str: str) -> None:
         """Salva o caminho da planilha na configuração."""
+        print(f"[DEBUG save_planilha_path] CHAMADO com path_str='{path_str}'")
         config_data = self.load_config()
+        print(f"[DEBUG save_planilha_path] Config antes: {config_data.keys()}")
         config_data[config.PLANILHA_KEY] = path_str
         # Limpa estados de onboarding pendentes ao salvar um novo caminho
         config_data.pop("onboarding_state", None)
         config_data.pop("pending_planilha_path", None)
+        print(f"[DEBUG save_planilha_path] Config depois: PLANILHA_KEY='{config.PLANILHA_KEY}' -> '{config_data.get(config.PLANILHA_KEY)}'")
         self.save_config(config_data)
+        print(f"[DEBUG save_planilha_path] save_config() concluído")
 
     def get_mapeamento(self) -> dict[str, Any] | None:
         config_data = self.load_config()
@@ -214,17 +235,6 @@ class UserConfigService:
                 os.remove(self.strategy_file_path)
             except OSError as e:
                 print(f"AVISO: Falha ao limpar {self.strategy_file_path}: {e}")
-
-    def save_google_oauth_tokens(self, token_json_str: str) -> None:
-        """Salva os tokens OAuth 2.0 do usuário (como JSON string) no config."""
-        config_data = self.load_config()
-        config_data["google_oauth_tokens"] = token_json_str
-        self.save_config(config_data)
-
-    def get_google_oauth_tokens(self) -> str | None:
-        """Carrega os tokens OAuth 2.0 do usuário (como JSON string)."""
-        config_data = self.load_config()
-        return config_data.get("google_oauth_tokens")
 
     def save_comunicacao_field(self, field_name: str, value: Any) -> None:
         """
