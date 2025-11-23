@@ -82,10 +82,17 @@ class CacheService:
             cached_timestamp = cache_payload.get("timestamp")
 
             # 2. Desserializa os DFs
-            dfs_dict = {
-                aba_nome: pd.read_json(json_data, orient="split")
-                for aba_nome, json_data in serialized_dfs.items()
-            }
+            from io import StringIO
+            
+            dfs_dict = {}
+            for aba_nome, json_data in serialized_dfs.items():
+                if json_data:
+                    try:
+                        # FIX: Wrap string in StringIO to avoid FutureWarning
+                        dfs_dict[aba_nome] = pd.read_json(StringIO(json_data), orient="split")
+                    except ValueError:
+                        pass
+
             dfs_dict = self._ensure_dtypes(dfs_dict)
 
             print(f"LOG: Cache HIT para a chave '{key}'.")

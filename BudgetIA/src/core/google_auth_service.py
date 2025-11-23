@@ -1,13 +1,17 @@
 # src/core/google_auth_service.py
+import io
 import json  # <-- 1. IMPORTAR JSON
 import re
+from pathlib import Path
 from typing import Any
 
 import streamlit as st
 from google.auth.transport.requests import Request
+from google.oauth2 import service_account
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload
 
 import config
 
@@ -44,14 +48,31 @@ class GoogleAuthService:
             redirect_uri=config.GOOGLE_OAUTH_REDIRECT_URI,
         )
 
-    def generate_authorization_url(self) -> str:
+    def generate_authorization_url(self, current_onboarding_state: str | None = None) -> str:
         """
-        Gera a URL para a qual o usuário deve ser enviado para fazer login.
+        Gera a URL OAuth com estado do onboarding (opcional) para restauração após redirect.
+        
+        Args:
+            current_onboarding_state: Nome do estado atual (ex: 'SPREADSHEET_ACQUISITION')
+        
+        Returns:
+            URL de autorização do Google OAuth
         """
+        # Cria um state customizado que inclui o estado do onboarding
+        custom_state = None
+        if current_onboarding_state:
+            from datetime import datetime
+            custom_state = json.dumps({
+                "onboarding_state": current_onboarding_state,
+                "timestamp": datetime.now().isoformat()
+            })
+        
         # 'access_type='offline'' garante que recebamos um 'refresh_token'
         # 'prompt='consent'' garante que o usuário veja a tela de permissões
         authorization_url, _ = self.flow.authorization_url(
-            access_type="offline", prompt="consent"
+            access_type="offline", 
+            prompt="consent",
+            state=custom_state  # ← NOVO: Passa estado customizado para preservar contexto
         )
         return str(authorization_url)
 
@@ -66,6 +87,87 @@ class GoogleAuthService:
             )
         except Exception as e:
             st.error(f"Erro ao trocar o código por tokens: {e}")
+
+    def download_sheets_as_excel_for_analysis(self, file_id: str) -> str:
+        """
+        Baixa um Google Sheet (nativo ou não-nativo) como .xlsx para análise local.
+        Implementa a lógica de alternar entre 'export' (Sheets nativo) e 'get_media' (XLSX não-nativo).
+        """
+        try:
+            # --- 1. Autenticar a Service Account (o robô) ---
+            sa_path = Path(config.SERVICE_ACCOUNT_CREDENTIALS_PATH)
+
+            if not sa_path.exists():
+                raise FileNotFoundError(
+                    f"O arquivo de credenciais da Service Account não foi encontrado no caminho: {sa_path}."
+                )
+
+            creds_sa = service_account.Credentials.from_service_account_file(
+                sa_path,
+                scopes=config.GOOGLE_OAUTH_SCOPES,
+            )
+            drive_service = build("drive", "v3", credentials=creds_sa)
+
+        except Exception as e:
+            raise Exception(
+                f"Erro ao carregar credenciais da Service Account para download: {e}"
+            )
+
+        # --- 2. Obter MIME Type do arquivo ---
+        file_metadata = (
+            drive_service.files().get(fileId=file_id, fields="mimeType").execute()
+        )
+        mime_type = file_metadata.get("mimeType")
+
+        # --- 3. Determinar o método de download ---
+
+        # MIME Type para XLSX (o formato que o Pandas precisa)
+        xlsx_mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+        # Se o arquivo for um Google Sheets nativo (requer export/conversão)
+        if mime_type == "application/vnd.google-apps.spreadsheet":
+            print(
+                "--- DEBUG GoogleAuth: Arquivo é um Google Sheet nativo. Usando EXPORT. ---"
+            )
+            request = drive_service.files().export(
+                fileId=file_id,
+                mimeType=xlsx_mime,  # Exporta como XLSX
+            )
+
+        # Se o arquivo for um XLSX não-nativo (upload original do usuário)
+        elif mime_type == xlsx_mime:
+            print(
+                "--- DEBUG GoogleAuth: Arquivo é um XLSX não-nativo. Usando GET media. ---"
+            )
+            request = drive_service.files().get_media(fileId=file_id)
+
+        else:
+            # Qualquer outro tipo de arquivo (Docs, PDF, etc.)
+            raise Exception(
+                f"Tipo de arquivo não suportado ({mime_type}). Apenas Google Sheets e XLSX."
+            )
+
+        # --- 4. Salvar o arquivo localmente ---
+        file_name = f"{file_id}_temp_analysis.xlsx"
+
+        # Cria um diretório temporário específico para o usuário
+        temp_dir = Path(config.DATA_DIR) / "temp" / self.config_service.username
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        local_file_path = temp_dir / file_name
+
+        # Executa o download usando MediaIoBaseDownload
+        fh = io.FileIO(local_file_path, "wb")
+        downloader = MediaIoBaseDownload(fh, request)
+
+        done = False
+        while done is False:
+            status, done = downloader.next_chunk()
+
+        # Após o download, o arquivo .xlsx está pronto para o Pandas
+        print(
+            f"--- DEBUG GoogleAuth: Download temporário concluído em: {local_file_path} ---"
+        )
+        return str(local_file_path)
 
     def get_user_credentials(self) -> Credentials | None:
         """Carrega as credenciais salvas do usuário."""

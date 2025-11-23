@@ -3,6 +3,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 
+from core.google_auth_service import GoogleAuthService
+
 
 # Interface para retorno padronizado
 @dataclass
@@ -10,7 +12,9 @@ class AcquisitionResult:
     success: bool
     file_path: str | None = None
     handler_type: str = "unknown"
-    requires_ui_action: str | None = None  # Ex: "show_file_uploader", "show_google_oauth"
+    requires_ui_action: str | None = (
+        None  # Ex: "show_file_uploader", "show_google_oauth"
+    )
     error_message: str | None = None
 
 
@@ -68,11 +72,11 @@ class DefaultSpreadsheetHandler(IFileHandler):
 
     def acquire(self, context: dict) -> AcquisitionResult:
         """Cria uma nova planilha Excel com estrutura completa na pasta do usuário."""
-        import pandas as pd
-        from openpyxl import Workbook
-        from openpyxl.utils.dataframe import dataframe_to_rows
-        import config
         from pathlib import Path
+
+        from openpyxl import Workbook
+
+        import config
 
         try:
             # Obtém username do contexto
@@ -264,6 +268,9 @@ class GoogleSheetsHandler(IFileHandler):
     Acionado por: "google", "drive", "sheets", "nuvem", "online".
     """
 
+    def __init__(self, auth_service: GoogleAuthService):
+        self.auth_service = auth_service
+
     def can_handle(self, user_input: str) -> bool:
         clean_input = (
             user_input.lower()
@@ -272,7 +279,14 @@ class GoogleSheetsHandler(IFileHandler):
             .replace("☁️", "")
             .strip()
         )
-        keywords = ["google", "drive", "sheets", "nuvem", "online"]
+        keywords = [
+            "google",
+            "drive",
+            "sheets",
+            "nuvem",
+            "online",
+            "seleção de planilha",
+        ]
         result = any(k in clean_input for k in keywords)
         print(
             f"[DEBUG GoogleHandler] Input: '{user_input}' | Clean: '{clean_input}' | Match: {result}"
@@ -280,20 +294,53 @@ class GoogleSheetsHandler(IFileHandler):
         return result
 
     def acquire(self, context: dict) -> AcquisitionResult:
-        # Verifica se já temos URL selecionada
+        # 1. FIRST: Se a URL foi selecionada (a UI enviou de volta), finaliza!
         selected_url = context.get("google_file_url")
+        if selected_url:
+            return AcquisitionResult(
+                success=True,
+                file_path=selected_url,  # URL é tratada como path
+                handler_type="google",
+            )
+        
+        # 2. Trata o callback do Google (se o 'code' estiver no contexto)
+        auth_code = context.get("google_auth_code")
 
-        if not selected_url:
+        if auth_code:
+            try:
+                self.auth_service.exchange_code_for_tokens(
+                    auth_code
+                )  # Troca código por tokens
+                # Tokens salvos. Avança para seleção de arquivo.
+                return AcquisitionResult(
+                    success=False,
+                    handler_type="google",
+                    requires_ui_action="show_file_selection",  # <--- Próximo passo
+                    error_message="Autenticação concluída. Por favor, selecione sua planilha.",
+                )
+            except Exception as e:
+                return AcquisitionResult(
+                    success=False,
+                    handler_type="google",
+                    requires_ui_action="show_google_oauth",
+                    error_message=f"Erro ao trocar o código por tokens. Tente novamente: {e}",
+                )
+
+        # 3. Se já estamos autenticados (ou após a troca), mas a URL não foi selecionada
+        # Ou se o usuário clicou para conectar e já tinha credenciais antigas válidas.
+        if self.auth_service.get_user_credentials():
             return AcquisitionResult(
                 success=False,
-                file_path=None,
                 handler_type="google",
-                requires_ui_action="show_google_oauth",
-                error_message="Aguardando seleção do Google Sheets",
+                requires_ui_action="show_file_selection",  # <--- Próximo passo
+                error_message="Por favor, selecione sua planilha do Google Drive.",
             )
 
+        # 4. Se não tem credenciais nem URL, solicita OAuth (início do fluxo)
         return AcquisitionResult(
-            success=True,
-            file_path=selected_url,  # URL é tratada como path
+            success=False,
+            file_path=None,
             handler_type="google",
+            requires_ui_action="show_google_oauth",  # <--- Inicia o fluxo
+            error_message="Aguardando seleção do Google Sheets",
         )

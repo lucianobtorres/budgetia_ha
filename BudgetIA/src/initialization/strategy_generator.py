@@ -225,13 +225,25 @@ class StrategyGenerator:
             strategy_file_path, file_path_usuario, layout_config
         )
 
+    def get_planilha_schema(self, file_path: str) -> str:
+        """Lê os metadados de uma planilha Excel para a IA analisar.
+        Esta função foi movida da antiga _get_planilha_schema para ser acessível publicamente.
+        """
+        # Mantenha a lógica de leitura do Pandas (com pd.ExcelFile) aqui.
+        # Se você já tem a lógica como _get_planilha_schema, apenas renomeie.
+        return self._get_planilha_schema(
+            file_path
+        )  # Assumindo que você renomeou o método.
+
     def generate_and_validate_strategy(
         self, file_path_usuario: str, strategy_save_path: Path
-    ) -> tuple[bool, str]:
+    ) -> tuple[bool, str, str]:
         """
         Orquestra o processo de geração e validação da estratégia.
         Salva o .py final no 'strategy_save_path' fornecido.
         """
+        schema_usuario = "Não foi possível ler o esquema da planilha. Erro crítico ocorreu antes da análise."
+
         try:
             schema_usuario = self._get_planilha_schema(file_path_usuario)
             base_templates = self._get_base_templates()
@@ -293,13 +305,14 @@ class StrategyGenerator:
                         f"--- DEBUG GENERATOR: Estratégia validada e salva como '{module_name}' ---"
                     )
                     mapa_para_salvar = {"strategy_module": module_name}
-                    return True, json.dumps(mapa_para_salvar)
+                    return True, json.dumps(mapa_para_salvar), schema_usuario
                 else:
                     erro_log = str(result)
 
             return (
                 False,
                 f"IA falhou em gerar uma estratégia válida após {self.max_retries} tentativas. Último erro: {erro_log}",
+                schema_usuario,
             )
 
         except Exception as e:
@@ -307,4 +320,4 @@ class StrategyGenerator:
             import traceback
 
             traceback.print_exc()
-            return False, f"Erro crítico no StrategyGenerator: {e}"
+            return False, f"Erro crítico no StrategyGenerator: {e}", schema_usuario

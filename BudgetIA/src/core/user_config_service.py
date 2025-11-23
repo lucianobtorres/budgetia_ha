@@ -171,14 +171,22 @@ class UserConfigService:
         config_data["pending_planilha_path"] = path_str
         self.save_config(config_data)
 
+
     def get_onboarding_state(self) -> str | None:
         config_data = self.load_config()
         return config_data.get("onboarding_state")
+
+    def get_onboarding_status(self) -> str | None:
+        """Retorna o status do onboarding salvo (ex: 'COMPLETE', 'WELCOME').
+        Lê a chave 'onboarding_status' que é salva pelo OnboardingOrchestrator."""
+        config_data = self.load_config()
+        return config_data.get("onboarding_status")
 
     def save_onboarding_state(self, state: str) -> None:
         config_data = self.load_config()
         config_data["onboarding_state"] = state
         self.save_config(config_data)
+
 
     def save_google_oauth_tokens(self, token_json_str: str) -> None:
         """Salva os tokens OAuth 2.0 do usuário (como JSON string) no config."""

@@ -271,3 +271,7 @@ LAYOUT_DTYPES: dict[str, str] = {
     ColunasInsights.ID: "Int64",
     ColunasInsights.DATA: "datetime64[ns]",
 }
+
+SERVICE_ACCOUNT_CREDENTIALS_PATH = os.path.join(
+    PROJECT_ROOT, "data", "gen-lang-client-0988185244-c9e312f68267.json"
+)
