@@ -82,7 +82,13 @@ def render(orchestrator: OnboardingOrchestrator) -> None:
 
     # 2. Se é a primeira vez (sem mensagens), mostra boas-vindas
     if len(st.session_state.onboarding_messages) == 0:
-        welcome_msg = "Olá! 👋 Sou seu assistente pessoal de finanças. Vou te ajudar a configurar tudo de forma simples e rápida. Quando estiver pronto, clique em **Começar Agora**!"
+        # Get dynamic initial message from orchestrator (if available)
+        welcome_msg = orchestrator.get_initial_message()
+        if not welcome_msg:
+            # Fallback if no auto-greeting available
+            welcome_msg = "Olá! 👋 Pronto para começar?"
+        
+        print(f"[UI ONBOARDING] Initial message: {welcome_msg[:100]}...")  # Log first 100 chars
         st.session_state.onboarding_messages.append(
             {"role": "assistant", "content": welcome_msg}
         )

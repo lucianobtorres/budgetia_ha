@@ -95,6 +95,9 @@ class OnboardingOrchestrator:
         self._user_profile: UserProfile | None = None
         self._suggested_strategy: FinancialStrategy | None = None
         self._profile_interview_started: bool = False
+        self._welcome_engaged: bool = (
+            False  # Track if user has engaged in welcome conversation
+        )
         self._last_agent_response: str = ""
 
     # ---------------------------------------------------------------------
@@ -105,6 +108,36 @@ class OnboardingOrchestrator:
 
     def get_progress(self) -> float:
         return self.state_machine.get_progress()
+
+    def get_initial_message(self) -> str | None:
+        """Get initial message to display when entering a state (if applicable).
+
+        Returns the agent's greeting for states that should auto-start conversation.
+        Returns None for states that wait for user action.
+        """
+        current_state = self.state_machine.current_state
+
+        # WELCOME: Auto-greet when not yet engaged
+        if current_state == OnboardingState.WELCOME and not self._welcome_engaged:
+            print("[ONBOARDING] Generating initial WELCOME greeting...")
+            message = self.agent.chat(
+                "[INÍCIO]",  # Placeholder - agent will initiate based on system prompt
+                OnboardingState.WELCOME,
+                extra_context="""PRIMEIRA INTERAÇÃO - Mensagem de boas-vindas completa:
+
+1. Cumprimente calorosamente com 👋
+2. EXPLIQUE O QUE É O BUDGETIA: "Sou seu assistente de finanças pessoais que te ajuda a organizar gastos de forma simples, conversando naturalmente."
+3. EXPLIQUE O MOMENTO: "Estamos na configuração inicial (onboarding) - vou te guiar em alguns passos rápidos para conectar sua planilha."
+4. SEGURANÇA (integrado naturalmente): "Uma coisa importante: seus dados ficam SEMPRE com você (no seu computador ou Google Drive 🔒). Eu apenas leio e organizo, nada é enviado para fora."
+5. PERGUNTA CONTEXTUAL: "Antes de começar, me conta: você já controla seus gastos de alguma forma hoje?"
+
+Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
+            )
+            print(f"[ONBOARDING] Initial greeting: {message[:100]}...")
+            return message
+
+        # Other states wait for user input
+        return None
 
     # ---------------------------------------------------------------------
     # Core processing
@@ -171,7 +204,7 @@ class OnboardingOrchestrator:
                 )
                 self._last_agent_response = response
                 return response
-            
+
             if intent == UserIntent.POSITIVE_CONFIRMATION:
                 print(
                     "[ONBOARDING] User accepted strategy after profile interview (Intent). Finalising onboarding."
@@ -205,6 +238,21 @@ class OnboardingOrchestrator:
             return response
 
         if current_state == OnboardingState.OPTIONAL_PROFILE:
+            # Check if we just arrived here (e.g. from default spreadsheet skip)
+            # and haven't started the interview yet.
+            if (
+                not self._profile_interview_started
+                and intent == UserIntent.UNCLEAR
+                and clean_text == ""
+            ):
+                # This happens when we transition directly without user input (e.g. default sheet)
+                # We need to prompt the user to start the interview.
+                return self.agent.chat(
+                    "[INÍCIO_PERFIL]",
+                    OnboardingState.OPTIONAL_PROFILE,
+                    extra_context="We just created a standard spreadsheet (or finished review). Now invite the user to answer a few quick questions to build their financial profile. Explain why it's useful (better strategy). Ask if they want to start.",
+                )
+
             # Start interview
             if clean_text in ["responder perguntas", "responder"] or (
                 intent == UserIntent.POSITIVE_CONFIRMATION
@@ -218,8 +266,6 @@ class OnboardingOrchestrator:
                 )
                 self._last_agent_response = response
                 return response
-
-
 
             # Skip everything and finish onboarding.
             if intent == UserIntent.SKIP or (
@@ -240,20 +286,33 @@ class OnboardingOrchestrator:
                 return response
 
             # Detect interview completion via intent
-            if self._profile_interview_started and intent == UserIntent.INTERVIEW_COMPLETE:
-                print("[ONBOARDING] User signaled interview completion (Intent). Generating strategy...")
-                self._generate_strategy_and_advance()
+            if (
+                self._profile_interview_started
+                and intent == UserIntent.INTERVIEW_COMPLETE
+            ):
+                print(
+                    "[ONBOARDING] User signaled interview completion (Intent). Generating strategy and FINALIZING..."
+                )
                 
-                # Offer the strategy
-                strategy_summary = f"Estratégia: {self._suggested_strategy.name}" if self._suggested_strategy else "Estratégia gerada"
+                # Generate strategy but DON'T transition to OPTIONAL_STRATEGY
+                # Just save it internally
+                chat_history = [
+                    msg.content for msg in self.agent.history if isinstance(msg, HumanMessage)
+                ]
+                self._user_profile = self.profile_analyzer.analyze(chat_history)
+                self._suggested_strategy = self.strategy_suggester.suggest(self._user_profile)
+                
+                # Finalize immediately
+                self.state_machine.transition_to(OnboardingState.COMPLETE)
+                self._finalize_onboarding()
+
                 response = self.agent.chat(
                     text,
-                    OnboardingState.OPTIONAL_STRATEGY,
-                    extra_context=f"User completed profile interview. Generated strategy: {strategy_summary}. Offer it to user.",
+                    OnboardingState.COMPLETE,
+                    extra_context=f"User completed profile and wants to start. Strategy generated: {self._suggested_strategy.name}. Finalise onboarding and welcome them to the dashboard.",
                 )
-                # Mark response so UI shows accept/skip buttons
-                self._last_agent_response = f"{response}\n\nSugestão de estratégia: {strategy_summary}"
-                return self._last_agent_response
+                self._last_agent_response = response
+                return response
 
             # Default: let the agent respond freely.
             response = self.agent.chat(text, current_state)
@@ -318,14 +377,67 @@ class OnboardingOrchestrator:
     # Handlers for each state
     # ---------------------------------------------------------------------
     def _handle_welcome(self, clean_text: str, intent: UserIntent) -> str:
-        if intent == UserIntent.POSITIVE_CONFIRMATION:
-            self.state_machine.transition_to(OnboardingState.SPREADSHEET_ACQUISITION)
+        """Handle WELCOME state with conversational sub-stages.
+
+        Agent auto-greets and guides through 3 stages:
+        1. Asks about financial control (detect literacy)
+        2. Engages based on response
+        3. Explains security → transitions to acquisition
+        """
+
+        # If already engaged, check if ready to proceed
+        if self._welcome_engaged:
+            # User confirms readiness
+            if intent == UserIntent.POSITIVE_CONFIRMATION:
+                print("[ONBOARDING] User ready to proceed from WELCOME")
+                self.state_machine.transition_to(
+                    OnboardingState.SPREADSHEET_ACQUISITION
+                )
+                return self.agent.chat(
+                    clean_text,
+                    OnboardingState.SPREADSHEET_ACQUISITION,
+                    extra_context="User is ready. Present the 3 spreadsheet acquisition options clearly with emojis.",
+                )
+
+            # Continue conversation
             return self.agent.chat(
                 clean_text,
-                OnboardingState.SPREADSHEET_ACQUISITION,
-                extra_context="User wants to start. Explain spreadsheet acquisition options.",
+                OnboardingState.WELCOME,
+                extra_context="User is engaged. Answer naturally. After addressing their input, explain security (dados ficam com você 🔒) and ask if ready to choose spreadsheet setup method.",
             )
-        return self.agent.chat(clean_text, OnboardingState.WELCOME)
+
+        # First meaningful interaction after greeting
+        engaging_intents = [
+            UserIntent.POSITIVE_CONFIRMATION,
+            UserIntent.NEGATIVE_REFUSAL,
+            UserIntent.NEUTRAL_INFO,
+            UserIntent.QUESTION,
+        ]
+
+        if intent in engaging_intents:
+            self._welcome_engaged = True
+            print(f"[ONBOARDING] User engaged in WELCOME (intent: {intent.name})")
+
+            # Context-aware based on user's answer
+            if intent == UserIntent.POSITIVE_CONFIRMATION:
+                context = "User said YES - they track finances. Great! Ask where they keep data (Excel? Sheets?). Then SECURITY: 'Seus dados ficam SEUS! 🔒 BudgetIA só lê e organiza.' Ask if ready to connect."
+            elif intent == UserIntent.NEGATIVE_REFUSAL:
+                context = "User said NO - doesn't track yet. Be empathetic: 'Sem problemas! 😊 Muitos não sabem por onde começar. Controlar é mais simples do que parece!' SECURITY: 'Dados seguros com você 🔒' Offer to create together."
+            elif intent == UserIntent.QUESTION:
+                context = "User asked something. Answer helpfully. Then mention: 'Dados privados e seguros 🔒' Ask if ready when appropriate."
+            else:
+                context = "User provided info. Acknowledge naturally. SECURITY: 'Dados ficam com você 🔒' Ask if want to set up spreadsheet."
+
+            return self.agent.chat(
+                clean_text, OnboardingState.WELCOME, extra_context=context
+            )
+
+        # Initial auto-greeting (agent should start conversation)
+        return self.agent.chat(
+            clean_text,
+            OnboardingState.WELCOME,
+            extra_context="PRIMEIRA INTERAÇÃO: Inicie a conversa automaticamente! Apresente-se calorosamente e pergunte: 'Você já controla seus gastos de alguma forma hoje?' Seja amigável e leve.",
+        )
 
     def _handle_acquisition(self, text: str) -> str:
         print(
@@ -447,66 +559,89 @@ class OnboardingOrchestrator:
                 schema_summary=schema_summary,
                 strategy_path=str(strategy_save_path) if success else None,
             )
-            if success and (
-                intent == UserIntent.POSITIVE_CONFIRMATION
-                or clean_text
-                in [
-                    "continuar",
-                    "avançar",
-                    "próximo",
-                    "ok",
-                    "tudo certo",
-                    "confirmar",
-                    "começar a usar",
-                    "comecar a usar",
-                ]
-            ):
-                self.state_machine.transition_to(OnboardingState.OPTIONAL_PROFILE)
-                self.state_machine.transition_to(OnboardingState.OPTIONAL_PROFILE)
-                return self.agent.chat(
-                    clean_text,
-                    OnboardingState.OPTIONAL_PROFILE,
-                    extra_context="Analysis SUCCESS. User confirmed. Transitioning to profile interview.",
-                )
+
+            # ALWAYS show analysis result on first call (don't transition immediately)
+            print(f"[ONBOARDING] Translation analysis complete: success={success}")
             context_for_agent = f"\n[CONTEXTO DE ANÁLISE DE PLANILHA]\nSUCESSO: {success}\nMENSAGEM: {message}\nESQUEMA LIDO:\n{schema_summary[:2000]}"
             return self.agent.chat(
                 f"Analisar o seguinte resultado da planilha: {message}",
                 OnboardingState.TRANSLATION_REVIEW,
                 extra_context=context_for_agent,
             )
-        # Subsequent calls – keep conversation.
+        # Subsequent calls – Intent-based conversation flow
         context_for_agent = f"\n[CONTEXTO DE PLANILHA SALVO]\nSUCESSO: {self._translation_result.success}\nMENSAGEM: {self._translation_result.message}\nESQUEMA LIDO:\n{self._translation_result.schema_summary[:2000]}"
-        if intent == UserIntent.POSITIVE_CONFIRMATION or clean_text in [
-            "continuar",
-            "avançar",
-            "próximo",
-            "ok",
-            "tudo certo",
-            "confirmar",
-            "começar a usar",
-        ]:
+
+        # CASO 1: User confirmed → Proceed to profile
+        if intent == UserIntent.POSITIVE_CONFIRMATION:
             if not self._translation_result.success:
+                # Analysis failed but user wants to continue → Offer alternatives
                 return self.agent.chat(
                     clean_text,
                     OnboardingState.TRANSLATION_REVIEW,
-                    extra_context="User wants to continue but analysis failed. Explain next steps.",
+                    extra_context="User wants to continue despite failed analysis. Offer to: 1) Try guided import (manual column mapping), 2) Create default spreadsheet. Ask which they prefer.",
                 )
+
+            # Analysis succeeded → Transition
+            print(
+                "[ONBOARDING] User confirmed translation review, proceeding to profile"
+            )
             self.state_machine.transition_to(OnboardingState.OPTIONAL_PROFILE)
             return self.agent.chat(
                 clean_text,
                 OnboardingState.OPTIONAL_PROFILE,
                 extra_context="User confirmed analysis. Transitioning to profile interview.",
             )
+
+        # CASO 2: User has questions → Discussion mode
+        if intent == UserIntent.QUESTION:
+            print("[ONBOARDING] User has questions about translation")
+            return self.agent.chat(
+                clean_text,
+                OnboardingState.TRANSLATION_REVIEW,
+                extra_context=f"User asked a question about the spreadsheet analysis. Answer naturally and helpfully using the context below. After answering, ask if they're ready to proceed or have more questions.\n{context_for_agent}",
+            )
+
+        # CASO 3: User refused/rejected → Offer alternatives
+        if intent == UserIntent.NEGATIVE_REFUSAL:
+            print("[ONBOARDING] User refused translation result")
+            if self._translation_result.success:
+                # Succeeded but user doesn't like it
+                return self.agent.chat(
+                    clean_text,
+                    OnboardingState.TRANSLATION_REVIEW,
+                    extra_context="Analysis was successful but user rejected it. Ask what specifically they'd like to adjust. Offer guided import if they want manual control over column mapping.",
+                )
+            else:
+                # Failed AND user refused → Create default
+                return self.agent.chat(
+                    clean_text,
+                    OnboardingState.TRANSLATION_REVIEW,
+                    extra_context="Analysis failed AND user refused/rejected. Offer to create a default template spreadsheet and continue with that instead. Reassure them it's quick and easy.",
+                )
+
+        # CASO 4: Skip → Create default spreadsheet
+        if intent == UserIntent.SKIP:
+            print("[ONBOARDING] User wants to skip translation review")
+            return self.agent.chat(
+                clean_text,
+                OnboardingState.TRANSLATION_REVIEW,
+                extra_context="User wants to skip this step. Confirm that we'll create a default spreadsheet template for them and proceed. Be positive and reassuring.",
+            )
+
+        # DEFAULT: Continue natural conversation
+        # Analysis failed → Keep discussion about problem
         if not self._translation_result.success:
             return self.agent.chat(
                 raw_text,
                 OnboardingState.TRANSLATION_REVIEW,
-                extra_context=context_for_agent,
+                extra_context=f"Analysis failed. Continue discussing the issue and  offer help.\n{context_for_agent}",
             )
+
+        # Analysis succeeded → Keep discussion about result
         return self.agent.chat(
             raw_text,
             OnboardingState.TRANSLATION_REVIEW,
-            extra_context=context_for_agent,
+            extra_context=f"Analysis succeeded. Continue natural conversation. When appropriate, ask if user is ready to proceed.\n{context_for_agent}",
         )
 
     def _finalize_acquisition(self, result: AcquisitionResult) -> None:
@@ -518,7 +653,15 @@ class OnboardingOrchestrator:
         )
         if result.file_path:
             self.config_service.save_pending_planilha_path(result.file_path)
-        self.state_machine.transition_to(OnboardingState.TRANSLATION_REVIEW)
+
+        # If default spreadsheet, skip translation review (schema is known)
+        if result.handler_type == "default":
+            print(
+                "[ONBOARDING] Default spreadsheet created. Skipping TRANSLATION_REVIEW."
+            )
+            self.state_machine.transition_to(OnboardingState.OPTIONAL_PROFILE)
+        else:
+            self.state_machine.transition_to(OnboardingState.TRANSLATION_REVIEW)
 
     def _generate_strategy_and_advance(self) -> None:
         """Generate user profile and suggested strategy, then move to OPTIONAL_STRATEGY."""
@@ -535,7 +678,8 @@ class OnboardingOrchestrator:
     def get_ui_options(self) -> list[str]:
         state = self.state_machine.current_state
         if state == OnboardingState.WELCOME:
-            return ["Começar agora! 👋"]
+            # No initial button - agent greets automatically
+            return []
         if state == OnboardingState.SPREADSHEET_ACQUISITION:
             return ["Criar do Zero 🚀", "Fazer Upload 📤", "Google Sheets ☁️"]
         if state == OnboardingState.TRANSLATION_REVIEW:
@@ -544,7 +688,7 @@ class OnboardingOrchestrator:
             # Check if agent has already offered a strategy (conversational transition)
             if "sugestão de estratégia" in self._last_agent_response.lower():
                 return ["Aceitar Sugestão ✅", "Pular / Finalizar 🚀"]
-            
+
             if self._profile_interview_started:
                 return ["Pular Perfil ⏭️"]
             return ["Responder Perguntas 📝", "Pular Perfil ⏭️"]
@@ -582,6 +726,7 @@ class OnboardingOrchestrator:
         self._user_profile = None
         self._suggested_strategy = None
         self._profile_interview_started = False
+        self._welcome_engaged = False
         self._last_agent_response = ""
 
     def get_google_auth_service(self) -> GoogleAuthService:

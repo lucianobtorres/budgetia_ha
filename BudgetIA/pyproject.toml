@@ -106,6 +106,7 @@ addopts = [
     "--cov=src",                 # Medir a cobertura de testes na pasta 'src'
     "--cov-report=term-missing", # Mostrar um relatório de cobertura no terminal, incluindo as linhas que faltaram
 ]
+testpaths = ["tests"]
 filterwarnings = [
     "ignore::FutureWarning",
 ]

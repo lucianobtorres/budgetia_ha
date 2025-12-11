@@ -157,9 +157,16 @@ class IntentClassifier:
         if text_lower in ["sim", "claro", "com certeza", "ok", "pode ser", "aceitar sugestão", "aceitar sugestao", "aceitar", "usar esta"]:
             return UserIntent.POSITIVE_CONFIRMATION
         
-        # Sinais de conclusão de entrevista
-        if text_lower in ["pronto", "terminei", "acabei", "é só isso", "e so isso", "entendi tudo", "já respondi", "ja respondi"]:
+        # Sinais de conclusão de entrevista (Hardcoded para garantir funcionamento)
+        if text_lower in ["pronto", "terminei", "acabei", "é só isso", "e so isso", "entendi tudo", "já respondi", "ja respondi", "vamos começar", "vamos comecar", "começar", "comecar", "iniciar", "ir para o sistema"]:
             return UserIntent.INTERVIEW_COMPLETE
+
+        # Heurística de contexto: Se o agente sugeriu finalizar/começar e o usuário concordou
+        if last_agent_message:
+            last_msg_lower = last_agent_message.lower()
+            if any(term in last_msg_lower for term in ["vamos começar", "iniciar", "finalizar", "ir para o sistema", "dashboard", "pronto para", "tudo certo"]):
+                 if text_lower in ["sim", "ok", "claro", "pode ser", "vamos", "bora", "tá bom", "ta bom"]:
+                     return UserIntent.INTERVIEW_COMPLETE
 
         prompt = f"""
         Atue como um classificador de intenção para um chat de onboarding financeiro.
@@ -172,11 +179,13 @@ class IntentClassifier:
         Classifique a intenção do usuário em UMA das seguintes categorias:
         
         1. positive_confirmation: O usuário concorda, aceita, quer continuar, diz "sim", "ok", "bora", "começar", "aceito".
+           IMPORTANTE: Se o estado for WELCOME e o usuário disser "vamos começar", "iniciar", é positive_confirmation.
         2. negative_refusal: O usuário recusa, diz "não", "não quero", "agora não", "deixa pra lá".
         3. skip: O usuário quer pular a etapa explicitamente ("pular", "ir para o fim").
         4. question: O usuário fez uma pergunta ou pediu explicação.
         5. neutral_info: O usuário está apenas respondendo uma pergunta do perfil (ex: "gasto muito", "sou iniciante") ou conversando normalmente sem confirmar/negar nada explicitamente.
         6. interview_complete: O usuário sinaliza que terminou a entrevista, está satisfeito, indica "pronto", "entendi", "obrigado e pronto", "é isso", "tudo certo, podemos avançar", demonstra conclusão natural da conversa.
+           IMPORTANTE: Se o estado for OPTIONAL_PROFILE e o usuário disser "vamos começar", "ir para o sistema", "iniciar", é interview_complete.
         
         Retorne APENAS o nome da categoria (ex: positive_confirmation). Nada mais.
         """
