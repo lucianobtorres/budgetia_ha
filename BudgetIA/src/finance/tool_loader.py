@@ -16,6 +16,9 @@ from finance.repositories.profile_repository import ProfileRepository
 from finance.repositories.transaction_repository import TransactionRepository
 
 
+from core.memory.memory_service import MemoryService # NEW
+from core.user_config_service import UserConfigService # NEW
+
 def load_all_financial_tools(
     # planilha_manager: PlanilhaManager, # Removido
     data_context: FinancialDataContext,
@@ -24,6 +27,9 @@ def load_all_financial_tools(
     debt_repo: DebtRepository,
     profile_repo: ProfileRepository,
     insight_repo: InsightRepository,
+    memory_service: MemoryService,
+    config_service: UserConfigService,
+    llm_orchestrator: Any, # Injetado para ferramentas que precisam do LLM direto
 ) -> list[BaseTool]:
     """
     Carrega dinamicamente todas as ferramentas financeiras do diretório 'tools/',
@@ -52,6 +58,14 @@ def load_all_financial_tools(
         "get_profile_as_text_func": profile_repo.get_profile_as_text,
         # InsightRepository
         "register_insight_func": insight_repo.add_insight,
+        # MemoryService
+        "memory_service": memory_service,
+        # UserConfigService
+        "config_service": config_service,
+        # LLM Orchestrator
+        "llm_orchestrator": llm_orchestrator,
+        # Repositories (Full Object Access)
+        "transaction_repo": transaction_repo,
     }
 
     if not os.path.exists(tools_dir):

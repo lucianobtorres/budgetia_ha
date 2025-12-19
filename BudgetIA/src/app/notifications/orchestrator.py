@@ -1,22 +1,21 @@
+
 # src/app/notifications/orchestrator.py
 from typing import Any
 
 import config
 from app.notifications.channels.base_channel import INotificationChannel
+from app.notifications.channels.in_app_channel import InAppChannel
 from app.notifications.rules.base_rule import IFinancialRule
+from app.services.notification_service import NotificationService
+from app.services.presence_service import PresenceService
 from core.user_config_service import UserConfigService
 from finance.planilha_manager import PlanilhaManager
 
 
 class ProactiveNotificationOrchestrator:
     """
-    Orquestrador do sistema de notificações proativas.
-
-    Responsabilidade:
-    1. Executar todas as regras de negócio
-    2. Selecionar canal apropriado para cada notificação
-    3. Enviar notificações através dos canais
-    4. Rastrear estatísticas de execução
+    Coordena a verificação de regras e o envio de notificações de forma proativa.
+    Agora suporta Múltiplos Canais (Omnichannel).
     """
 
     def __init__(
@@ -27,104 +26,74 @@ class ProactiveNotificationOrchestrator:
     ):
         """
         Inicializa o orchestrator.
-
-        Args:
-            rules: Lista de regras de negócio a executar.
-            channels: Lista de canais disponíveis para envio.
-            config_service: Serviço de configuração do usuário.
         """
         self.rules = rules
-        self.channels = {ch.channel_name: ch for ch in channels}
+        # Mapeia nome -> instância
+        self.channels_map = {ch.channel_name: ch for ch in channels}
+        # Garante que InAppChannel esteja disponível
+        if "in_app" not in self.channels_map:
+            self.channels_map["in_app"] = InAppChannel()
+            
         self.config_service = config_service
+        self.notification_service = NotificationService(config_service)
+        self.presence_service = PresenceService()
 
-    def _select_channel(
+    def _select_channels(
         self, user_config: dict[str, Any]
-    ) -> INotificationChannel | None:
+    ) -> list[tuple[INotificationChannel, str]]:
         """
-        Seleciona o melhor canal para o usuário.
-
-        Lógica simples (v1):
-        - Usa primeiro canal configurado
-        - Futuro: respeitar preferências, fallback, etc.
-
-        Args:
-            user_config: Configuração do usuário.
-
-        Returns:
-            Canal selecionado ou None se nenhum disponível.
+        Seleciona TODOS os canais configurados e válidos para envio (Omnichannel Broadcast).
+        Retorna lista de (Channel, RecipientID).
         """
-        for channel in self.channels.values():
-            if channel.is_configured_for_user(user_config):
-                print(
-                    f"LOG (Orchestrator): Canal '{channel.channel_name}' selecionado."
-                )
-                return channel
+        targets = []
+        username = self.config_service.username
 
-        print("LOG (Orchestrator): Nenhum canal configurado para este usuário.")
-        return None
+        # 1. In-App (Sempre ativo)
+        in_app = self.channels_map.get("in_app")
+        if in_app:
+            targets.append((in_app, username))
+
+        # 2. Canais Externos
+        external_channels = ["whatsapp", "telegram", "sms", "email"]
+        
+        for ch_name in external_channels:
+            channel = self.channels_map.get(ch_name)
+            # Verifica se o canal existe (foi injetado) e se está configurado pelo usuário
+            if channel and channel.is_configured_for_user(user_config):
+                recipient = channel.get_recipient_id(user_config)
+                if recipient:
+                    targets.append((channel, recipient))
+                    print(f"LOG (Orchestrator): Canal '{ch_name}' selecionado para '{recipient}'.")
+
+        return targets
 
     async def run(self, plan_manager: PlanilhaManager) -> dict[str, Any]:
-        """
-        Executa todas as regras e envia notificações necessárias.
-
-        Args:
-            plan_manager: Gerenciador de dados financeiros.
-
-        Returns:
-            Estatísticas de execução:
-            {
-                "rules_checked": int,
-                "rules_triggered": int,
-                "notifications_sent": int,
-                "failures": list[str]
-            }
-        """
-        print("\n--- INICIANDO ORCHESTRATOR DE NOTIFICAÇÕES PROATIVAS ---")
-
         stats = {
+            "notifications_sent": 0,
             "rules_checked": 0,
             "rules_triggered": 0,
-            "notifications_sent": 0,
             "failures": [],
         }
 
-        # 1. Carregar dados do usuário
         try:
-            transactions_df = plan_manager.visualizar_dados(config.NomesAbas.TRANSACOES)
-            budgets_df = plan_manager.visualizar_dados(config.NomesAbas.ORCAMENTOS)
-            profile_df = plan_manager.visualizar_dados(
-                config.NomesAbas.PERFIL_FINANCEIRO
-            )
-
-            # Converter perfil para dict (simplificado)
-            user_profile = {}
-            if not profile_df.empty and "Campo" in profile_df.columns:
-                user_profile = dict(zip(profile_df["Campo"], profile_df["Valor"]))
+            # 1. Carregar dados
+            transactions_df = plan_manager.visualizar_dados("Visão Geral e Transações")
+            budgets_df = plan_manager.visualizar_dados("Meus Orçamentos")
+            user_profile = {} # Todo: carregar profile
 
         except Exception as e:
             print(f"ERRO (Orchestrator): Falha ao carregar dados: {e}")
-            stats["failures"].append(f"data_loading: {e}")
+            stats["failures"].append(f"data_load_error: {e}")
             return stats
 
-        # 2. Obter configuração do usuário
+        # 2. Config & Seleção de Canais
         user_config = self.config_service.load_config()
-
-        # 3. Selecionar canal
-        selected_channel = self._select_channel(user_config)
-        if not selected_channel:
-            print("AVISO (Orchestrator): Nenhum canal disponível. Não há onde enviar.")
-            stats["failures"].append("no_channel_configured")
-            return stats
-
-        recipient_id = selected_channel.get_recipient_id(user_config)
-        if not recipient_id:
-            print(
-                "ERRO (Orchestrator): Canal selecionado mas recipient_id não encontrado."
-            )
-            stats["failures"].append("recipient_id_missing")
-            return stats
-
-        # 4. Executar todas as regras
+        targets = self._select_channels(user_config)
+        
+        if not targets:
+            print("AVISO (Orchestrator): Nenhum canal (nem In-App?) disponível.")
+        
+        # 3. Executar Regras
         for rule in self.rules:
             stats["rules_checked"] += 1
             print(f"\nLOG (Orchestrator): Executando regra '{rule.rule_name}'...")
@@ -134,30 +103,35 @@ class ProactiveNotificationOrchestrator:
 
                 if result.triggered:
                     stats["rules_triggered"] += 1
-                    print(f"LOG (Orchestrator): Regra '{rule.rule_name}' ACIONADA!")
-
-                    # Converter para mensagem
                     message = result.to_message()
+                    
+                    # Salva no Notification Center (DB Local)
+                    self.notification_service.add_notification(
+                        message=message.text, 
+                        category=message.category,
+                        priority=message.priority.value if hasattr(message.priority, 'value') else "medium"
+                    )
 
-                    # Enviar via canal
-                    success = await selected_channel.send(recipient_id, message)
+                    # BROADCAST para todos os canais alvo
+                    for channel, recipient in targets:
+                        try:
+                            # Envio Async
+                            # Nota: 'send' deve retornar True/False
+                            success = await channel.send(recipient, message)
+                            if success:
+                                stats["notifications_sent"] += 1
+                                print(f"LOG (Orchestrator): Enviado para {recipient} via {channel.channel_name}.")
+                            else:
+                                stats["failures"].append(f"{rule.rule_name}:{channel.channel_name}:failed")
+                        except Exception as ex:
+                            stats["failures"].append(f"{rule.rule_name}:{channel.channel_name}:error")
+                            print(f"ERRO Envio {channel.channel_name}: {ex}")
 
-                    if success:
-                        stats["notifications_sent"] += 1
-                        print(
-                            f"LOG (Orchestrator): Notificação enviada com sucesso via {selected_channel.channel_name}."
-                        )
-                    else:
-                        stats["failures"].append(f"{rule.rule_name}: send_failed")
                 else:
-                    print(f"LOG (Orchestrator): Regra '{rule.rule_name}' não acionada.")
+                    print(f"LOG (Orchestrator): Regra '{rule.rule_name}' ok (não acionada).")
 
             except Exception as e:
-                print(
-                    f"ERRO (Orchestrator): Falha ao executar regra '{rule.rule_name}': {e}"
-                )
+                print(f"ERRO (Orchestrator): Falha na regra '{rule.rule_name}': {e}")
                 stats["failures"].append(f"{rule.rule_name}: {e}")
 
-        print("\n--- ORCHESTRATOR FINALIZADO ---")
-        print(f"Estatísticas: {stats}")
         return stats

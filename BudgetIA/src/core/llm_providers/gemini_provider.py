@@ -23,7 +23,10 @@ class GeminiProvider(LLMProvider):
         print(f"LOG: Instanciando Gemini LLM: Modelo='{model}', Temp={temp}")
 
         llm = ChatGoogleGenerativeAI(
-            model=model, temperature=temp, google_api_key=self.api_key
+            model=model, 
+            temperature=temp, 
+            google_api_key=self.api_key,
+            max_retries=1 # Fail fast on Quota Exceeded
         )
 
         return llm

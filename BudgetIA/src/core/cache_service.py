@@ -24,7 +24,8 @@ class CacheService:
                 print("LOG: Conexão com o Cache Service (Redis/Upstash) bem-sucedida.")
             except redis.exceptions.ConnectionError as e:
                 print(
-                    f"AVISO: Não foi possível conectar ao Redis. O cache ficará desabilitado. Erro: {e}"
+                    f"AVISO (Cache): Falha ao conectar ao Redis ({redis_url}). O cache será desabilitado. "
+                    f"Verifique sua internet ou remova UPSTASH_REDIS_URL do .env se não quiser usar cache. (Detalhe: {e})"
                 )
                 self.client = None
         else:

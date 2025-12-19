@@ -16,9 +16,9 @@ class RuleResult:
     """
 
     triggered: bool
-    message_template: str
-    context: dict[str, Any]
-    priority: NotificationPriority
+    message_template: str = ""
+    context: dict[str, Any] = None
+    priority: NotificationPriority = NotificationPriority.LOW
     category: str = "financial_alert"
 
     def to_message(self) -> NotificationMessage:

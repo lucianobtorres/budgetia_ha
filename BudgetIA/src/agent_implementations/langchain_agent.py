@@ -1,5 +1,6 @@
 # src/agent_implementations/langchain_agent.py
 
+from datetime import datetime
 from dotenv import load_dotenv
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain.memory import ConversationSummaryBufferMemory
@@ -10,6 +11,8 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 import config
 from core.agent_runner_interface import AgentRunner
 from core.llm_manager import LLMOrchestrator
+from core.memory.memory_service import MemoryService # NEW
+from core.user_config_service import UserConfigService # NEW
 from finance.repositories.budget_repository import BudgetRepository
 
 # Importa todos os repositórios e o contexto
@@ -41,6 +44,8 @@ class IADeFinancas(AgentRunner):  # type: ignore[misc]
         debt_repo: DebtRepository,
         profile_repo: ProfileRepository,
         insight_repo: InsightRepository,
+        memory_service: MemoryService, # NEW Dependency
+        config_service: UserConfigService, # NEW Dependency
         # --- FIM NOVOS ARGUMENTOS ---
     ) -> None:
         """
@@ -48,6 +53,7 @@ class IADeFinancas(AgentRunner):  # type: ignore[misc]
         """
         # self.plan_manager = planilha_manager # REMOVIDO
         self.llm_orchestrator = llm_orchestrator
+        self.memory_service = memory_service # Store instance
         self.model = self.llm_orchestrator.get_current_llm()
 
         try:
@@ -65,6 +71,14 @@ class IADeFinancas(AgentRunner):  # type: ignore[misc]
         final_system_prompt = prompt_template_str.format(
             contexto_perfil=contexto_perfil
         )
+        
+        # --- INJEÇÃO DE CHRONOS & MEMÓRIA ---
+        # 1. Data Atual
+        final_system_prompt = "Data e Hora Atual: {data_atual}\n\n" + final_system_prompt
+        
+        # 2. Memória de Longo Prazo (Jarvis Mind)
+        memory_context = self.memory_service.get_context_string()
+        final_system_prompt += f"\n\n=== MEMÓRIA DE LONGO PRAZO ===\n{memory_context}\n=============================="
 
         prompt_template = ChatPromptTemplate.from_messages(
             [
@@ -81,9 +95,10 @@ class IADeFinancas(AgentRunner):  # type: ignore[misc]
             memory_key="chat_history",
             return_messages=True,
             output_key="output",
+            input_key="input",  # FIXED: Explicitly set input key
         )
 
-        print("--- DEBUG AGENTE: Carregando ferramentas com injeção de repositório...")
+        print("--- DEBUG AGENTE: Carregando ferramentas com injeção de repositório e memória...")
         tools_custom = load_all_financial_tools(
             # planilha_manager=planilha_manager, # REMOVIDO
             data_context=data_context,
@@ -92,6 +107,9 @@ class IADeFinancas(AgentRunner):  # type: ignore[misc]
             debt_repo=debt_repo,
             profile_repo=profile_repo,
             insight_repo=insight_repo,
+            memory_service=self.memory_service, # PASS DEPENDENCY
+            config_service=config_service, # PASS DEPENDENCY
+            llm_orchestrator=self.llm_orchestrator, # PASS DEPENDENCY
         )
 
         self.tools = [
@@ -117,7 +135,13 @@ class IADeFinancas(AgentRunner):  # type: ignore[misc]
     def interagir(self, input_usuario: str) -> str:
         """Executa o agente com a entrada do usuário."""
         try:
-            response = self.agent_executor.invoke({"input": input_usuario})
+            # Injeta a data atual na execução
+            data_atual = datetime.now().strftime("%d/%m/%Y (%A) - %H:%M")
+
+            response = self.agent_executor.invoke({
+                "input": input_usuario,
+                "data_atual": data_atual
+            })
             return str(
                 response.get("output", "Não consegui processar sua solicitação.")
             )

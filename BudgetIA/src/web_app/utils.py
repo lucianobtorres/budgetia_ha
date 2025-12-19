@@ -314,18 +314,103 @@ def initialize_session_auth() -> (
     auth_config = load_auth_config()
     llm_orchestrator = get_llm_orchestrator()
 
+    # Tenta injetar o validador no dicionário de config (caso a lib leia de lá)
+    # E usa regex "aceita tudo" para teste
+    if "validator" not in auth_config:
+        auth_config["validator"] = "^.*$"
+
     authenticator = stauth.Authenticate(
         auth_config["credentials"],
         auth_config["cookie"]["name"],
         auth_config["cookie"]["key"],
         auth_config["cookie"]["expiry_days"],
+        validator="^.*$"  # Keyword arg override
     )
+    
+    # Validation Monkey Patch (Force)
+    authenticator.validator = "^.*$"
 
     # Renderiza o widget de login na *sidebar* para não travar a página
     # ou use st.empty() se preferir no centro
-    with st.container():
-        authenticator.login()
+    # --- LOGIC DE VISUALIZAÇÃO (Tabs) ---
+    if st.session_state["authentication_status"] is None or st.session_state["authentication_status"] is False:
+        # Define Abas para Login e Registro
+        tab_login, tab_register = st.tabs(["🔐 Entrar", "📝 Criar Nova Conta"])
 
+        with tab_login:
+            authenticator.login()
+            if st.session_state["authentication_status"] is False:
+                st.error("Usuário ou senha incorretos.")
+            elif st.session_state["authentication_status"] is None:
+                st.warning("Por favor, faça o login para acessar o BudgetIA.")
+
+        with tab_register:
+            st.info(
+                "ℹ️ **Requisitos:**\n"
+                "- **Todos** os campos são obrigatórios.\n"
+                "- **Senha:** Mínimo 6 caracteres (simples)."
+            )
+            
+            # --- IMPLEMENTAÇÃO CUSTOMIZADA DE REGISTRO ---
+            try:
+                with st.form("register_form"):
+                    st.write("Preencha seus dados:")
+                    new_name = st.text_input("Nome")
+                    new_email = st.text_input("E-mail")
+                    new_username = st.text_input("Nome de Usuário (Login)")
+                    new_password = st.text_input("Senha", type="password")
+                    new_password_repeat = st.text_input("Repetir Senha", type="password")
+                    
+                    submitted = st.form_submit_button("Criar Conta")
+                
+                if submitted:
+                    # 1. Validações Básicas
+                    if not (new_name and new_email and new_username and new_password):
+                        st.error("Todos os campos são obrigatórios.")
+                    elif new_password != new_password_repeat:
+                        st.error("As senhas não coincidem.")
+                    elif len(new_password) < 6:
+                        st.error("A senha deve ter no mínimo 6 caracteres.")
+                    elif new_username in auth_config["credentials"]["usernames"]:
+                        st.error("Este nome de usuário já existe.")
+                    else:
+                        # 2. Sucesso! Gerar Hash e Salvar
+                        hashed_password = stauth.Hasher([new_password]).generate()[0]
+                        
+                        # Estrutura do usuário no YAML
+                        new_user_data = {
+                            "name": new_name,
+                            "email": new_email,
+                            "password": hashed_password,
+                            # Adicionar campos extras se necessário
+                        }
+                        
+                        # Atualiza dict em memória
+                        auth_config["credentials"]["usernames"][new_username] = new_user_data
+                        
+                        # Persiste no disco
+                        with open("data/users.yaml", "w") as file:
+                            yaml.dump(auth_config, file, default_flow_style=False)
+                        
+                        # 3. Auto-Login (UX Improvement)
+                        st.session_state["authentication_status"] = True
+                        st.session_state["name"] = new_name
+                        st.session_state["username"] = new_username
+                        try:
+                            # Tenta definir cookie se possível (opcional)
+                            # authenticator.cookie_handler... mas varia entre versões.
+                            # Focaremos apenas na sessão por enquanto.
+                            pass
+                        except:
+                            pass
+                            
+                        st.success("Conta criada! Redirecionando...")
+                        st.rerun()
+
+            except Exception as e:
+                st.error(f"Erro ao processar registro: {e}")
+
+    # --- LÓGICA DE SUCESSO DO LOGIN ---
     if st.session_state["authentication_status"] is True:
         # --- USUÁRIO LOGADO ---
         username = st.session_state["username"]
@@ -334,23 +419,32 @@ def initialize_session_auth() -> (
 
         # Inicializa os serviços
         config_service = UserConfigService(username)  # Direct instantiation (utils.py is deprecated)
+        
+        # GARANTE que o Cliente da API esteja na sessão (para subpáginas)
+        if "api_client" not in st.session_state:
+            from web_app.api_client import BudgetAPIClient
+            api_url = os.getenv("API_URL", "http://127.0.0.1:8000")
+            st.session_state.api_client = BudgetAPIClient(base_url=api_url, user_id=username)
+
+        # --- SMART ROUTING: Heartbeat & Toasts ---
+        # Enviamos "Estou aqui" e checamos se tem recado
+        st.session_state.api_client.send_heartbeat()
+        
+        # Checa toasts (mensagens que o Scheduler mandou para cá)
+        toasts = st.session_state.api_client.get_toasts()
+        if toasts:
+            for t in toasts:
+                st.toast(t.get("message"), icon=t.get("icon", "🔔"))
+
+        # --- SIDEBAR BADGE (Para visibilidade) ---
+        try:
+            unread_count = st.session_state.api_client.get_unread_count()
+            if unread_count > 0:
+                 st.sidebar.markdown(f"### 🔔 **{unread_count} Notificações**")
+                 st.sidebar.info("Vá para a página **Notificações** para ver os detalhes.")
+        except Exception:
+            pass
+
         return True, username, config_service, llm_orchestrator
 
-    elif st.session_state["authentication_status"] is False:
-        st.error("Usuário ou senha incorretos.")
-        return False, None, None, None
-    else:
-        # (authentication_status is None)
-        # --- NOVO FLUXO DE REGISTRO ---
-        # (Movido do ui_login.py para cá)
-        try:
-            if authenticator.register_user(preauthorization=False):
-                with open("data/users.yaml", "w") as file:
-                    yaml.dump(auth_config, file, default_flow_style=False)
-                st.success("Usuário registrado com sucesso! Por favor, faça o login.")
-        except Exception as e:
-            st.error(e)
-        # --- FIM DO FLUXO DE REGISTRO ---
-
-        st.warning("Por favor, faça o login ou crie uma conta para acessar o BudgetIA.")
-        return False, None, None, None
+    return False, None, None, None

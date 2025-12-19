@@ -7,19 +7,38 @@ from typing import Any
 os.environ["TRANSFORMERS_NO_ADVISORY_WARNINGS"] = "true"
 
 # --- Imports ---
+# --- Imports ---
 from app.chat_history_manager import StreamlitHistoryManager
-from app.chat_service import ChatService
-from config import DEFAULT_GEMINI_MODEL
-from core.agent_runner_interface import AgentRunner
+from config import DEFAULT_GEMINI_MODEL, UPSTASH_REDIS_URL
 from core.llm_enums import LLMProviderType
 from core.llm_factory import LLMProviderFactory
 from core.llm_manager import LLMOrchestrator
 from core.user_config_service import UserConfigService
-from finance.planilha_manager import PlanilhaManager
 from initialization.onboarding.orchestrator import OnboardingOrchestrator, OnboardingState
-from initialization.system_initializer import initialize_financial_system
 from web_app.ui_components import ui_home_hub, ui_onboarding_chat
 from web_app.utils import initialize_session_auth
+from web_app.api_client import BudgetAPIClient
+
+# --- Cache Setup (LangChain) ---
+try:
+    if UPSTASH_REDIS_URL:
+        import redis
+        from langchain.globals import set_llm_cache
+        from langchain_community.cache import RedisCache
+
+        # Força protocolo seguro se necessário e remove args incompatíveis
+        real_url = UPSTASH_REDIS_URL
+        if real_url.startswith("redis://") and not real_url.startswith("rediss://"):
+             # Upstash geralmente precisa de rediss://
+             real_url = real_url.replace("redis://", "rediss://")
+
+        # Configura Cache Global do LangChain
+        # decode_responses=False pois o cache usa pickle
+        redis_client = redis.from_url(real_url, decode_responses=False)
+        set_llm_cache(RedisCache(redis_client))
+        print("LOG: LangChain Redis Cache (Global) ENABLED. 🚀")
+except Exception as e:
+    print(f"AVISO: Falha ao ativar Cache de LLM: {e}")
 
 # --- Functions ---
 
@@ -31,37 +50,7 @@ def setup_page():
         initial_sidebar_state="collapsed",
     )
 
-@st.cache_resource
-def load_financial_system(
-    planilha_path: str,
-    _llm_orchestrator: LLMOrchestrator,
-    _config_service: UserConfigService,
-) -> tuple[PlanilhaManager | None, Any | None, Any | None, bool]:
-    """Carrega o sistema financeiro (PlanilhaManager, AgentRunner, etc.)."""
-    print(f"\n--- DEBUG: Entrando em load_financial_system para '{planilha_path}' ---")
-    try:
-        plan_manager, agent_runner, llm_orchestrator_loaded, dados_adicionados = (
-            initialize_financial_system(
-                planilha_path, _llm_orchestrator, _config_service
-            )
-        )
-        if plan_manager and agent_runner and llm_orchestrator_loaded:
-            print("--- DEBUG: load_financial_system retornando objetos válidos. ---")
-            return (
-                plan_manager,
-                agent_runner,
-                llm_orchestrator_loaded,
-                dados_adicionados,
-            )
-        else:
-            st.error("Falha interna ao inicializar componentes.")
-            st.stop()
-            return None, None, None, False
-    except Exception as e:
-        print(f"--- DEBUG ERROR: Exception em load_financial_system: {e} ---")
-        st.error(f"Erro inesperado ao carregar sistema: {e}")
-        st.stop()
-        return None, None, None, False
+# load_financial_system removido (substituído pela API)
 
 def run_onboarding(username: str, config_service: UserConfigService, llm_orchestrator: LLMOrchestrator):
     """Executa o fluxo de onboarding."""
@@ -75,73 +64,27 @@ def run_onboarding(username: str, config_service: UserConfigService, llm_orchest
     ui_onboarding_chat.render(orchestrator)
 
 def run_main_app(username: str, config_service: UserConfigService, llm_orchestrator: LLMOrchestrator, planilha_path: str):
-    """Executa a aplicação principal (Home Hub)."""
-    print("--- DEBUG APP: Onboarding completo. Carregando sistema... ---")
+    """Executa a aplicação principal (Home Hub) via API."""
     
-    try:
-        if "chat_service" not in st.session_state:
-            plan_manager, agent_runner, llm_orchestrator_loaded, dados_adicionados = (
-                load_financial_system(planilha_path, llm_orchestrator, config_service)
-            )
-            
-            if plan_manager and agent_runner and llm_orchestrator_loaded:
-                st.session_state.plan_manager = plan_manager
-                st.session_state.agent_runner = agent_runner
-                st.session_state.llm_orchestrator = llm_orchestrator_loaded
-                st.session_state.current_planilha_path = planilha_path
-
-                # History Managers
-                onboarding_history = StreamlitHistoryManager("onboarding_messages")
-                main_chat_history = StreamlitHistoryManager("chat_history")
-
-                # Chat Services
-                st.session_state.profile_chat_service = ChatService(
-                    agent_runner=agent_runner, history_manager=onboarding_history
-                )
-                st.session_state.main_chat_service = ChatService(
-                    agent_runner=agent_runner, history_manager=main_chat_history
-                )
-                
-                if dados_adicionados and "dados_exemplo_msg_mostrada" not in st.session_state:
-                    st.success("Dados de exemplo foram carregados na sua planilha!")
-                    st.session_state.dados_exemplo_msg_mostrada = True
-            else:
-                st.error("Falha crítica ao carregar componentes do sistema.")
-                if st.button("Tentar Novamente (Limpar Configuração)"):
-                    config_service.clear_config()
-                    st.cache_resource.clear()
-                    st.cache_data.clear()
-                    st.rerun()
-                st.stop()
-
-        # Recupera objetos da sessão
-        plan_manager = st.session_state.plan_manager
-        main_chat_service = st.session_state.main_chat_service
-
-        # Verifica conexão
-        is_connected, error_message = plan_manager.check_connection()
-        if not is_connected:
-            st.error("🔴 **Erro de Conexão com a Planilha!**", icon="📡")
-            st.warning(f"**Detalhe:** {error_message}")
-            if st.button("Tentar reconfigurar (Usar outra planilha)"):
-                config_service.clear_config()
-                st.cache_resource.clear()
-                st.cache_data.clear()
+    # Inicializa Cliente da API
+    if "api_client" not in st.session_state:
+        # Passa o username logado para o cliente
+        client = BudgetAPIClient(user_id=username)
+        if not client.is_healthy():
+            st.error("🔴 **API Offline!**", icon="🔌")
+            st.info("Por favor, execute `poetry run start-api` no terminal para iniciar o backend.")
+            if st.button("Verificar Novamente"):
                 st.rerun()
             st.stop()
+        else:
+            st.session_state.api_client = client
+            st.success(f"Conectado à API como {username}!", icon="🟢")
 
-        # Renderiza Home Hub
-        ui_home_hub.render(plan_manager, main_chat_service)
+    api_client: BudgetAPIClient = st.session_state.api_client
+    st.session_state.current_planilha_path = planilha_path
 
-    except Exception as e:
-        st.error("🔴 Erro Crítico ao Carregar sua Planilha!", icon="🔥")
-        st.warning(f"**Detalhe:** {e}")
-        if st.button("Tentar reconfigurar (Usar outra planilha)"):
-            config_service.clear_config()
-            st.cache_resource.clear()
-            st.cache_data.clear()
-            st.rerun()
-        st.stop()
+    # Renderiza Home Hub usando o Cliente API
+    ui_home_hub.render(api_client)
 
 def main():
     setup_page()

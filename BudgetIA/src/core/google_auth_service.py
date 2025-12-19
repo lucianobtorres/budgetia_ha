@@ -1,11 +1,10 @@
 # src/core/google_auth_service.py
 import io
-import json  # <-- 1. IMPORTAR JSON
+import json
 import re
 from pathlib import Path
 from typing import Any
 
-import streamlit as st
 from google.auth.transport.requests import Request
 from google.oauth2 import service_account
 from google.oauth2.credentials import Credentials
@@ -86,7 +85,7 @@ class GoogleAuthService:
                 credentials.to_json()  # Salva como JSON
             )
         except Exception as e:
-            st.error(f"Erro ao trocar o código por tokens: {e}")
+            raise Exception(f"Erro ao trocar o código por tokens: {e}") from e
 
     def download_sheets_as_excel_for_analysis(self, file_id: str) -> str:
         """
@@ -194,8 +193,7 @@ class GoogleAuthService:
         """
         creds = self.get_user_credentials()
         if not creds:
-            st.error("Não foi possível carregar as credenciais do Google.")
-            return []
+            raise ValueError("Não foi possível carregar as credenciais do Google.")
 
         try:
             # Constrói o serviço autenticado COMO o usuário
@@ -224,8 +222,7 @@ class GoogleAuthService:
             return files
 
         except Exception as e:
-            st.error(f"Erro ao listar arquivos do Google Drive: {e}")
-            return []
+            raise Exception(f"Erro ao listar arquivos do Google Drive: {e}") from e
 
     def share_file_with_service_account(self, file_id: str) -> tuple[bool, str]:
         """

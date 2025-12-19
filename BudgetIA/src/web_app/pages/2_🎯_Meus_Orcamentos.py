@@ -1,77 +1,63 @@
-# pages/4_🎯_Meus_Orcamentos.py
-import pandas as pd
+
 import streamlit as st
+import pandas as pd
+import sys
+import os
 
-# Importar NomesAbas e PlanilhaManager
-from config import ColunasOrcamentos, NomesAbas
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-try:
-    from ..ui_components.common_ui import setup_page
-except ImportError:
-    from web_app.ui_components.common_ui import setup_page
+from config import ColunasOrcamentos
+from web_app.api_client import BudgetAPIClient
 from web_app.utils import initialize_session_auth
 
-is_logged_in, username, config_service, llm_orchestrator = initialize_session_auth()
-
-if not is_logged_in or not config_service or "plan_manager" not in st.session_state:
-    st.warning(
-        "Você precisa estar logado e ter uma planilha configurada para acessar esta página."
-    )
+# --- Autenticação ---
+is_logged_in, username, _, _ = initialize_session_auth()
+if not is_logged_in:
+    st.warning("Por favor, faça o login na página inicial.")
     st.stop()
-plan_manager, agent_runner = setup_page(
-    title="Meus Orçamentos",
-    icon="🎯",
-)
 
-aba_orcamentos = NomesAbas.ORCAMENTOS
+if "api_client" not in st.session_state:
+    st.warning("Conexão com API não estabelecida. Volte para a Home.")
+    st.stop()
 
-try:
-    st.info("O sistema irá monitorar seus gastos automaticamente.")
-    editor_key_orc = "editor_orcamentos"
-    df_orcamentos = plan_manager.visualizar_dados(aba_nome=aba_orcamentos)
+api_client: BudgetAPIClient = st.session_state.api_client
 
+st.set_page_config(page_title="Meus Orçamentos", page_icon="🎯", layout="wide")
+
+st.title("🎯 Meus Orçamentos")
+st.info("O sistema irá monitorar seus gastos automaticamente. Edite seus limites aqui.")
+
+# --- Busca Dados ---
+budgets_data = api_client.get_all_budgets()
+
+if not budgets_data:
+    st.warning("Nenhum orçamento encontrado ou falha ao carregar.")
+else:
+    df_orcamentos = pd.DataFrame(budgets_data)
+    
+    # Tratamentos básicos de tipos (similar à original)
     if ColunasOrcamentos.ATUALIZACAO in df_orcamentos.columns:
         df_orcamentos[ColunasOrcamentos.ATUALIZACAO] = pd.to_datetime(
             df_orcamentos[ColunasOrcamentos.ATUALIZACAO], errors="coerce"
         )
-
-    if ColunasOrcamentos.CATEGORIA in df_orcamentos.columns:
-        df_orcamentos[ColunasOrcamentos.CATEGORIA] = (
-            df_orcamentos[ColunasOrcamentos.CATEGORIA].astype(str).fillna("")
-        )
-    if ColunasOrcamentos.PERIODO in df_orcamentos.columns:
-        df_orcamentos[ColunasOrcamentos.PERIODO] = (
-            df_orcamentos[ColunasOrcamentos.PERIODO]
-            .astype(str)
-            .fillna("Mensal")  # Preenche padrão
-        )
-    if ColunasOrcamentos.OBS in df_orcamentos.columns:
-        df_orcamentos[ColunasOrcamentos.OBS] = (
-            df_orcamentos[ColunasOrcamentos.OBS].astype(str).fillna("")
-        )
-    # Garante que tipos numéricos também sejam tratados (caso venham como string)
     if ColunasOrcamentos.LIMITE in df_orcamentos.columns:
         df_orcamentos[ColunasOrcamentos.LIMITE] = pd.to_numeric(
-            df_orcamentos[ColunasOrcamentos.LIMITE], errors="coerce"
+             df_orcamentos[ColunasOrcamentos.LIMITE], errors="coerce"
         ).fillna(0.0)
-
-    cols = [ColunasOrcamentos.ID] + [
-        col for col in df_orcamentos if col != ColunasOrcamentos.ID
-    ]
+    
+    # Reordenar colunas
+    cols = [c for c in df_orcamentos.columns if c != ColunasOrcamentos.ID]
+    if ColunasOrcamentos.ID in df_orcamentos.columns:
+        cols = [ColunasOrcamentos.ID] + cols
     df_orcamentos = df_orcamentos[cols]
 
-    # Verifica se há dados editados no estado da sessão (preservar entre reruns)
-    if f"{editor_key_orc}_edited_rows" in st.session_state:
-        edited_rows = st.session_state[f"{editor_key_orc}_edited_rows"]
-        # Potencialmente aplicar edições aqui se necessário antes de renderizar,
-        # mas o data_editor geralmente lida bem com isso.
-        pass
+    editor_key_orc = "editor_orcamentos_api"
 
     edited_df_orc = st.data_editor(
         df_orcamentos,
         num_rows="dynamic",
         use_container_width=True,
-        column_config={  # Configurações para melhor edição
+        column_config={
             ColunasOrcamentos.ID: st.column_config.NumberColumn(disabled=True),
             ColunasOrcamentos.CATEGORIA: st.column_config.TextColumn(
                 required=True, help="Nome da categoria (Ex: Alimentação)"
@@ -87,56 +73,41 @@ try:
                 options=["Mensal", "Anual", "Único"],
                 default="Mensal",
                 required=True,
-                help="Frequência do orçamento (geralmente Mensal).",
+                help="Frequência do orçamento.",
             ),
-            ColunasOrcamentos.OBS: st.column_config.TextColumn(
-                help="Notas opcionais sobre este orçamento."
-            ),
-            # Colunas calculadas não devem ser editáveis diretamente
+            ColunasOrcamentos.OBS: st.column_config.TextColumn(),
             ColunasOrcamentos.GASTO: st.column_config.NumberColumn(
                 format="R$ %.2f", disabled=True
             ),
-            ColunasOrcamentos.PERCENTUAL: st.column_config.ProgressColumn(  # Usar barra de progresso!
-                format="%.1f%%",
-                min_value=0,
-                max_value=100,  # A barra vai até 100%, mesmo se exceder
+            # O progresso é visual apenas
+            ColunasOrcamentos.PERCENTUAL: st.column_config.ProgressColumn(
+                format="%.1f%%", min_value=0, max_value=100
             ),
             ColunasOrcamentos.STATUS: st.column_config.TextColumn(disabled=True),
             ColunasOrcamentos.ATUALIZACAO: st.column_config.DatetimeColumn(
                 disabled=True, format="YYYY-MM-DD HH:mm:ss"
             ),
         },
-        # Esconder colunas calculadas que não são tão úteis na edição direta
         hide_index=True,
         key=editor_key_orc,
     )
 
     if not df_orcamentos.equals(edited_df_orc):
         if st.button("Salvar Alterações nos Orçamentos"):
-            st.info("Salvando e recalculando...")
+            st.info("Enviando alterações para a API...")
             try:
-                # Validações antes de salvar
-                if (edited_df_orc[ColunasOrcamentos.LIMITE] <= 0).any():
-                    st.warning(
-                        "Orçamentos devem ter um 'Valor Limite Mensal' positivo."
-                    )
-                    # Poderia impedir o salvamento ou apenas alertar
-                else:
-                    plan_manager.update_dataframe(aba_orcamentos, edited_df_orc)
-                    plan_manager.recalculate_budgets()  # Recalcula após editar
-                    plan_manager.save()
+                # Conversão de Datas para String
+                edited_df_to_send = edited_df_orc.copy()
+                if ColunasOrcamentos.ATUALIZACAO in edited_df_to_send.columns:
+                     edited_df_to_send[ColunasOrcamentos.ATUALIZACAO] = edited_df_to_send[ColunasOrcamentos.ATUALIZACAO].astype(str)
+
+                records = edited_df_to_send.to_dict(orient="records")
+                success = api_client.update_budgets_bulk(records)
+                
+                if success:
                     st.success("Orçamentos atualizados com sucesso!")
                     st.rerun()
+                else:
+                    st.error("Falha ao salvar via API.")
             except Exception as e:
-                st.error(f"Erro ao salvar alterações nos orçamentos: {e}")
-                st.exception(e)
-        else:
-            st.warning("Você tem alterações não salvas.")
-
-    st.caption(
-        "Preencha 'Categoria', 'Valor Limite Mensal' e 'Período'. As outras colunas são calculadas pelo sistema."
-    )
-
-except Exception as e:
-    st.error(f"Erro ao carregar ou editar orçamentos: {e}")
-    st.exception(e)
+                st.error(f"Erro: {e}")

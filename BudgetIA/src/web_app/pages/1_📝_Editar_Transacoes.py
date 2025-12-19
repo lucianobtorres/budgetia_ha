@@ -1,52 +1,58 @@
-# pages/1_📝_Editar_Transacoes.py
+
+import streamlit as st
+import pandas as pd
+from typing import Any
+import sys
 import os
 
-# Adiciona o 'src' ao path
-import sys
-
-import pandas as pd
-import streamlit as st
-
+# Adiciona o 'src' ao path (para acesso a config/enums se necessário, 
+# embora devêssemos mover constantes para um lugar comum)
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-from config import ColunasTransacoes, NomesAbas, ValoresTipo
-
-try:
-    from ..ui_components.common_ui import setup_page
-except ImportError:
-    from web_app.ui_components.common_ui import setup_page
-
+from config import ColunasTransacoes, ValoresTipo
+from web_app.api_client import BudgetAPIClient
 from web_app.utils import initialize_session_auth
 
-is_logged_in, username, config_service, llm_orchestrator = initialize_session_auth()
-
-if not is_logged_in or not config_service or "plan_manager" not in st.session_state:
-    st.warning(
-        "Você precisa estar logado e ter uma planilha configurada para acessar esta página."
-    )
+# --- Autenticação ---
+is_logged_in, username, _, _ = initialize_session_auth()
+if not is_logged_in:
+    st.warning("Por favor, faça o login na página inicial.")
     st.stop()
 
-# --- Configuração da Página ---
-plan_manager, agent_runner = setup_page(title="Editar Transações", icon="📝")
-aba_transacoes = NomesAbas.TRANSACOES
+if "api_client" not in st.session_state:
+    st.warning("Conexão com API não estabelecida. Volte para a Home.")
+    st.stop()
 
-try:
-    # Lê os dados usando a fachada
-    st.info(f"Gerencie diretamente as transações da sua aba '{aba_transacoes}'.")
-    df_transacoes = plan_manager.visualizar_dados(aba_transacoes)
+api_client: BudgetAPIClient = st.session_state.api_client
 
+st.set_page_config(page_title="Editar Transações", page_icon="📝", layout="wide")
+
+st.title("📝 Editar Transações")
+st.info("Gerencie suas transações diretamente aqui. As alterações são salvas na planilha via API.")
+
+# --- Busca Dados ---
+# Por enquanto trazemos um limite alto para edição, mas idealmente seria paginado
+# Se for muito grande, o GET transactions pode demorar.
+transactions_data = api_client.get_transactions(limit=1000)
+
+if not transactions_data:
+    st.warning("Nenhuma transação encontrada ou falha ao carregar.")
+else:
+    df_transacoes = pd.DataFrame(transactions_data)
+    
+    # Normalização de Datas
     if ColunasTransacoes.DATA in df_transacoes.columns:
         df_transacoes[ColunasTransacoes.DATA] = pd.to_datetime(
             df_transacoes[ColunasTransacoes.DATA], errors="coerce"
         ).dt.date
-
-    # Garante que o ID da Transação seja o primeiro
-    cols = [ColunasTransacoes.ID] + [
-        col for col in df_transacoes if col != ColunasTransacoes.ID
-    ]
+    
+    # Reordenar colunas se possível (ID primeiro)
+    cols = [c for c in df_transacoes.columns if c != ColunasTransacoes.ID]
+    if ColunasTransacoes.ID in df_transacoes.columns:
+        cols = [ColunasTransacoes.ID] + cols
     df_transacoes = df_transacoes[cols]
 
-    editor_key = f"editor_{aba_transacoes}"
+    editor_key = "editor_transacoes_api"
 
     edited_df = st.data_editor(
         df_transacoes,
@@ -74,24 +80,29 @@ try:
 
     if not df_transacoes.equals(edited_df):
         if st.button("Salvar Alterações nas Transações"):
-            st.info("Salvando alterações e recalculando...")
+            st.info("Enviando alterações para a API...")
+            
             try:
-                if (edited_df[ColunasTransacoes.VALOR] < 0).any():
-                    st.warning(
-                        "Valores negativos detectados na coluna 'Valor'. Verifique as transações."
-                    )
+                # Validação Básica
+                if ColunasTransacoes.VALOR in edited_df.columns:
+                    if (edited_df[ColunasTransacoes.VALOR] < 0).any():
+                        st.warning("Atenção: Valores negativos detectados.")
 
-                # --- USA A FACHADA (ESTADO ORIGINAL) ---
-                plan_manager.update_dataframe(aba_transacoes, edited_df)
-                plan_manager.recalculate_budgets()  # Orquestração
-                plan_manager.save()
-                # --- FIM ---
-
-                st.success("Planilha atualizada com sucesso!")
-                st.rerun()
-
+                # Converte para lista de dicts para JSON
+                # Converte datas para string ISO
+                edited_df_to_send = edited_df.copy()
+                if ColunasTransacoes.DATA in edited_df_to_send.columns:
+                     edited_df_to_send[ColunasTransacoes.DATA] = edited_df_to_send[ColunasTransacoes.DATA].astype(str)
+                
+                records = edited_df_to_send.to_dict(orient="records")
+                
+                success = api_client.update_transactions_bulk(records)
+                
+                if success:
+                    st.success("Transações atualizadas com sucesso!")
+                    st.rerun()
+                else:
+                    st.error("Falha ao salvar via API. Verifique se o servidor está rodando.")
+            
             except Exception as e:
-                st.error(f"Erro ao salvar: {e}")
-
-except Exception as e:
-    st.error(f"Erro ao carregar dados da aba '{aba_transacoes}': {e}")
+                st.error(f"Erro no processamento: {e}")

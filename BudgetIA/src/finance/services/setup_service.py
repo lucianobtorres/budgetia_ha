@@ -103,7 +103,7 @@ class FinancialSetupService:
 
         for t in transacoes_exemplo:
             self._transaction_repo.add_transaction(
-                data=str(t[ColunasTransacoes.DATA]),
+                data=str(t.get(ColunasTransacoes.DATA, t.get("Data", "2024-01-01"))),
                 tipo=str(t[ColunasTransacoes.TIPO]),
                 categoria=str(t[ColunasTransacoes.CATEGORIA]),
                 descricao=str(t.get(ColunasTransacoes.DESCRICAO, "")),

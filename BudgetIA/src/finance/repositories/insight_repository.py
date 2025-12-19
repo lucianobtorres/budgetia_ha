@@ -46,10 +46,10 @@ class InsightRepository:
             [
                 {
                     ColunasInsights.ID: novo_id,
-                    ColunasInsights.DATA: data_insight,
+                    ColunasInsights.DATA: pd.to_datetime(data_insight),
                     ColunasInsights.TIPO: tipo_insight,
                     ColunasInsights.TITULO: titulo_insight,
-                    ColunasInsights.DETALHE: detalhes_recomendacao,
+                    ColunasInsights.DETALHES: detalhes_recomendacao,
                     ColunasInsights.STATUS: status,
                 }
             ],

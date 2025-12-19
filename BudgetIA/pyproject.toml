@@ -31,13 +31,21 @@ dependencies = [
     "google-auth-httplib2 (>=0.2.1,<0.3.0)",
     "python-magic-bin (>=0.4.14,<0.5.0)",
     "redis (>=7.0.1,<8.0.0)",
+    "fastapi (>=0.124.2,<0.125.0)",
+    "uvicorn (>=0.38.0,<0.39.0)",
+    "agno (>=2.3.10,<3.0.0)",
+    "google-genai (>=1.55.0,<2.0.0)",
+    "requests (>=2.31.0,<3.0.0)",
 ]
 
 [tool.poetry]
 packages = [{ include = "*", from = "src" }]
 
 [tool.poetry.scripts]
-start = "start:main"
+start-web = "start:main"
+start-api = "run_api:main"
+start-bot = "bot.main:main"
+start-scheduler = "scheduler.main:main"
 
 # --- Scripts de Qualidade ---
 #format = "black src tests"  # Executa o Black

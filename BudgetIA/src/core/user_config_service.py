@@ -262,3 +262,12 @@ class UserConfigService:
                 f"--- DEBUG ConfigService: Salvando '{field_name}' ({value}) para {self.username} ---"
             )
             self.save_config(config_data)
+
+    def get_comunicacao_config(self) -> dict[str, Any]:
+        """Retorna o dicionário de configurações de comunicação."""
+        config_data = self.load_config()
+        return config_data.get("comunicacao", {})
+
+    def get_user_dir(self) -> str:
+        """Retorna o caminho absoluto do diretório de dados deste usuário."""
+        return str(self.config_dir.resolve())

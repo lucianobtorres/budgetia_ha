@@ -59,7 +59,7 @@ class TransactionRepository:
             [
                 {
                     ColunasTransacoes.ID: novo_id,
-                    ColunasTransacoes.DATA: data,
+                    ColunasTransacoes.DATA: pd.to_datetime(data),
                     ColunasTransacoes.TIPO: tipo,
                     ColunasTransacoes.CATEGORIA: categoria,
                     ColunasTransacoes.DESCRICAO: descricao,

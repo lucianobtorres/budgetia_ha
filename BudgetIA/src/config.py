@@ -45,8 +45,8 @@ SYSTEM_PROMPT_PATH = os.path.join(PROMPTS_DIR, SYSTEM_PROMPT_FILENAME)
 # O os.getenv busca a variável de ambiente, se não encontrar, usa o valor padrão.
 DEFAULT_GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 # Adicione outros modelos padrão aqui se necessário
-DEFAULT_GEMINI_MODEL2 = "gemini-1.5-flash"
-DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+DEFAULT_GEMINI_MODEL2 = "gemini-2.5-flash"
+DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite"
 
 SERVICE_ACCOUNT_EMAIL = None
 try:
@@ -70,6 +70,11 @@ UPSTASH_REDIS_URL = os.getenv("UPSTASH_REDIS_URL")
 # Você pode adicionar uma verificação se quiser
 if not UPSTASH_REDIS_URL:
     print("Aviso: UPSTASH_REDIS_URL não encontrada. O cache não funcionará.")
+
+# PRESENÇA / SMART ROUTING
+# Tempo sem heartbeat para considerar offline (Default: 300s = 5 min)
+# Reduzido para 30s para testes a pedido do usuário
+PRESENCE_OFFLINE_THRESHOLD_SECONDS = 30
 
 
 class SummaryKeys:

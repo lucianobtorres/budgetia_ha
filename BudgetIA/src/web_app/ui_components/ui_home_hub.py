@@ -5,22 +5,23 @@ import streamlit as st
 import config
 
 # --- NOVOS IMPORTS ---
-from app.chat_service import ChatService
-
-# Remover 'AgentRunner'
+from web_app.api_client import BudgetAPIClient
+from app.chat_history_manager import StreamlitHistoryManager
 # --- FIM NOVOS IMPORTS ---
-from finance.planilha_manager import PlanilhaManager
-from web_app.utils import create_excel_export_bytes
 
 
-def _render_dashboard_metrics(plan_manager: PlanilhaManager) -> None:
-    """Renderiza os KPIs e gráficos do dashboard."""
+
+
+print("--- RELOADED UI_HOME_HUB (V2) ---")
+
+def _render_dashboard_metrics(api_client: BudgetAPIClient) -> None:
+    """Renderiza os KPIs e gráficos do dashboard buscando da API."""
     # (Esta função não muda em nada)
     st.title("Meu Mentor Financeiro 💰")
     st.info(
         "Este é o seu Hub de IA. Visualize seus dados e converse com seu mentor abaixo."
     )
-    summary = plan_manager.get_summary()
+    summary = api_client.get_summary()
     if summary and (
         summary.get(config.SummaryKeys.RECEITAS, 0) > 0
         or summary.get(config.SummaryKeys.DESPESAS, 0) > 0
@@ -42,22 +43,18 @@ def _render_dashboard_metrics(plan_manager: PlanilhaManager) -> None:
         col_graf_1, col_graf_2 = st.columns(2)
         with col_graf_1:
             st.subheader("Top 5 Despesas")
-            despesas_por_categoria = plan_manager.get_expenses_by_category(top_n=5)
-            if not despesas_por_categoria.empty:
+            despesas_por_categoria = api_client.get_expenses_chart_data(top_n=5)
+            if despesas_por_categoria:
                 st.bar_chart(despesas_por_categoria)
             else:
                 st.info("Sem despesas para exibir no gráfico.")
         with col_graf_2:
             st.subheader("Status dos Orçamentos")
-            df_orcamentos = plan_manager.visualizar_dados(
-                aba_nome=config.NomesAbas.ORCAMENTOS
-            )
-            orcamentos_ativos = df_orcamentos[
-                (df_orcamentos[config.ColunasOrcamentos.PERIODO] == "Mensal")
-                & (df_orcamentos[config.ColunasOrcamentos.LIMITE] > 0)
-            ]
-            if not orcamentos_ativos.empty:
-                for index, row in orcamentos_ativos.iterrows():
+            # API retorna lista de dicts
+            orcamentos_ativos = api_client.get_budgets_status()
+            
+            if orcamentos_ativos:
+                for row in orcamentos_ativos:
                     categoria = row[config.ColunasOrcamentos.CATEGORIA]
                     gasto = row[config.ColunasOrcamentos.GASTO]
                     limite = row[config.ColunasOrcamentos.LIMITE]
@@ -88,11 +85,14 @@ def _render_dashboard_metrics(plan_manager: PlanilhaManager) -> None:
         )
 
 
-def _render_chat_interface(chat_service: ChatService) -> None:  # Recebe o ChatService
+def _render_chat_interface(api_client: BudgetAPIClient) -> None:
     """Renderiza a interface de chat (histórico e input)."""
+    
+    # Gerenciador de Histórico Local (apenas visualização)
+    history_manager = StreamlitHistoryManager("chat_history")
 
-    # Exibe o histórico de mensagens (lido do service)
-    for message in chat_service.get_history():
+    # Exibe o histórico de mensagens
+    for message in history_manager.get_history():
         with st.chat_message(message["role"]):
             st.write(message["content"])  # Usando st.write como pedido
 
@@ -107,13 +107,18 @@ def _render_chat_interface(chat_service: ChatService) -> None:  # Recebe o ChatS
         # Processa a mensagem
         with st.chat_message("assistant"):
             with st.spinner("Pensando..."):
-                # O Service cuida de tudo:
-                # 1. Salva 'prompt' no histórico
-                # 2. Chama 'agent_runner.interagir()'
-                # 3. Salva 'response' no histórico
-                user_id_key = st.session_state.get("username", "default_user")
-                _ = chat_service.handle_message(prompt, user_id_key)
-                # Não precisamos fazer mais nada aqui
+                # 1. Adiciona mensagem do usuário ao histórico local
+                history_manager.add_message("user", prompt)
+
+                # 2. Envia para a API
+                response_text = api_client.send_chat_message(prompt)
+
+                # 3. Adiciona resposta da IA ao histórico local
+                if response_text:
+                    history_manager.add_message("assistant", response_text)
+                    st.write(response_text)
+                else:
+                    st.error("Erro ao comunicar com a IA.")
 
         # O Rerun vai recarregar a UI, e o loop lá em cima
         # vai ler o histórico atualizado (incluindo a resposta)
@@ -123,11 +128,11 @@ def _render_chat_interface(chat_service: ChatService) -> None:  # Recebe o ChatS
 def render_sidebar_export() -> None:
     """Renderiza a funcionalidade 'Salvar Como' na barra lateral."""
 
-    if "plan_manager" not in st.session_state:
-        st.error("Erro: plan_manager não encontrado.")
-        return
-
-    plan_manager: PlanilhaManager = st.session_state.plan_manager
+    # plan_manager não é mais necessário aqui se usarmos a exportação da API
+    # Mas como o código abaixo usa 'create_excel_export_bytes(plan_manager)',
+    # vamos mudar para usar 'api_client.export_excel_bytes()'
+    
+    api_client: BudgetAPIClient = st.session_state.api_client
 
     with st.sidebar:
         st.subheader("Salvar Como")
@@ -153,7 +158,7 @@ def render_sidebar_export() -> None:
                 st.warning("Por favor, insira um nome de arquivo.")
             else:
                 with st.spinner("Gerando seu arquivo Excel..."):
-                    excel_bytes = create_excel_export_bytes(plan_manager)
+                    excel_bytes, filename_api = api_client.export_excel_bytes()
                     if excel_bytes:
                         # Armazena os bytes e o nome do arquivo na sessão
                         st.session_state.download_data = {
@@ -192,16 +197,17 @@ def render_sidebar_export() -> None:
 
 
 def render(
-    plan_manager: PlanilhaManager, chat_service: ChatService
-) -> None:  # Assinatura mudou
+    api_client: BudgetAPIClient
+) -> None:
+    """Renderiza o Hub de IA principal, combinando Dashboard e Chat."""
     """Renderiza o Hub de IA principal, combinando Dashboard e Chat."""
 
     # 1. Renderiza o Dashboard no topo
     with st.expander("Ver Dashboard e Métricas 📊", expanded=True):
-        _render_dashboard_metrics(plan_manager)
+        _render_dashboard_metrics(api_client)
 
     # 2. Renderiza a Interface de Chat abaixo
-    _render_chat_interface(chat_service)
+    _render_chat_interface(api_client)
 
     # 3. Renderiza a funcionalidade de exportação na sidebar
     render_sidebar_export()
