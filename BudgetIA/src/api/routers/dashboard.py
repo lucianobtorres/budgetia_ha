@@ -44,7 +44,6 @@ def get_budgets_status(
         # Filtra ativos e mensais
         orcamentos_ativos = df[
             (df[ColunasOrcamentos.PERIODO] == "Mensal")
-            & (df[ColunasOrcamentos.LIMITE] > 0)
         ]
         
         return orcamentos_ativos.to_dict(orient="records") # type: ignore

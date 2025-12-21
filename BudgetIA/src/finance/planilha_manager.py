@@ -67,7 +67,20 @@ class PlanilhaManager:
         self.transaction_repo.add_transaction(
             data, tipo, categoria, descricao, valor, status
         )
-        self.recalculate_budgets()
+    def recalculate_budgets(self) -> None:
+        self.budget_repo.recalculate_all_budgets()
+
+    def delete_transaction(self, transaction_id: int) -> bool:
+        success = self.transaction_repo.delete_transaction(transaction_id)
+        if success:
+            self.recalculate_budgets() # Recalcula orçamentos se remover gasto
+        return success
+
+    def update_transaction(self, transaction_id: int, dados: dict) -> bool:
+        success = self.transaction_repo.update_transaction(transaction_id, dados)
+        if success:
+            self.recalculate_budgets()
+        return success
 
     def get_summary(self) -> dict[str, float]:
         return self.transaction_repo.get_summary()
@@ -90,6 +103,18 @@ class PlanilhaManager:
         )
         self.recalculate_budgets()
         return mensagem
+
+    def delete_budget(self, budget_id: int) -> bool:
+        success = self.budget_repo.delete_budget(budget_id)
+        if success:
+            self.recalculate_budgets()
+        return success
+
+    def update_budget(self, budget_id: int, dados: dict) -> bool:
+        success = self.budget_repo.update_budget_by_id(budget_id, dados)
+        if success:
+            self.recalculate_budgets()
+        return success
 
     def recalculate_budgets(self) -> None:
         self.budget_repo.recalculate_all_budgets()

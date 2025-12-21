@@ -275,7 +275,20 @@ class StrategyGenerator:
                     f"--- DEBUG GENERATOR [PROMPT (Tentativa {i + 1})]:\n{messages[1].content[:500]}...\n"
                 )
 
-                resposta_ia = self.llm.invoke(messages).content
+                try:
+                    resposta_ia = self.llm.invoke(messages).content
+                except Exception as e:
+                    error_msg = str(e)
+                    if "429" in error_msg or "Rate limit" in error_msg:
+                        print(f"--- DEBUG GENERATOR: RATE LIMIT DETECTADO NA TENTATIVA {i+1} ---")
+                        # Em caso de rate limit, não adianta tentar de novo imediatamente.
+                        # Retornamos falha controlada para o orchestrator lidar.
+                        return False, f"Rate Limit Exceeded: {error_msg}", schema_usuario
+                    # Outros erros, loga e continua o loop de retry
+                    erro_log = f"Erro na chamada LLM: {error_msg}"
+                    print(f"--- DEBUG GENERATOR [ERRO LLM]: {erro_log} ---")
+                    continue
+
                 codigo_gerado = (
                     str(resposta_ia)
                     .strip()

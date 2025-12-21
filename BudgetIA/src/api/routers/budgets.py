@@ -3,7 +3,7 @@ import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Body
 from api.dependencies import get_planilha_manager
 from finance.planilha_manager import PlanilhaManager
-from config import NomesAbas
+from config import NomesAbas, ColunasOrcamentos
 
 router = APIRouter(prefix="/budgets", tags=["Orçamentos"])
 
@@ -16,30 +16,69 @@ def listar_orcamentos(
     """
     try:
         df = manager.visualizar_dados(NomesAbas.ORCAMENTOS)
-        if df is None or df.empty:
-            return []
+        
+        if ColunasOrcamentos.ID in df.columns:
+             df = df.copy() # Evita SettingWithCopy warning
+             df[ColunasOrcamentos.ID] = pd.to_numeric(df[ColunasOrcamentos.ID], errors='coerce').fillna(0).astype(int)
+
         return df.to_dict(orient="records") # type: ignore
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.put("/bulk")
-def update_orcamentos_bulk(
-    budgets: list[dict[str, Any]] = Body(...),
+@router.post("/")
+def add_orcamento(
+    categoria: str = Body(...),
+    valor_limite: float = Body(...),
+    periodo: str = Body("Mensal"),
+    observacoes: str = Body(""),
     manager: PlanilhaManager = Depends(get_planilha_manager)
-) -> dict[str, str]:
-    """
-    Atualiza TODOS os orçamentos reescrevendo a aba.
-    """
+):
     try:
-        if not budgets:
-            return {"message": "Nenhuma alteração enviada."}
-            
-        df_new = pd.DataFrame(budgets)
-        
-        manager.update_dataframe(NomesAbas.ORCAMENTOS, df_new)
-        manager.recalculate_budgets()
+        # Usa o método correto do manager
+        msg = manager.adicionar_ou_atualizar_orcamento(categoria, valor_limite, periodo, observacoes)
         manager.save()
-        
-        return {"message": f"{len(budgets)} orçamentos atualizados com sucesso."}
+        return {"message": msg}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao atualizar orçamentos: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.put("/{budget_id}")
+def update_orcamento_item(
+    budget_id: int,
+    categoria: str = Body(...),
+    valor_limite: float = Body(...),
+    periodo: str = Body("Mensal"),
+    observacoes: str = Body(""),
+    manager: PlanilhaManager = Depends(get_planilha_manager)
+):
+    try:
+        dados = {
+            ColunasOrcamentos.CATEGORIA: categoria,
+            ColunasOrcamentos.LIMITE: valor_limite,
+            ColunasOrcamentos.PERIODO: periodo,
+            ColunasOrcamentos.OBS: observacoes
+        }
+        success = manager.update_budget(budget_id, dados)
+        if not success:
+             raise HTTPException(status_code=404, detail="Orçamento não encontrado")
+        manager.save()
+        return {"message": "Orçamento atualizado."}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/{budget_id}")
+def delete_orcamento_item(
+    budget_id: int,
+    manager: PlanilhaManager = Depends(get_planilha_manager)
+):
+    try:
+        success = manager.delete_budget(budget_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Orçamento não encontrado")
+        manager.save()
+        return {"message": "Orçamento removido."}
+    except HTTPException:
+         raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

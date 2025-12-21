@@ -43,10 +43,12 @@ SYSTEM_PROMPT_PATH = os.path.join(PROMPTS_DIR, SYSTEM_PROMPT_FILENAME)
 
 # --- 2. Configurações de Modelos de IA ---
 # O os.getenv busca a variável de ambiente, se não encontrar, usa o valor padrão.
-DEFAULT_GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+# DEFAULT_GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+# DEFAULT_GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
+DEFAULT_GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 # Adicione outros modelos padrão aqui se necessário
 DEFAULT_GEMINI_MODEL2 = "gemini-2.5-flash"
-DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite"
+DEFAULT_GEMINI_MODEL = "gemini-2.0-flash-lite"
 
 SERVICE_ACCOUNT_EMAIL = None
 try:
@@ -109,7 +111,7 @@ class ColunasOrcamentos:
 
     ID = "ID Orcamento"
     CATEGORIA = "Categoria"
-    LIMITE = "Valor Limite Mensal"
+    LIMITE = "Valor Limite"
     GASTO = "Valor Gasto Atual"
     PERCENTUAL = "Porcentagem Gasta (%)"
     PERIODO = "Período Orçamento"

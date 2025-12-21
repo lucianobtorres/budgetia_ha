@@ -154,9 +154,12 @@ class IntentClassifier:
             return UserIntent.SKIP
         if text_lower in ["não", "nao", "não, obrigado", "nao, obrigado"]:
             return UserIntent.NEGATIVE_REFUSAL
-        if text_lower in ["sim", "claro", "com certeza", "ok", "pode ser", "aceitar sugestão", "aceitar sugestao", "aceitar", "usar esta"]:
+        if text_lower in ["sim", "claro", "com certeza", "ok", "pode ser", "aceitar sugestão", "aceitar sugestao", "aceitar", "usar esta", "tudo certo", "tudo certo!", "confirmar", "prosseguir"]:
             return UserIntent.POSITIVE_CONFIRMATION
         
+        if text_lower in ["preciso de ajuda", "ajuda", "socorro", "não entendi", "duvida", "dúvida", "tenho uma dúvida"]:
+            return UserIntent.QUESTION
+
         # Sinais de conclusão de entrevista (Hardcoded para garantir funcionamento)
         if text_lower in ["pronto", "terminei", "acabei", "é só isso", "e so isso", "entendi tudo", "já respondi", "ja respondi", "vamos começar", "vamos comecar", "começar", "comecar", "iniciar", "ir para o sistema"]:
             return UserIntent.INTERVIEW_COMPLETE

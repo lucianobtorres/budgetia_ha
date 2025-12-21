@@ -42,36 +42,39 @@ class OnboardingStateMachine:
     Garante que o fluxo siga uma ordem lógica e válida.
     """
 
-    def __init__(self, initial_state: OnboardingState = OnboardingState.WELCOME):
+    def __init__(self, initial_state: OnboardingState = OnboardingState.WELCOME, on_transition=None):
         self._current_state = initial_state
+        self._on_transition = on_transition # Callback(new_state)
 
         # Define transições válidas para cada estado
         self._valid_transitions: dict[OnboardingState, set[OnboardingState]] = {
+            # ... (mantém igual, apenas injetando o callback no init)
             OnboardingState.WELCOME: {
                 OnboardingState.SPREADSHEET_ACQUISITION,
-                OnboardingState.COMPLETE,  # Caso usuário já tenha tudo configurado (edge case)
+                OnboardingState.COMPLETE,
             },
             OnboardingState.SPREADSHEET_ACQUISITION: {
-                OnboardingState.TRANSLATION_REVIEW,  # Caminho normal (Upload/Google)
-                OnboardingState.OPTIONAL_PROFILE,  # Caminho rápido (Default - pula tradução)
-                OnboardingState.WELCOME,  # Voltar/Reiniciar
+                OnboardingState.TRANSLATION_REVIEW,
+                OnboardingState.OPTIONAL_PROFILE,
+                OnboardingState.WELCOME,
             },
             OnboardingState.TRANSLATION_REVIEW: {
-                OnboardingState.OPTIONAL_PROFILE,  # Sucesso na tradução
-                OnboardingState.SPREADSHEET_ACQUISITION,  # Falha/Tentar outro arquivo
+                OnboardingState.OPTIONAL_PROFILE,
+                OnboardingState.SPREADSHEET_ACQUISITION,
             },
             OnboardingState.OPTIONAL_PROFILE: {
-                OnboardingState.OPTIONAL_STRATEGY,  # Preencheu perfil
-                OnboardingState.COMPLETE,  # Pulou perfil
+                OnboardingState.OPTIONAL_STRATEGY,
+                OnboardingState.COMPLETE,
             },
             OnboardingState.OPTIONAL_STRATEGY: {
-                OnboardingState.COMPLETE,  # Finalizou
-                OnboardingState.OPTIONAL_PROFILE,  # Voltar para ajustar perfil
+                OnboardingState.COMPLETE,
+                OnboardingState.OPTIONAL_PROFILE,
             },
             OnboardingState.COMPLETE: {
-                OnboardingState.WELCOME  # Reset forçado
+                OnboardingState.WELCOME
             },
         }
+
 
     @property
     def current_state(self) -> OnboardingState:
@@ -98,6 +101,11 @@ class OnboardingStateMachine:
                 f"--- ONBOARDING: Transição de {self._current_state.name} para {new_state.name} ---"
             )
             self._current_state = new_state
+            
+            # Aciona callback de persistência
+            if self._on_transition:
+                self._on_transition(new_state)
+                
             return True
 
         print(

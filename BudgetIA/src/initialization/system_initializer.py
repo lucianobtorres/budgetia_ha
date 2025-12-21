@@ -57,8 +57,14 @@ def initialize_financial_system(
         # --- 3. Inicialização da IA e do Agente ---
         print("--- DEBUG INITIALIZER: Configurando LLM e Agente... ---")
         primary_provider = LLMProviderFactory.create_provider(
-            LLMProviderType.GEMINI, default_model=config.DEFAULT_GEMINI_MODEL
+            # LLMProviderType.GROQ, default_model="llama-3.3-70b-Versatile"
+            LLMProviderType.GROQ,
+            default_model="openai/gpt-oss-120b",
+            # default_model="llama-3.1-8b-instant",
         )
+        # primary_provider = LLMProviderFactory.create_provider(
+        #     LLMProviderType.GEMINI, default_model=config.DEFAULT_GEMINI_MODEL
+        # )
         llm_orchestrator = LLMOrchestrator(primary_provider=primary_provider)
         llm_orchestrator.get_configured_llm()
 

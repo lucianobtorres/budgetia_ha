@@ -92,6 +92,8 @@ class OnboardingAgent:
 
         except Exception as e:
             logger.error(f"Erro na invocação do LLM de onboarding: {e}")
+            if "429" in str(e) or "Rate limit" in str(e):
+                return "⚠️ O servidor de IA está sobrecarregado no momento (Rate Limit). Aguarde alguns instantes e tente novamente, ou se preferir, podemos usar a configuração padrão."
             return "Desculpe, tive um pequeno problema técnico. Podemos tentar de novo?"
 
     def reset_history(self):

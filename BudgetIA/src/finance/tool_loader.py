@@ -30,6 +30,7 @@ def load_all_financial_tools(
     memory_service: MemoryService,
     config_service: UserConfigService,
     llm_orchestrator: Any, # Injetado para ferramentas que precisam do LLM direto
+    essential_only: bool = False, # Flag para carregar apenas ferramentas essenciais (Groq/Llama)
 ) -> list[BaseTool]:
     """
     Carrega dinamicamente todas as ferramentas financeiras do diretório 'tools/',
@@ -38,6 +39,22 @@ def load_all_financial_tools(
     """
     tools_list: list[BaseTool] = []
     tools_dir = os.path.join(os.path.dirname(__file__), "tools")
+
+    # Lista de ferramentas essenciais para modelos menores (Llama 8B / Groq)
+    ESSENTIAL_TOOLS_FILES = [
+        "add_transaction_tool.py",
+        "view_data_tool.py",
+        "calculate_balance_tool.py",
+        "check_budget_status_tool.py",
+        "generate_monthly_summary_tool.py",
+        "register_ai_insight_tool.py",
+        "define_budget_tool.py", # Importante para controle
+        # Opcionais (Removidos para economizar tokens):
+        # "extract_transactions_tool.py", # Complexo
+        # "analyze_*.py", # Pesados
+        # "memory_tools.py",
+        # "debt_tools.py"
+    ]
 
     # --- O MAPA DE DEPENDÊNCIAS (Sem PlanilhaManager) ---
     dependency_map: dict[str, Callable[..., Any]] = {
@@ -74,6 +91,10 @@ def load_all_financial_tools(
 
     for filename in os.listdir(tools_dir):
         if filename.endswith(".py") and filename != "__init__.py":
+            # Filtro de Essencial
+            if essential_only and filename not in ESSENTIAL_TOOLS_FILES:
+                continue
+
             module_name = filename[:-3]
             full_module_name = f"finance.tools.{module_name}"
 
@@ -124,5 +145,5 @@ def load_all_financial_tools(
                     f"ERRO (ToolLoader): Erro ao importar módulo '{full_module_name}'. Erro: {e}"
                 )
 
-    print(f"LOG (ToolLoader): {len(tools_list)} ferramentas carregadas com sucesso.")
+    print(f"LOG (ToolLoader): {len(tools_list)} ferramentas carregadas com sucesso. (Essential Only: {essential_only})")
     return tools_list

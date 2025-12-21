@@ -1,7 +1,7 @@
-
 from core.llm_enums import LLMProviderType
 from core.llm_providers.base_provider import LLMProvider
 from core.llm_providers.gemini_provider import GeminiProvider
+from core.llm_providers.groq_provider import GroqProvider
 
 
 class LLMProviderFactory:
@@ -12,6 +12,7 @@ class LLMProviderFactory:
 
     _REGISTRY: dict[LLMProviderType, type[LLMProvider]] = {
         LLMProviderType.GEMINI: GeminiProvider,
+        LLMProviderType.GROQ: GroqProvider,
     }
 
     @classmethod

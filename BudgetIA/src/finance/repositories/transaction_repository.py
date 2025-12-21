@@ -75,6 +75,50 @@ class TransactionRepository:
         self._context.update_dataframe(self._aba_nome, df_atualizado)
         print(f"LOG (Repo): Transação '{descricao}' adicionada ao contexto.")
 
+    def delete_transaction(self, transaction_id: int) -> bool:
+        """Exclui uma transação pelo ID."""
+        df = self.get_all_transactions()
+        if ColunasTransacoes.ID not in df.columns:
+            return False
+        
+        # Filtra removendo o ID
+        df_novo = df[df[ColunasTransacoes.ID] != transaction_id]
+        
+        if len(df_novo) == len(df):
+            return False # Nada foi removido
+            
+        self._context.update_dataframe(self._aba_nome, df_novo)
+        return True
+
+    def update_transaction(self, transaction_id: int, novos_dados: dict) -> bool:
+        """Atualiza uma transação existente pelo ID."""
+        df = self.get_all_transactions()
+        if ColunasTransacoes.ID not in df.columns:
+            return False
+            
+        mask = df[ColunasTransacoes.ID] == transaction_id
+        if not mask.any():
+            return False
+            
+        # Atualiza os campos fornecidos
+        # Mapeia chaves do dict (que vêm do Pydantic) para colunas do DataFrame
+        # Ex: "descricao" -> "Descricao"
+        
+        # Mapeamento reverso simples ou uso direto das constantes se o input usar as constantes
+        # Assumindo que o input usa os nomes das colunas ou chaves compatíveis
+        
+        idx = df.index[mask][0]
+        
+        for col, valor in novos_dados.items():
+            if col in df.columns and col != ColunasTransacoes.ID:
+                if col == ColunasTransacoes.DATA:
+                     df.at[idx, col] = pd.to_datetime(valor)
+                else:
+                     df.at[idx, col] = valor
+                     
+        self._context.update_dataframe(self._aba_nome, df)
+        return True
+
     def get_summary(self) -> dict[str, float]:
         """Delega o cálculo do resumo para o FinancialCalculator."""
         df_transacoes = self.get_all_transactions()

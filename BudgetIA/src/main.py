@@ -3,7 +3,7 @@ import os
 import pandas as pd
 
 from agent_implementations.factory import AgentFactory
-from config import DEFAULT_GEMINI_MODEL, NomesAbas
+from config import NomesAbas
 from core.llm_enums import LLMProviderType
 from core.llm_factory import LLMProviderFactory
 from core.llm_manager import LLMOrchestrator
@@ -44,8 +44,14 @@ def main() -> None:
     )
 
     # 3. Inicializa a IA
+    # primary_provider = LLMProviderFactory.create_provider(
+    #     LLMProviderType.GEMINI, default_model=DEFAULT_GEMINI_MODEL
+    # )
     primary_provider = LLMProviderFactory.create_provider(
-        LLMProviderType.GEMINI, default_model=DEFAULT_GEMINI_MODEL
+        # LLMProviderType.GROQ, default_model="llama-3.3-70b-Versatile"
+        LLMProviderType.GROQ,
+        # default_model="llama-3.1-8b-instant",
+        default_model="openai/gpt-oss-120b",
     )
     llm_orchestrator = LLMOrchestrator(primary_provider=primary_provider)
     llm_orchestrator.get_configured_llm()

@@ -61,9 +61,13 @@ def render(orchestrator: OnboardingOrchestrator) -> None:
         # ✅ FIX: Ao invés de "autenticação concluída" (que o handler não reconhece),
         # simulamos que o usuário clicou em "Google Sheets" novamente.
         # Assim o handler detecta os tokens e mostra a lista de arquivos automaticamente.
+        # IMPORTANTE: Passamos o redirect_uri para que a troca de tokens funcione
         response = orchestrator.process_user_input(
             "Google Sheets",  # ← Simula o clique original
-            extra_context={"google_auth_code": auth_code}
+            extra_context={
+                "google_auth_code": auth_code, 
+                "redirect_uri": "http://localhost:8501" # ← Garante validacao correta do token
+            }
         )
 
         st.session_state.onboarding_messages.append(
@@ -182,10 +186,15 @@ def render(orchestrator: OnboardingOrchestrator) -> None:
         google_auth_service = orchestrator.get_google_auth_service()
         # ✅ NOVO: Passa o estado atual para preservar durante o redirect OAuth
         current_state_name = orchestrator.get_current_state().name
-        print(f"[DEBUG AUTH URL] Gerando URL OAuth com estado: {current_state_name}")
+        
+        # Define a URI explícita para o Streamlit (fixa aqui, mas poderia vir de config)
+        streamlit_redirect_uri = "http://localhost:8501"
+        
+        print(f"[DEBUG AUTH URL] Gerando URL OAuth com estado: {current_state_name} e URI: {streamlit_redirect_uri}")
         
         auth_url = google_auth_service.generate_authorization_url(
-            current_onboarding_state=current_state_name
+            current_onboarding_state=current_state_name,
+            redirect_uri=streamlit_redirect_uri # ← Garante que o serviço use a porta 8501
         )
         
         print(f"[DEBUG AUTH URL] URL gerada (primeiros 200 chars): {auth_url[:200]}...")

@@ -2,12 +2,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.routers import (
+    auth,
     budgets,
     chat,
     dashboard,
     health,
     jobs,
     notifications,
+    onboarding,
     presence,
     profile,
     transactions,
@@ -49,6 +51,8 @@ app.include_router(profile.router)
 app.include_router(jobs.router)
 app.include_router(notifications.router)
 app.include_router(presence.router)
+app.include_router(auth.router)
+app.include_router(onboarding.router)
 
 if __name__ == "__main__":
     import uvicorn

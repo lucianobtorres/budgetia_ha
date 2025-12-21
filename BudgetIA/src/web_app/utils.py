@@ -12,6 +12,7 @@ import streamlit_authenticator as stauth
 import yaml
 from yaml.loader import SafeLoader
 
+from core.llm_providers.groq_provider import GroqProvider
 from core.user_config_service import UserConfigService
 from finance.strategies.base_strategy import BaseMappingStrategy
 
@@ -22,9 +23,8 @@ from finance.strategies.base_strategy import BaseMappingStrategy
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import config
-from config import DATA_DIR, DEFAULT_GEMINI_MODEL, PLANILHA_KEY
+from config import DATA_DIR, DEFAULT_GROQ_MODEL, PLANILHA_KEY
 from core.llm_manager import LLMOrchestrator
-from core.llm_providers.gemini_provider import GeminiProvider
 
 # Importa a Fachada
 from finance.planilha_manager import PlanilhaManager
@@ -39,13 +39,11 @@ CONFIG_FILE_PATH = Path(DATA_DIR) / "user_config.json"
 def get_llm_orchestrator() -> LLMOrchestrator:
     """Cria e cacheia o LLMOrchestrator."""
     print("--- DEBUG APP: Criando LLMOrchestrator (cache_resource)... ---")
-    primary_provider = GeminiProvider(default_model=DEFAULT_GEMINI_MODEL)
+    # primary_provider = GeminiProvider(default_model=DEFAULT_GEMINI_MODEL)
+    primary_provider = GroqProvider(default_model=DEFAULT_GROQ_MODEL)
     orchestrator = LLMOrchestrator(primary_provider=primary_provider)
     orchestrator.get_configured_llm()
     return orchestrator
-
-
-
 
 
 @st.cache_data
@@ -166,12 +164,13 @@ def verificar_perfil_preenchido(plan_manager: PlanilhaManager) -> bool:
         return False  # Falha genérica
 
 
-@st.cache_resource
-def get_llm_orchestrator() -> LLMOrchestrator:
-    """Retorna uma instância cacheada do LLMOrchestrator."""
-    print("\n--- DEBUG APP: Criando LLMOrchestrator (cache_resource)... ---")
-    primary_provider = GeminiProvider(default_model=config.DEFAULT_GEMINI_MODEL)
-    return LLMOrchestrator(primary_provider=primary_provider)
+# @st.cache_resource
+# def get_llm_orchestrator() -> LLMOrchestrator:
+#     """Retorna uma instância cacheada do LLMOrchestrator."""
+#     print("\n--- DEBUG APP: Criando LLMOrchestrator (cache_resource)... ---")
+#     primary_provider = GeminiProvider(default_model=DEFAULT_GEMINI_MODEL)
+#     # primary_provider = GroqProvider(default_model=DEFAULT_GROQ_MODEL)
+#     return LLMOrchestrator(primary_provider=primary_provider)
 
 
 def check_onboarding_status() -> bool:
@@ -302,9 +301,9 @@ def create_excel_export_bytes(plan_manager: PlanilhaManager) -> bytes:
         return b""  # Retorna bytes vazios em caso de falha
 
 
-def initialize_session_auth() -> (
-    tuple[bool, str | None, UserConfigService | None, LLMOrchestrator | None]
-):
+def initialize_session_auth() -> tuple[
+    bool, str | None, UserConfigService | None, LLMOrchestrator | None
+]:
     """
     Função MESTRE. Deve ser chamada no topo de CADA página.
     Renderiza o login, gerencia o estado e inicializa os serviços.
@@ -324,16 +323,19 @@ def initialize_session_auth() -> (
         auth_config["cookie"]["name"],
         auth_config["cookie"]["key"],
         auth_config["cookie"]["expiry_days"],
-        validator="^.*$"  # Keyword arg override
+        validator="^.*$",  # Keyword arg override
     )
-    
+
     # Validation Monkey Patch (Force)
     authenticator.validator = "^.*$"
 
     # Renderiza o widget de login na *sidebar* para não travar a página
     # ou use st.empty() se preferir no centro
     # --- LOGIC DE VISUALIZAÇÃO (Tabs) ---
-    if st.session_state["authentication_status"] is None or st.session_state["authentication_status"] is False:
+    if (
+        st.session_state["authentication_status"] is None
+        or st.session_state["authentication_status"] is False
+    ):
         # Define Abas para Login e Registro
         tab_login, tab_register = st.tabs(["🔐 Entrar", "📝 Criar Nova Conta"])
 
@@ -350,7 +352,7 @@ def initialize_session_auth() -> (
                 "- **Todos** os campos são obrigatórios.\n"
                 "- **Senha:** Mínimo 6 caracteres (simples)."
             )
-            
+
             # --- IMPLEMENTAÇÃO CUSTOMIZADA DE REGISTRO ---
             try:
                 with st.form("register_form"):
@@ -359,10 +361,12 @@ def initialize_session_auth() -> (
                     new_email = st.text_input("E-mail")
                     new_username = st.text_input("Nome de Usuário (Login)")
                     new_password = st.text_input("Senha", type="password")
-                    new_password_repeat = st.text_input("Repetir Senha", type="password")
-                    
+                    new_password_repeat = st.text_input(
+                        "Repetir Senha", type="password"
+                    )
+
                     submitted = st.form_submit_button("Criar Conta")
-                
+
                 if submitted:
                     # 1. Validações Básicas
                     if not (new_name and new_email and new_username and new_password):
@@ -376,7 +380,7 @@ def initialize_session_auth() -> (
                     else:
                         # 2. Sucesso! Gerar Hash e Salvar
                         hashed_password = stauth.Hasher([new_password]).generate()[0]
-                        
+
                         # Estrutura do usuário no YAML
                         new_user_data = {
                             "name": new_name,
@@ -384,14 +388,16 @@ def initialize_session_auth() -> (
                             "password": hashed_password,
                             # Adicionar campos extras se necessário
                         }
-                        
+
                         # Atualiza dict em memória
-                        auth_config["credentials"]["usernames"][new_username] = new_user_data
-                        
+                        auth_config["credentials"]["usernames"][new_username] = (
+                            new_user_data
+                        )
+
                         # Persiste no disco
                         with open("data/users.yaml", "w") as file:
                             yaml.dump(auth_config, file, default_flow_style=False)
-                        
+
                         # 3. Auto-Login (UX Improvement)
                         st.session_state["authentication_status"] = True
                         st.session_state["name"] = new_name
@@ -403,7 +409,7 @@ def initialize_session_auth() -> (
                             pass
                         except:
                             pass
-                            
+
                         st.success("Conta criada! Redirecionando...")
                         st.rerun()
 
@@ -418,18 +424,23 @@ def initialize_session_auth() -> (
         st.sidebar.title(f"Bem-vindo, {st.session_state['name']}!")
 
         # Inicializa os serviços
-        config_service = UserConfigService(username)  # Direct instantiation (utils.py is deprecated)
-        
+        config_service = UserConfigService(
+            username
+        )  # Direct instantiation (utils.py is deprecated)
+
         # GARANTE que o Cliente da API esteja na sessão (para subpáginas)
         if "api_client" not in st.session_state:
             from web_app.api_client import BudgetAPIClient
+
             api_url = os.getenv("API_URL", "http://127.0.0.1:8000")
-            st.session_state.api_client = BudgetAPIClient(base_url=api_url, user_id=username)
+            st.session_state.api_client = BudgetAPIClient(
+                base_url=api_url, user_id=username
+            )
 
         # --- SMART ROUTING: Heartbeat & Toasts ---
         # Enviamos "Estou aqui" e checamos se tem recado
         st.session_state.api_client.send_heartbeat()
-        
+
         # Checa toasts (mensagens que o Scheduler mandou para cá)
         toasts = st.session_state.api_client.get_toasts()
         if toasts:
@@ -440,8 +451,10 @@ def initialize_session_auth() -> (
         try:
             unread_count = st.session_state.api_client.get_unread_count()
             if unread_count > 0:
-                 st.sidebar.markdown(f"### 🔔 **{unread_count} Notificações**")
-                 st.sidebar.info("Vá para a página **Notificações** para ver os detalhes.")
+                st.sidebar.markdown(f"### 🔔 **{unread_count} Notificações**")
+                st.sidebar.info(
+                    "Vá para a página **Notificações** para ver os detalhes."
+                )
         except Exception:
             pass
 

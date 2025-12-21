@@ -46,6 +46,7 @@ start-web = "start:main"
 start-api = "run_api:main"
 start-bot = "bot.main:main"
 start-scheduler = "scheduler.main:main"
+start-pwa = "run_frontend:main"
 
 # --- Scripts de Qualidade ---
 #format = "black src tests"  # Executa o Black

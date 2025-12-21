@@ -48,7 +48,13 @@ def main() -> None:
     # Alternativamente, podemos passar o app object importado,
     # mas passar string habilita o 'reload' funcionar melhor.
     uvicorn.run(
-        "api.main:app", host="127.0.0.1", port=8000, reload=True, log_level="info"
+        "api.main:app", 
+        host="0.0.0.0", # Allow external access if needed (for mobile/PWA testing)
+        port=8000, 
+        reload=True, 
+        reload_dirs=["src"],
+        reload_excludes=["data", "data/*", "*.pyc", "__pycache__", "*temp_user_strategy.py"],
+        log_level="info"
     )
 
 

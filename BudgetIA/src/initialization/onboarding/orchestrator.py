@@ -59,10 +59,10 @@ class OnboardingOrchestrator:
         # Load any previously saved onboarding status.
         saved_status = config_service.get_onboarding_status()
         initial_state = OnboardingState.WELCOME
-        if saved_status and saved_status != OnboardingState.COMPLETE.name:
+        if saved_status:
             try:
                 initial_state = OnboardingState[saved_status]
-                print(f"[ONBOARDING] Restoring interrupted state: {initial_state.name}")
+                print(f"[ONBOARDING] Restoring state: {initial_state.name}")
             except KeyError:
                 print(
                     f"[ONBOARDING] Invalid saved status '{saved_status}'. Starting fresh."
@@ -72,7 +72,11 @@ class OnboardingOrchestrator:
                 f"[ONBOARDING] Starting new onboarding with state: {initial_state.name}"
             )
 
-        self.state_machine = OnboardingStateMachine(initial_state=initial_state)
+        self.state_machine = OnboardingStateMachine(
+            initial_state=initial_state,
+            on_transition=self._persist_state  # Hook de persistência
+        )
+    
         self.google_auth_service = GoogleAuthService(config_service)
 
         # Handlers for spreadsheet acquisition.
@@ -99,6 +103,19 @@ class OnboardingOrchestrator:
             False  # Track if user has engaged in welcome conversation
         )
         self._last_agent_response: str = ""
+
+    def _persist_state(self, new_state: OnboardingState) -> None:
+        """Callback: Salva o estado atual no config a cada transição."""
+        try:
+             # Só salvamos o state name.
+             # Se for COMPLETE, _finalize_onboarding cuida dos detalhes extras (limpar flags).
+             # Mas salvar o status 'COMPLETE' aqui também não faz mal.
+             print(f"[ONBOARDING] Persistindo estado intermediário: {new_state.name}")
+             config_data = self.config_service.load_config()
+             config_data["onboarding_status"] = new_state.name
+             self.config_service.save_config(config_data)
+        except Exception as e:
+             print(f"[ONBOARDING] ERRO AO PERSISTIR ESTADO: {e}")
 
     # ---------------------------------------------------------------------
     # Public helpers
@@ -136,6 +153,28 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
             print(f"[ONBOARDING] Initial greeting: {message[:100]}...")
             return message
 
+        # OPTIONAL_PROFILE: Auto-prompt if arriving here directly (e.g. reload or default sheet skip)
+        if current_state == OnboardingState.OPTIONAL_PROFILE and not self._profile_interview_started:
+             print("[ONBOARDING] Generating initial PROFILE prompt...")
+             return self.agent.chat(
+                 "[INÍCIO_PERFIL]",
+                 OnboardingState.OPTIONAL_PROFILE,
+                 extra_context="We arrived at profile step (likely skipped translation review). Invite user to answer a few quick questions to build their financial profile for better strategy suggestions. Ask if they want to start.",
+             )
+
+        # SPREADSHEET_ACQUISITION: Remind user of options
+        if current_state == OnboardingState.SPREADSHEET_ACQUISITION:
+            return "Como você gostaria de conectar sua planilha?\n\n1. 🚀 Criar do Zero (Recomendado)\n2. 📤 Fazer Upload (Excel/CSV)\n3. ☁️ Conectar Google Sheets"
+
+        # TRANSLATION_REVIEW: Remind user to review
+        if current_state == OnboardingState.TRANSLATION_REVIEW:
+            return "Analisei sua planilha. O que você acha do resultado? Se estiver tudo certo, podemos prosseguir."
+        
+        # OPTIONAL_STRATEGY: Check strategy
+        if current_state == OnboardingState.OPTIONAL_STRATEGY:
+            strategy_name = self._suggested_strategy.name if self._suggested_strategy else "Padrão"
+            return f"Com base no seu perfil, sugeri a estratégia: **{strategy_name}**. Você gostaria de segui-la ou personalizar?"
+
         # Other states wait for user input
         return None
 
@@ -146,7 +185,9 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
         """Process a user message (or UI action) and return the agent's reply."""
         if extra_context:
             self._context.update(extra_context)
-
+        
+        self._context["user_input_text"] = text
+        
         current_state = self.state_machine.current_state
 
         # Normalise text for simple keyword matching (still useful for legacy commands)
@@ -178,9 +219,15 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
         logger.info(f"[ONBOARDING] State={current_state.name} | User Input: '{text}'")
 
         # Classify Intent
-        intent = self.intent_classifier.classify(
-            clean_text, current_state.name, self._last_agent_response
-        )
+        try:
+            intent = self.intent_classifier.classify(
+                clean_text, current_state.name, self._last_agent_response
+            )
+        except Exception as e:
+            print(f"[ONBOARDING] AVISO: Falha na classificação de intenção (Rate Limit?): {e}")
+            logger.warning(f"[ONBOARDING] Intent classification failed: {e}")
+            intent = UserIntent.NEUTRAL_INFO
+        
         print(f"[ONBOARDING] Intent Detected: {intent.name}")
 
         # -----------------------------------------------------------------
@@ -456,10 +503,19 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
                 result = handler.acquire(self._context)
                 if result.success:
                     self._finalize_acquisition(result)
+                    # Use o estado ATUAL da máquina, pois _finalize_acquisition pode ter pulado etapas (ex: Default -> Profile)
+                    current_state = self.state_machine.current_state
+                    
+                    context_msg = f"Acquisition SUCCESS. File path: {result.file_path}. Handler: {result.handler_type}."
+                    if current_state == OnboardingState.OPTIONAL_PROFILE:
+                        context_msg += " We skipped Translation Review (Default Sheet). Now invite user to Profile Interview."
+                    else:
+                        context_msg += " Proceed to analysis."
+
                     return self.agent.chat(
                         text,
-                        OnboardingState.TRANSLATION_REVIEW,
-                        extra_context=f"Acquisition SUCCESS. File path: {result.file_path}. Handler: {result.handler_type}. Proceed to analysis.",
+                        current_state,
+                        extra_context=context_msg,
                     )
                 elif result.requires_ui_action:
                     error_msg = result.error_message or "Ação de UI necessária"
@@ -534,11 +590,18 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
                 message = "Planilha padrão lida e validada com sucesso."
             else:
                 print("[ONBOARDING] Iniciando geração/validação da estratégia...")
-                success, message, schema_summary = (
-                    self.strategy_generator.generate_and_validate_strategy(
-                        file_to_analyze, strategy_save_path
+                try:
+                    success, message, schema_summary = (
+                        self.strategy_generator.generate_and_validate_strategy(
+                            file_to_analyze, strategy_save_path
+                        )
                     )
-                )
+                except Exception as e:
+                    print(f"[ONBOARDING] AVISO: Falha na geração da estratégia (Rate Limit?): {e}")
+                    success = True # Assume sucesso para não travar o user
+                    message = "Devido à alta demanda do servidor, ignoramos a análise detalhada e usaremos a Estratégia Padrão."
+                    schema_summary = "Análise ignorada (Fallback)."
+                    # strategy_save_path não será escrito, o que força fallback para DefaultStrategy depois.
             if (
                 local_file_path
                 and "docs.google.com" in file_path

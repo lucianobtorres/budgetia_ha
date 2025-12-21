@@ -272,6 +272,11 @@ class GoogleSheetsHandler(IFileHandler):
         self.auth_service = auth_service
 
     def can_handle(self, user_input: str) -> bool:
+        # Check for direct URL
+        if "docs.google.com/spreadsheets" in user_input:
+            print(f"[DEBUG GoogleHandler] Input is Google Sheets URL: {user_input}")
+            return True
+
         clean_input = (
             user_input.lower()
             .replace("🚀", "")
@@ -294,22 +299,34 @@ class GoogleSheetsHandler(IFileHandler):
         return result
 
     def acquire(self, context: dict) -> AcquisitionResult:
-        # 1. FIRST: Se a URL foi selecionada (a UI enviou de volta), finaliza!
+        # 1. FIRST: Se a URL foi passada via texto (Chat) ou contexto explícito, finaliza!
         selected_url = context.get("google_file_url")
+        user_input = context.get("user_input_text", "")
+        
+        # Se o input do usuário parece uma URL de planilha, usamos ele.
+        if "docs.google.com/spreadsheets" in user_input:
+            selected_url = user_input.strip()
+
         if selected_url:
+            # Limpa código de auth antigo para evitar reuso
+            if "google_auth_code" in context:
+                del context["google_auth_code"]
+                
             return AcquisitionResult(
                 success=True,
-                file_path=selected_url,  # URL é tratada como path
+                file_path=selected_url,
                 handler_type="google",
             )
         
         # 2. Trata o callback do Google (se o 'code' estiver no contexto)
         auth_code = context.get("google_auth_code")
+        redirect_uri = context.get("redirect_uri")  # ← NOVO: Pega URI do contexto
 
         if auth_code:
             try:
                 self.auth_service.exchange_code_for_tokens(
-                    auth_code
+                    auth_code,
+                    redirect_uri=redirect_uri # ← Passa para o serviço
                 )  # Troca código por tokens
                 # Tokens salvos. Avança para seleção de arquivo.
                 return AcquisitionResult(

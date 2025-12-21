@@ -80,7 +80,8 @@ class BudgetRepository:
                     {
                         ColunasOrcamentos.ID: novo_id,
                         ColunasOrcamentos.CATEGORIA: categoria,
-                        ColunasOrcamentos.GASTO: valor_limite,
+                        ColunasOrcamentos.LIMITE: valor_limite, # FIXED
+                        ColunasOrcamentos.GASTO: 0.0,
                         ColunasOrcamentos.PERIODO: periodo,
                         ColunasOrcamentos.OBS: observacoes,
                     }
@@ -94,12 +95,47 @@ class BudgetRepository:
 
         self._context.update_dataframe(self._aba_nome, df)
 
-        # --- CORREÇÃO: REMOVER ESTA LINHA ---
-        # A orquestração não pertence ao repositório.
-        # self.recalculate_all_budgets()
-        # --- FIM DA CORREÇÃO ---
-
         return mensagem
+
+    def delete_budget(self, budget_id: int) -> bool:
+        """Exclui um orçamento pelo ID."""
+        df = self._context.get_dataframe(self._aba_nome)
+        
+        if ColunasOrcamentos.ID not in df.columns:
+             return False
+
+        # Garante que ID seja numérico para comparação
+        df[ColunasOrcamentos.ID] = pd.to_numeric(df[ColunasOrcamentos.ID], errors='coerce').fillna(0).astype(int)
+        
+        df_novo = df[df[ColunasOrcamentos.ID] != budget_id]
+        
+        if len(df_novo) == len(df):
+            return False
+            
+        self._context.update_dataframe(self._aba_nome, df_novo)
+        return True
+
+    def update_budget_by_id(self, budget_id: int, dados: dict) -> bool:
+        """Atualiza um orçamento pelo ID."""
+        df = self._context.get_dataframe(self._aba_nome)
+        
+        if ColunasOrcamentos.ID not in df.columns:
+            return False
+            
+        df[ColunasOrcamentos.ID] = pd.to_numeric(df[ColunasOrcamentos.ID], errors='coerce').fillna(0).astype(int)
+        mask = df[ColunasOrcamentos.ID] == budget_id
+        
+        if not mask.any():
+            return False
+            
+        idx = df.index[mask][0]
+        
+        for col, valor in dados.items():
+            if col in df.columns and col != ColunasOrcamentos.ID:
+                df.at[idx, col] = valor
+        
+        self._context.update_dataframe(self._aba_nome, df)
+        return True
 
     def recalculate_all_budgets(self) -> None:
         """

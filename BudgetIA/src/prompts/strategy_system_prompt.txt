@@ -18,3 +18,14 @@ REGRAS CRÍTICAS PARA O CÓDIGO GERADO:
 5. MÉTODOS: Implemente `map_transactions` e `unmap_transactions`.
 
 Responda APENAS com o código Python completo. Não inclua markdown (```python) ou qualquer outra explicação.
+
+REGRAS DE IMPORTS OBRIGATÓRIOS:
+- `import pandas as pd`
+- `from typing import Any`
+- `import config`
+- `from finance.strategies.base_strategy import BaseMappingStrategy`
+
+REGRAS DE ASSINATURA DE MÉTODOS (NÃO INVENTE TIPO):
+1. `map_transactions(self, df_bruto: pd.DataFrame) -> pd.DataFrame`
+   ATENÇÃO: Este método recebe UM ÚNICO DataFrame (a aba de transações já carregada), NÃO um dicionário.
+2. `unmap_transactions(self, df_interno: pd.DataFrame) -> pd.DataFrame`

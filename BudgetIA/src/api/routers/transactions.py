@@ -29,10 +29,58 @@ def listar_transacoes(
         for col in df.select_dtypes(include=['datetime', 'datetimetz']).columns:
             df[col] = df[col].astype(str).replace('NaT', '')
             
+        # Garante que ID está presente e é int (se existir)
+        if ColunasTransacoes.ID in df.columns:
+             df[ColunasTransacoes.ID] = pd.to_numeric(df[ColunasTransacoes.ID], errors='coerce').fillna(0).astype(int)
+
         # Converte para dict (records) para JSON
         # tail(limit) pega as últimas (assumindo ordem cronológica de inserção)
         registros: list[dict[str, Any]] = df.tail(limit).to_dict(orient="records")
         return registros
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/{transaction_id}")
+def delete_item(
+    transaction_id: int,
+    manager: PlanilhaManager = Depends(get_planilha_manager)
+):
+    try:
+        success = manager.delete_transaction(transaction_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Transação não encontrada")
+        manager.save()
+        return {"message": "Transação removida."}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.put("/{transaction_id}")
+def update_item(
+    transaction_id: int,
+    item: AddTransactionInput, # Reutilizando schema de input
+    manager: PlanilhaManager = Depends(get_planilha_manager)
+):
+    try:
+        # Converte modelo Input para dict com chaves das COLUNAS DA PLANILHA
+        # O Input tem chaves minúsculas (data, tipo...), a planilha tem Maiúsculas
+        dados_atualizados = {
+             ColunasTransacoes.DATA: item.data, # type: ignore
+             ColunasTransacoes.TIPO: item.tipo,
+             ColunasTransacoes.CATEGORIA: item.categoria,
+             ColunasTransacoes.DESCRICAO: item.descricao,
+             ColunasTransacoes.VALOR: item.valor,
+             ColunasTransacoes.STATUS: item.status
+        }
+        
+        success = manager.update_transaction(transaction_id, dados_atualizados)
+        if not success:
+             raise HTTPException(status_code=404, detail="Transação não encontrada")
+        manager.save()
+        return {"message": "Transação atualizada."}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

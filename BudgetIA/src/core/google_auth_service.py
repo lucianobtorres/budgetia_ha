@@ -47,16 +47,28 @@ class GoogleAuthService:
             redirect_uri=config.GOOGLE_OAUTH_REDIRECT_URI,
         )
 
-    def generate_authorization_url(self, current_onboarding_state: str | None = None) -> str:
+    def generate_authorization_url(
+        self, 
+        current_onboarding_state: str | None = None,
+        redirect_uri: str | None = None
+    ) -> str:
         """
         Gera a URL OAuth com estado do onboarding (opcional) para restauração após redirect.
         
         Args:
             current_onboarding_state: Nome do estado atual (ex: 'SPREADSHEET_ACQUISITION')
+            redirect_uri: URI de callback explícita (para suportar PWA/Streamlit dinamicamente).
+                        Se None, usa o valor padrão do config.
         
         Returns:
             URL de autorização do Google OAuth
         """
+        # Atualiza a URI de redirecionamento dinamicamente se fornecida
+        if redirect_uri:
+            self.flow.redirect_uri = redirect_uri
+        else:
+            self.flow.redirect_uri = config.GOOGLE_OAUTH_REDIRECT_URI
+
         # Cria um state customizado que inclui o estado do onboarding
         custom_state = None
         if current_onboarding_state:
@@ -75,9 +87,16 @@ class GoogleAuthService:
         )
         return str(authorization_url)
 
-    def exchange_code_for_tokens(self, code: str) -> None:
+    def exchange_code_for_tokens(self, code: str, redirect_uri: str | None = None) -> None:
         """Troca o código de autorização pelos tokens de acesso."""
         try:
+            # Atualiza a URI de redirecionamento dinamicamente se fornecida
+            # Isso é CRÍTICO: a URI usada aqui deve ser IDÊNTICA à usada no generate_authorization_url
+            if redirect_uri:
+                self.flow.redirect_uri = redirect_uri
+            else:
+                self.flow.redirect_uri = config.GOOGLE_OAUTH_REDIRECT_URI
+
             self.flow.fetch_token(code=code)
             # Salva os tokens criptografados no config do usuário
             credentials = self.flow.credentials

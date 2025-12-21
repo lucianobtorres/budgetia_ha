@@ -102,11 +102,19 @@ class FinancialSetupService:
             ]
 
         for t in transacoes_exemplo:
+            # Tenta pegar usando a chave do Config, ou chaves simples como fallback
+            data_val = t.get(ColunasTransacoes.DATA, t.get("Data", "2024-01-01"))
+            tipo_val = t.get(ColunasTransacoes.TIPO, t.get("Tipo", "Despesa"))
+            cat_val = t.get(ColunasTransacoes.CATEGORIA, t.get("Categoria", "Outros"))
+            desc_val = t.get(ColunasTransacoes.DESCRICAO, t.get("Descricao", ""))
+            valor_val = t.get(ColunasTransacoes.VALOR, t.get("Valor", 0.0))
+            status_val = t.get(ColunasTransacoes.STATUS, t.get("Status", "Concluído"))
+
             self._transaction_repo.add_transaction(
-                data=str(t.get(ColunasTransacoes.DATA, t.get("Data", "2024-01-01"))),
-                tipo=str(t[ColunasTransacoes.TIPO]),
-                categoria=str(t[ColunasTransacoes.CATEGORIA]),
-                descricao=str(t.get(ColunasTransacoes.DESCRICAO, "")),
-                valor=float(t[ColunasTransacoes.VALOR]),
-                status=str(t.get(ColunasTransacoes.STATUS, "Concluído")),
+                data=str(data_val),
+                tipo=str(tipo_val),
+                categoria=str(cat_val),
+                descricao=str(desc_val),
+                valor=float(valor_val),
+                status=str(status_val),
             )
