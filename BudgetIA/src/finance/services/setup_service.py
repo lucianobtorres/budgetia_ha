@@ -74,7 +74,7 @@ class FinancialSetupService:
         for o in orcamentos_dicts:
             self._budget_repo.add_or_update_budget(
                 categoria=str(o[ColunasOrcamentos.CATEGORIA]),
-                valor_limite=float(o[ColunasOrcamentos.LIMITE]),
+                valor_limite=float(str(o[ColunasOrcamentos.LIMITE])),
                 periodo=str(o[ColunasOrcamentos.PERIODO]),
                 observacoes=str(o.get(ColunasOrcamentos.OBS, "")),
             )

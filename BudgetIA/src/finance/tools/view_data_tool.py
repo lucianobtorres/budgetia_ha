@@ -37,7 +37,7 @@ class VisualizarDadosPlanilhaTool(BaseTool):  # type: ignore[misc]
                 return f"A aba '{aba_nome}' está vazia."
 
             # Converte o DataFrame para uma tabela bonita em formato Markdown
-            return str(tabulate(df, headers="keys", tablefmt="pipe", showindex=False))
+            return str(tabulate(df.to_dict(orient="records"), headers="keys", tablefmt="pipe", showindex=False))
 
         except Exception as e:
             return f"Ocorreu um erro ao visualizar os dados da aba '{aba_nome}': {e}"

@@ -1,6 +1,6 @@
 # src/finance/tools/add_transaction_tool.py
 import datetime
-from collections.abc import Callable  # Importar Callable
+from typing import Callable, Any  # Importar Callable
 
 from core.base_tool import BaseTool
 from finance.schemas import AddTransactionInput
@@ -17,7 +17,7 @@ class AddTransactionTool(BaseTool):  # type: ignore[misc]
         add_transaction_func: Callable[..., None],
         save_func: Callable[[], None],
         get_summary_func: Callable[[], dict[str, float]],
-        recalculate_budgets_func: Callable,
+        recalculate_budgets_func: Callable[[], Any],
     ) -> None:
         self.adicionar_registro = add_transaction_func
         self.save = save_func

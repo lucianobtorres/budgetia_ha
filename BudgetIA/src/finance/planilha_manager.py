@@ -1,4 +1,5 @@
 # src/finance/planilha_manager.py
+from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import pandas as pd
@@ -50,7 +51,7 @@ class PlanilhaManager:
         self._context.save(add_intelligence)
 
     def visualizar_dados(self, aba_nome: str) -> pd.DataFrame:
-        return self._context.get_dataframe(sheet_name=aba_nome)
+        return self._context.get_dataframe(sheet_name=aba_nome) # type: ignore[no-any-return]
 
     def update_dataframe(self, sheet_name: str, new_df: pd.DataFrame) -> None:
         self._context.update_dataframe(sheet_name, new_df)
@@ -67,6 +68,7 @@ class PlanilhaManager:
         self.transaction_repo.add_transaction(
             data, tipo, categoria, descricao, valor, status
         )
+        self.recalculate_budgets()
     def recalculate_budgets(self) -> None:
         self.budget_repo.recalculate_all_budgets()
 
@@ -74,19 +76,19 @@ class PlanilhaManager:
         success = self.transaction_repo.delete_transaction(transaction_id)
         if success:
             self.recalculate_budgets() # Recalcula orçamentos se remover gasto
-        return success
+        return success # type: ignore[no-any-return]
 
-    def update_transaction(self, transaction_id: int, dados: dict) -> bool:
+    def update_transaction(self, transaction_id: int, dados: dict[str, Any]) -> bool:
         success = self.transaction_repo.update_transaction(transaction_id, dados)
         if success:
             self.recalculate_budgets()
-        return success
+        return success # type: ignore[no-any-return]
 
     def get_summary(self) -> dict[str, float]:
-        return self.transaction_repo.get_summary()
+        return self.transaction_repo.get_summary() # type: ignore[no-any-return]
 
     def get_expenses_by_category(self, top_n: int = 5) -> pd.Series:
-        return self.transaction_repo.get_expenses_by_category(top_n)
+        return self.transaction_repo.get_expenses_by_category(top_n) # type: ignore[no-any-return]
 
     def adicionar_ou_atualizar_orcamento(
         self,
@@ -102,22 +104,21 @@ class PlanilhaManager:
             observacoes=observacoes,
         )
         self.recalculate_budgets()
-        return mensagem
+        return mensagem # type: ignore[no-any-return]
 
     def delete_budget(self, budget_id: int) -> bool:
         success = self.budget_repo.delete_budget(budget_id)
         if success:
             self.recalculate_budgets()
-        return success
+        return success # type: ignore[no-any-return]
 
-    def update_budget(self, budget_id: int, dados: dict) -> bool:
+    def update_budget(self, budget_id: int, dados: dict[str, Any]) -> bool:
         success = self.budget_repo.update_budget_by_id(budget_id, dados)
         if success:
             self.recalculate_budgets()
-        return success
+        return success # type: ignore[no-any-return]
 
-    def recalculate_budgets(self) -> None:
-        self.budget_repo.recalculate_all_budgets()
+
 
     def adicionar_ou_atualizar_divida(
         self,
@@ -130,7 +131,7 @@ class PlanilhaManager:
         data_proximo_pgto: str | None = None,
         observacoes: str = "",
     ) -> str:
-        return self.debt_repo.add_or_update_debt(
+        return self.debt_repo.add_or_update_debt( # type: ignore[no-any-return]
             nome_divida=nome_divida,
             valor_original=valor_original,
             taxa_juros_mensal=taxa_juros_mensal,
@@ -158,21 +159,21 @@ class PlanilhaManager:
         )
 
     def salvar_dado_perfil(self, campo: str, valor: Any) -> str:
-        return self.profile_repo.save_profile_field(campo=campo, valor=valor)
+        return self.profile_repo.save_profile_field(campo=campo, valor=valor) # type: ignore[no-any-return]
 
     def get_perfil_como_texto(self) -> str:
-        return self.profile_repo.get_profile_as_text()
+        return self.profile_repo.get_profile_as_text() # type: ignore[no-any-return]
 
     def ensure_profile_fields(self, fields: list[str]) -> bool:
-        return self.profile_repo.ensure_fields(fields)
+        return self.profile_repo.ensure_fields(fields) # type: ignore[no-any-return]
 
     def analisar_para_insights_proativos(self) -> list[dict[str, Any]]:
         print("LOG (PM): Delegando análise proativa para o InsightService.")
-        return self.insight_service.run_proactive_analysis_orchestration()
+        return self.insight_service.run_proactive_analysis_orchestration() # type: ignore[no-any-return]
 
     def check_connection(self) -> tuple[bool, str]:
         print("--- DEBUG PM: Verificando saúde da conexão com o armazenamento... ---")
-        return self._context.storage.ping()
+        return self._context.storage.ping() # type: ignore[no-any-return]
 
     def clear_cache(self) -> None:
         print(

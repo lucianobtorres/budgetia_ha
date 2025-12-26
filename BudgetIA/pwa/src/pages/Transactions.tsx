@@ -1,236 +1,193 @@
-import { useState, useEffect } from 'react';
-import { fetchAPI } from '../services/api';
-import { Plus, Search, Filter, Edit2, Trash2, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
-import { cn } from '../utils/cn';
-import TransactionModal from '../components/TransactionModal';
+import { useState } from "react";
+import { useTransactions, useDeleteTransaction, useCreateTransaction, useUpdateTransaction, type Transaction } from "../hooks/useTransactions";
+import { useCategoryColorMap } from "../hooks/useCategoryColorMap";
+import { TransactionCard } from "../components/transactions/TransactionCard";
+import TransactionModal from "../components/transactions/TransactionFormDrawer";
+import { Skeleton } from "../components/ui/Skeleton";
+import { Filter, Search, Plus } from "lucide-react";
+import { PageHeader } from "../components/ui/PageHeader";
+import { Button } from "../components/ui/Button";
+import { Input } from "../components/ui/Input";
+import { EmptyState } from "../components/ui/EmptyState";
 
-interface Transaction {
-    "ID Transacao"?: number;
-    Data: string;
-    Descricao: string;
-    Valor: number;
-    Tipo: string;
-    Categoria: string;
-    Status: string;
-}
-
-// Interface usada pelo Modal (lowercase)
-interface TransactionInput {
-    data: string;
-    descricao: string;
-    valor: number;
-    tipo: 'Receita' | 'Despesa';
-    categoria: string;
-    status: string;
-}
 
 export default function Transactions() {
-    const [transactions, setTransactions] = useState<Transaction[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [searchTerm, setSearchTerm] = useState('');
+    // Current date for default filter
+    const now = new Date();
+    // Use string to handle "all" option
+    const [filterValue, setFilterValue] = useState<string>(`${now.getFullYear()}-${now.getMonth() + 1}`);
+    const [searchTerm, setSearchTerm] = useState("");
     
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingTx, setEditingTx] = useState<Transaction | null>(null);
-    const [isSaving, setIsSaving] = useState(false);
 
-    useEffect(() => {
-        loadTransactions();
-    }, []);
+    // Parse filter value
+    const isAll = filterValue === 'all';
+    const [selectedYear, selectedMonth] = isAll 
+        ? [undefined, undefined] 
+        : filterValue.split('-').map(Number);
 
-    const loadTransactions = async () => {
-        try {
-            const data = await fetchAPI('/transactions?limit=100');
-            if (data) setTransactions(data);
-        } catch (error) {
-            console.error("Error loading transactions", error);
-        } finally {
-            setLoading(false);
-        }
+    const { data: transactions, isLoading } = useTransactions({ 
+        month: selectedMonth, 
+        year: selectedYear,
+        limit: 1000 // Ensure we get enough recent ones if viewing all
+    });
+    // Fetch global rank-based colors
+    const { getCategoryColor } = useCategoryColorMap();
+
+    const { mutate: deleteTransaction } = useDeleteTransaction();
+    const { mutateAsync: createTransaction } = useCreateTransaction();
+    const { mutateAsync: updateTransaction } = useUpdateTransaction();
+
+    // Category sorting is handled by backend or default, color is now hash-based.
+    // No need for complex rank calculation here.
+
+    const filteredTransactions = transactions?.filter(t => 
+        t.Descricao.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        t.Categoria.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        setFilterValue(e.target.value);
     };
 
-    const handleSave = async (data: TransactionInput) => {
-        setIsSaving(true);
+    const handleSave = async (data: any) => {
         try {
-            if (editingTx && editingTx["ID Transacao"]) {
-                // Edit existing
-                await fetchAPI(`/transactions/${editingTx["ID Transacao"]}`, {
-                    method: 'PUT',
-                    body: JSON.stringify(data)
-                });
+            if (editingTx) {
+                 await updateTransaction({ id: editingTx["ID Transacao"], data });
             } else {
-                // Create new
-                await fetchAPI('/transactions/', {
-                    method: 'POST',
-                    body: JSON.stringify(data)
-                });
+                 await createTransaction(data);
             }
-            // Reload list
-            await loadTransactions();
             setIsModalOpen(false);
             setEditingTx(null);
         } catch (error) {
-            console.error("Error saving transaction", error);
-            alert("Erro ao salvar transação. Verifique o console.");
-        } finally {
-            setIsSaving(false);
+            console.error("Erro ao salvar:", error);
         }
     };
 
-    const handleDelete = async (id?: number) => {
-        if (!id) return;
-        if (!confirm("Tem certeza que deseja excluir esta transação?")) return;
-
-        try {
-            await fetchAPI(`/transactions/${id}`, { method: 'DELETE' });
-            // Optimistic update or reload
-            setTransactions(prev => prev.filter(tx => tx["ID Transacao"] !== id));
-        } catch (error) {
-            console.error("Error deleting transaction", error);
-            alert("Erro ao excluir transação.");
-        }
-    };
-
-    const openNewModal = () => {
-        setEditingTx(null);
-        setIsModalOpen(true);
-    };
-
-    const openEditModal = (tx: Transaction) => {
+    const handleEdit = (tx: Transaction) => {
         setEditingTx(tx);
         setIsModalOpen(true);
     };
 
-    const filteredTransactions = transactions.filter(tx => 
-        tx.Descricao.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        tx.Categoria.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-
-    // Helper to convert Transaction (API) to TransactionInput (Modal)
-    const getInitialData = (): TransactionInput | undefined => {
-        if (!editingTx) return undefined;
+    // Generate last 12 months for selector
+    const months = Array.from({ length: 12 }, (_, i) => {
+        const d = new Date();
+        d.setMonth(d.getMonth() - i);
         return {
-            data: editingTx.Data ? new Date(editingTx.Data).toISOString().split('T')[0] : '', // Safe conversion
-            descricao: editingTx.Descricao,
-            valor: editingTx.Valor,
-            tipo: editingTx.Tipo as 'Receita' | 'Despesa',
-            categoria: editingTx.Categoria,
-            status: editingTx.Status
+            value: `${d.getFullYear()}-${d.getMonth() + 1}`,
+            label: d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
         };
-    };
+    });
+
+    const initialFormData = editingTx ? {
+        data: editingTx.Data,
+        descricao: editingTx.Descricao,
+        valor: editingTx.Valor,
+        tipo: editingTx["Tipo (Receita/Despesa)"],
+        categoria: editingTx.Categoria,
+        status: editingTx.Status
+    } : undefined;
 
     return (
-        <div className="space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h2 className="text-3xl font-bold tracking-tight text-white">Transações</h2>
-                    <p className="text-gray-400">Gerencie suas entradas e saídas.</p>
-                </div>
-                <button 
-                    onClick={openNewModal}
-                    className="flex items-center justify-center space-x-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg transition-colors"
-                >
-                    <Plus size={20} />
-                    <span>Nova Transação</span>
-                </button>
-            </div>
-
-            {/* Filters */}
-            <div className="flex items-center space-x-4 bg-gray-900/50 p-4 rounded-xl border border-gray-800">
-                <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
-                    <input 
-                        type="text" 
-                        placeholder="Buscar por descrição ou categoria..." 
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full bg-gray-950 border border-gray-700 text-white rounded-lg pl-10 pr-4 py-2 focus:outline-none focus:border-emerald-500 transition-colors"
+        <div className="h-full flex flex-col gap-4 overflow-hidden">
+            {/* Header - Fixed */}
+            <PageHeader
+                title="Transações"
+                description="Gerencie suas receitas e despesas."
+                action={
+                    <Button 
+                        onClick={() => { setEditingTx(null); setIsModalOpen(true); }}
+                        variant="primary"
+                        size="icon"
+                        className="rounded-xl shadow-lg hover:bg-emerald-600 transition-colors"
+                        icon={Plus}
                     />
-                </div>
-                <button className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors">
-                    <Filter size={20} />
-                </button>
-            </div>
+                }
+            />
 
-            {/* Table */}
-            <div className="bg-gray-900/50 border border-gray-800 rounded-xl overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm text-gray-400">
-                        <thead className="bg-gray-900 text-gray-200 font-medium uppercase text-xs">
-                            <tr>
-                                <th className="px-6 py-4">Data</th>
-                                <th className="px-6 py-4">Descrição</th>
-                                <th className="px-6 py-4">Categoria</th>
-                                <th className="px-6 py-4">Valor</th>
-                                <th className="px-6 py-4">Status</th>
-                                <th className="px-6 py-4 text-right">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-800">
-                             {loading ? (
-                                <tr><td colSpan={6} className="text-center py-8">Carregando...</td></tr>
-                            ) : filteredTransactions.length === 0 ? (
-                                <tr><td colSpan={6} className="text-center py-8">Nenhuma transação encontrada.</td></tr>
-                            ) : (
-                                filteredTransactions.map((tx, idx) => (
-                                    <tr key={idx} className="hover:bg-gray-800/50 transition-colors">
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            {tx.Data ? new Date(tx.Data).toLocaleDateString() : '-'}
-                                        </td>
-                                        <td className="px-6 py-4 font-medium text-white">{tx.Descricao}</td>
-                                        <td className="px-6 py-4">
-                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-800 text-gray-300">
-                                                {tx.Categoria}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center space-x-2">
-                                                 {tx.Tipo === "Receita" ? <ArrowUpCircle size={16} className="text-blue-400" /> : <ArrowDownCircle size={16} className="text-red-400" />}
-                                                 <span className={cn("font-bold", tx.Tipo === "Receita" ? "text-blue-400" : "text-red-400")}>
-                                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(tx.Valor)}
-                                                 </span>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <span className={cn(
-                                                "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
-                                                tx.Status === "Concluído" ? "bg-emerald-500/10 text-emerald-400" : "bg-yellow-500/10 text-yellow-400"
-                                            )}>
-                                                {tx.Status}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <div className="flex items-center justify-end space-x-2">
-                                                <button 
-                                                    onClick={() => openEditModal(tx)}
-                                                    className="p-1 hover:text-emerald-400 transition-colors"
-                                                    title="Editar"
-                                                >
-                                                    <Edit2 size={16} />
-                                                </button>
-                                                <button 
-                                                    onClick={() => handleDelete(tx["ID Transacao"])}
-                                                    className="p-1 hover:text-red-400 transition-colors" 
-                                                    title="Excluir"
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+                {/* Filters Row */}
+                <div className="flex items-center gap-2">
+                    {/* Month Select */}
+                    <div className="relative flex-1 max-w-[180px]">
+                        <div className="absolute inset-y-0 left-2 flex items-center pointer-events-none text-gray-400">
+                             <Filter size={14} />
+                        </div>
+                        <select 
+                            value={filterValue}
+                            onChange={handleFilterChange}
+                            className="w-full pl-8 pr-4 py-2 bg-gray-900 border border-gray-800 rounded-xl text-sm text-white appearance-none focus:border-emerald-500 outline-none capitalize transition-colors"
+                        >
+                            <option value="all">Ver Tudo</option>
+                            {months.map(m => (
+                                <option key={m.value} value={m.value}>{m.label}</option>
+                            ))}
+                        </select>
+                    </div>
 
+                    {/* Search Input */}
+                    <div className="relative flex-1">
+                        <Input 
+                            type="text" 
+                            placeholder="Buscar..." 
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            icon={Search}
+                        />
+                    </div>
+                </div>
+
+
+            {/* List - Scrollable */}
+            <div className="flex-1 overflow-y-auto scrollbar-none pb-20">
+                {isLoading ? (
+                    <div className="space-y-3">
+                         {[1,2,3,4,5].map(i => (
+                             <div key={i} className="flex items-center gap-3 p-3 bg-gray-900/30 rounded-xl border border-gray-800/50">
+                                 <Skeleton className="h-12 w-12 rounded-lg" />
+                                 <div className="flex-1 space-y-1">
+                                     <Skeleton className="h-4 w-3/4" />
+                                     <Skeleton className="h-3 w-1/4" />
+                                 </div>
+                             </div>
+                         ))}
+                    </div>
+                ) : (
+                    <div className="space-y-1">
+                        {filteredTransactions && filteredTransactions.length > 0 ? (
+                            filteredTransactions.map(t => (
+                                <TransactionCard 
+                                    key={t["ID Transacao"]} 
+                                    transaction={t} 
+                                    categoryColor={getCategoryColor(t.Categoria)}
+                                    onDelete={(id) => {
+                                        if (window.confirm("Tem certeza que deseja excluir esta transação?")) {
+                                            deleteTransaction(id);
+                                        }
+                                    }} 
+                                    onEdit={handleEdit}
+                                />
+                            ))
+                        ) : (
+                            <EmptyState 
+                                title="Nenhuma transação encontrada"
+                                description={searchTerm ? "Nenhum resultado para sua busca." : "Você ainda não possui transações neste período."}
+                                icon={Search}
+                                className="h-[300px]"
+                                actionLabel={!searchTerm ? "Adicionar Transação" : undefined}
+                                onAction={!searchTerm ? () => { setEditingTx(null); setIsModalOpen(true); } : undefined}
+                            />
+                        )}
+                    </div>
+                )}
+            </div>
+            
             <TransactionModal 
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 onSave={handleSave}
-                initialData={getInitialData()}
-                isLoading={isSaving}
+                initialData={initialFormData}
             />
         </div>
     );

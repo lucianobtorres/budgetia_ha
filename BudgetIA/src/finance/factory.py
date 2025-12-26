@@ -44,11 +44,11 @@ def _load_strategy_from_file(
 
         # O nome da classe é padronizado pelo StrategyGenerator
         StrategyClass = getattr(strategy_module, "CustomStrategy")
-        return StrategyClass
+        return StrategyClass # type: ignore[no-any-return]
     except Exception as e:
         print(f"ERRO CRÍTICO: Falha ao carregar estratégia de '{strategy_path}': {e}")
         # Retorna a Padrão como fallback de segurança
-        return DefaultStrategy
+        return DefaultStrategy # type: ignore[no-any-return]
 
 
 class FinancialSystemFactory:

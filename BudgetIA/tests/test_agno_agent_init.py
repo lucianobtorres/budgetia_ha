@@ -1,5 +1,5 @@
 from unittest.mock import MagicMock
-from agent_implementations.agno_agent import AgnoAgent
+from infrastructure.agents.agno_agent import AgnoAgent
 from core.llm_manager import LLMOrchestrator
 from core.base_tool import BaseTool
 from pydantic import BaseModel, Field
@@ -30,7 +30,7 @@ def test_agno_agent_initialization():
     # VAMOS MOCKAR o modulo 'finance.tool_loader'
     from unittest.mock import patch
     
-    with patch("agent_implementations.agno_agent.load_all_financial_tools") as mock_loader:
+    with patch("infrastructure.agents.agno_agent.load_all_financial_tools") as mock_loader:
         mock_loader.return_value = [MockTool()]
         
         # Instancia

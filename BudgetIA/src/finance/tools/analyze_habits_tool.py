@@ -7,14 +7,14 @@ from core.llm_manager import LLMOrchestrator
 from core.memory.memory_service import MemoryService
 from core.user_config_service import UserConfigService
 from finance.repositories.transaction_repository import TransactionRepository
-from app.services.behavior_analyst import BehaviorAnalyst
+from application.services.behavior_analyst import BehaviorAnalyst
 
 
 class AnalyzeHabitsInput(BaseModel):
     days: int = Field(60, description="Dias de histórico para analisar (Padrão: 60)")
 
 
-class AnalyzeHabitsTool(BaseTool):
+class AnalyzeHabitsTool(BaseTool): # type: ignore[misc]
     """
     Ferramenta que aciona "O Observador" para analisar o histórico recente
     e aprender novos fatos sobre o comportamento financeiro do usuário.

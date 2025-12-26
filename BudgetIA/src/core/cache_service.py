@@ -19,7 +19,7 @@ class CacheService:
         if redis_url:
             try:
                 # 'decode_responses=True' faz o redis-py retornar strings (utf-8)
-                self.client = redis.from_url(redis_url, decode_responses=True)
+                self.client = redis.from_url(redis_url, decode_responses=True)  # type: ignore[no-untyped-call]
                 self.client.ping()
                 print("LOG: Conexão com o Cache Service (Redis/Upstash) bem-sucedida.")
             except redis.exceptions.ConnectionError as e:
@@ -42,7 +42,7 @@ class CacheService:
         Serializa um dicionário de DataFrames para JSON e salva no Redis.
         'ex' é o tempo de expiração em segundos (default: 5 minutos).
         """
-        if not self._is_connected():
+        if self.client is None:
             return
 
         try:
@@ -68,7 +68,7 @@ class CacheService:
         """
         Busca uma string JSON do Redis e a desserializa para um dicionário de DataFrames.
         """
-        if not self._is_connected():
+        if self.client is None:
             return None, None
 
         try:
@@ -77,8 +77,8 @@ class CacheService:
                 print(f"LOG: Cache MISS para a chave '{key}'.")
                 return None, None
 
-            # 1. Carrega o payload
-            cache_payload = json.loads(json_string)
+            json_str: str = str(json_string)
+            cache_payload = json.loads(json_str)
             serialized_dfs = cache_payload.get("data", {})
             cached_timestamp = cache_payload.get("timestamp")
 
@@ -105,7 +105,7 @@ class CacheService:
 
     def delete(self, key: str) -> None:
         """Deleta uma chave do cache (invalidação)."""
-        if not self._is_connected():
+        if self.client is None:
             return
 
         try:
@@ -151,7 +151,7 @@ class CacheService:
         Verifica se uma ação (identificada pela chave) excedeu o limite.
         Retorna True se o limite foi excedido (bloquear), False caso contrário (permitir).
         """
-        if not self._is_connected():
+        if self.client is None:
             # Se o cache estiver desabilitado, não podemos limitar
             return False
 
@@ -169,7 +169,7 @@ class CacheService:
                 return False  # Permitido
 
             # Converte para int
-            count_int = int(count)
+            count_int = int(str(count))
 
             if count_int >= limit:
                 # Limite atingido

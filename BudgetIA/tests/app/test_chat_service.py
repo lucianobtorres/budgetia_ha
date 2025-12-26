@@ -1,8 +1,8 @@
 import pytest
 from unittest.mock import MagicMock
-from app.chat_service import ChatService
+from application.chat_service import ChatService
 from core.agent_runner_interface import AgentRunner
-from app.chat_history_manager import BaseHistoryManager
+from application.chat_history_manager import BaseHistoryManager
 
 class MockAgentRunner(AgentRunner):
     def __init__(self):
@@ -52,7 +52,7 @@ def test_chat_service_handle_message_flow():
     
     # Mock do CacheService para não falhar no rate limit
     from unittest.mock import patch
-    with patch("app.chat_service.CacheService") as MockCache:
+    with patch("application.chat_service.CacheService") as MockCache:
         mock_cache_instance = MockCache.return_value
         mock_cache_instance.check_rate_limit.return_value = False
         

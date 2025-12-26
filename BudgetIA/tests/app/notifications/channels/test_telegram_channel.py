@@ -3,8 +3,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.notifications.channels.telegram_channel import TelegramChannel
-from app.notifications.models.notification_message import (
+from application.notifications.channels.telegram_channel import TelegramChannel
+from application.notifications.models.notification_message import (
     NotificationMessage,
     NotificationPriority,
 )

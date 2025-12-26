@@ -1,23 +1,49 @@
-import { Home, MessageSquare, CreditCard, PieChart, User, Bell, LogOut } from "lucide-react";
+import { Home, CreditCard, User, LogOut, Link as LinkIcon } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { DownloadCloud } from "lucide-react";
 import { cn } from "../utils/cn";
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: Home },
-  { name: 'Chat IA', href: '/chat', icon: MessageSquare },
   { name: 'Transações', href: '/transactions', icon: CreditCard },
-  { name: 'Orçamentos', href: '/budgets', icon: PieChart },
-  { name: 'Notificações', href: '/notifications', icon: Bell },
+  { name: 'Conexões', href: '/connections', icon: LinkIcon },
   { name: 'Perfil', href: '/profile', icon: User },
 ];
 
 export function Sidebar() {
   const location = useLocation();
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstallClick = () => {
+    if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choiceResult: any) => {
+            if (choiceResult.outcome === 'accepted') {
+                setDeferredPrompt(null);
+            }
+        });
+    }
+  };
 
   return (
-    <div className="flex h-screen w-64 flex-col bg-gray-900 text-white border-r border-gray-800">
-      <div className="flex h-16 items-center px-6">
-        <h1 className="text-xl font-bold text-emerald-400 font-sans tracking-tight">💰 BudgetIA</h1>
+    <div className="hidden md:flex h-screen w-auto min-w-[16rem] flex-col bg-gray-900 text-white border-r border-gray-800 transition-all duration-300">
+      <div className="flex h-16 items-center px-6 gap-3 border-b border-gray-800/50">
+        <div className="relative h-9 w-9 overflow-hidden rounded-lg shadow-black/50 shadow-sm ring-1 ring-white/10 shrink-0">
+             <img src="/pwa-192x192.png" alt="Icon" className="h-full w-full object-cover" />
+        </div>
+        <h1 className="text-xl font-bold tracking-tight text-white whitespace-nowrap">
+            Budget<span className="text-emerald-500">IA</span>
+        </h1>
       </div>
       <nav className="flex-1 space-y-1 px-3 py-4">
         {navigation.map((item) => {
@@ -43,6 +69,15 @@ export function Sidebar() {
             </Link>
           );
         })}
+        {deferredPrompt && (
+            <button
+                onClick={handleInstallClick}
+                className="group flex w-full items-center rounded-md px-3 py-2 text-sm font-medium text-emerald-400 hover:bg-emerald-900/20 hover:text-emerald-300 transition-colors mt-4 border border-emerald-500/20"
+            >
+                <DownloadCloud className="mr-3 h-5 w-5 flex-shrink-0" />
+                Instalar App
+            </button>
+        )}
       </nav>
       <div className="p-4 border-t border-gray-800">
         <div className="flex items-center justify-between">

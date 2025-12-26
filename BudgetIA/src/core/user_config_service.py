@@ -9,14 +9,18 @@ from cryptography.fernet import Fernet, InvalidToken
 
 import config
 
+ENCRYPTION_KEY: bytes | None = None
+FERNET: Fernet | None = None
+
 try:
-    ENCRYPTION_KEY = os.getenv("USER_DATA_ENCRYPTION_KEY").encode("utf-8")
-    FERNET = Fernet(ENCRYPTION_KEY)
+    _key_env = os.getenv("USER_DATA_ENCRYPTION_KEY")
+    if _key_env:
+        ENCRYPTION_KEY = _key_env.encode("utf-8")
+        FERNET = Fernet(ENCRYPTION_KEY)
 except Exception as e:
     print(
         f"ERRO CRÍTICO: USER_DATA_ENCRYPTION_KEY inválida ou não definida no .env. {e}"
     )
-    FERNET = None
 
 
 class UserConfigService:
@@ -47,11 +51,13 @@ class UserConfigService:
 
     def _encrypt_data(self, data: str) -> bytes:
         """Criptografa uma string de dados."""
+        assert FERNET is not None, "FERNET not initialized"
         return FERNET.encrypt(data.encode("utf-8"))
 
     def _decrypt_data(self, encrypted_data: bytes) -> str | None:
         """Descriptografa bytes de volta para uma string."""
         try:
+            assert FERNET is not None, "FERNET not initialized"
             return FERNET.decrypt(encrypted_data).decode("utf-8")
         except InvalidToken:
             print(
@@ -69,7 +75,7 @@ class UserConfigService:
         if self.config_file_path.exists():
             try:
                 with open(self.config_file_path, "rb") as f:
-                    encrypted_data = f.read()  # type: ignore
+                    encrypted_data = f.read()
 
                 if not encrypted_data:
                     print("[DEBUG load_config] Arquivo vazio!")
@@ -78,7 +84,7 @@ class UserConfigService:
                 json_string = self._decrypt_data(encrypted_data)
 
                 if json_string:
-                    data = json.loads(json_string)
+                    data: dict[str, Any] = json.loads(json_string)
                     print(f"[DEBUG load_config] Dados carregados: {list(data.keys())}")
                     return data
                 else:
@@ -188,7 +194,7 @@ class UserConfigService:
         self.save_config(config_data)
 
 
-    def save_google_oauth_tokens(self, token_json_str: str) -> None:
+    def save_google_oauth_tokens(self, token_json_str: str | None) -> None:
         """Salva os tokens OAuth 2.0 do usuário (como JSON string) no config."""
         config_data = self.load_config()
         config_data["google_oauth_tokens"] = token_json_str
@@ -208,8 +214,8 @@ class UserConfigService:
     def get_backend_consent(self) -> bool:
         """Verifica se o usuário deu consentimento ao backend."""
         config_data = self.load_config()
-        # Retorna False por padrão se a chave não existir
-        return config_data.get("backend_consent", False)
+        result: bool = config_data.get("backend_consent", False)
+        return result
 
     def clear_config(self) -> None:
         """
@@ -266,7 +272,8 @@ class UserConfigService:
     def get_comunicacao_config(self) -> dict[str, Any]:
         """Retorna o dicionário de configurações de comunicação."""
         config_data = self.load_config()
-        return config_data.get("comunicacao", {})
+        result: dict[str, Any] = config_data.get("comunicacao", {})
+        return result
 
     def get_user_dir(self) -> str:
         """Retorna o caminho absoluto do diretório de dados deste usuário."""

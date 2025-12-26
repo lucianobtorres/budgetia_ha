@@ -1,10 +1,10 @@
 
-from typing import Type
+from typing import Type, Optional, Any
 from pydantic import BaseModel, Field
 
 from core.base_tool import BaseTool
-from app.notifications.rule_repository import RuleRepository
-from app.notifications.rules.dynamic_rule import DynamicThresholdRule
+from application.notifications.rule_repository import RuleRepository
+from application.notifications.rules.dynamic_rule import DynamicThresholdRule
 from core.user_config_service import UserConfigService
 
 
@@ -19,13 +19,13 @@ class CreateAlertSchema(BaseModel):
         "monthly",
         description="Período de monitoramento: 'monthly' (Mensal - Padrão) ou 'weekly' (Semanal).",
     )
-    message: str = Field(
+    message: Optional[str] = Field(
         None,
         description="Mensagem personalizada para o alerta. Se não informado, usa padrão.",
     )
 
 
-class CreateAlertTool(BaseTool):
+class CreateAlertTool(BaseTool): # type: ignore[misc]
     """
     Ferramenta que permite ao agente criar alertas de monitoramento de gastos
     solicitados pelo usuário.
@@ -48,7 +48,7 @@ class CreateAlertTool(BaseTool):
         category: str,
         threshold: float,
         period: str = "monthly",
-        message: str = None,
+        message: Optional[str] = None,
     ) -> str:
         try:
             # Normalizar input
@@ -72,7 +72,7 @@ class CreateAlertTool(BaseTool):
                 rule_id=rule_id,
                 category=category,
                 threshold=threshold,
-                period=period,  # type: ignore
+                period=period,
                 custom_message=message,
             )
 

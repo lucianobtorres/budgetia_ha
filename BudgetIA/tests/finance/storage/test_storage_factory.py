@@ -1,6 +1,6 @@
 import pytest
 
-from finance.storage.excel_storage_handler import ExcelHandler
+from finance.storage.excel_storage_handler import ExcelStorageHandler
 from finance.storage.storage_enums import StorageType
 from finance.storage.storage_factory import StorageHandlerFactory
 
@@ -33,10 +33,10 @@ class TestStorageHandlerFactory:
         assert storage_type == StorageType.GOOGLE_DRIVE_FILE
 
     def test_create_local_excel_handler(self) -> None:
-        """Testa criação de ExcelHandler para arquivo local."""
+        """Testa criação de ExcelStorageHandler para arquivo local."""
         path = "C:\\planilha.xlsx"
         handler = StorageHandlerFactory.create_handler(path)
-        assert isinstance(handler, ExcelHandler)
+        assert isinstance(handler, ExcelStorageHandler)
 
     def test_get_available_storage_types(self) -> None:
         """Testa retorno dos tipos disponíveis."""

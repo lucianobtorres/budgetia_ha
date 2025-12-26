@@ -9,7 +9,7 @@ from openpyxl import load_workbook
 
 # Importa as classes que vamos testar
 from BudgetIA.src import config
-from finance.storage.excel_storage_handler import ExcelHandler
+from finance.storage.excel_storage_handler import ExcelStorageHandler
 from finance.strategies.custom_json_strategy import CustomJsonStrategy
 
 
@@ -64,7 +64,7 @@ def test_strategy_load_and_unmap(
     # 1. Cria a Estratégia de Leitura
     strategy = CustomJsonStrategy(config.LAYOUT_PLANILHA, user_map)
     # 2. Cria o Handler
-    handler_leitura = ExcelHandler(file_path=file_path)
+    handler_leitura = ExcelStorageHandler(file_path=file_path)
     # 3. Executa o Load (que usa strategy.map_transactions)
     dfs_interno, _ = handler_leitura.load_sheets(config.LAYOUT_PLANILHA, strategy)
 
@@ -98,7 +98,7 @@ def test_strategy_load_and_unmap(
     ] = "Verificado"
 
     # 2. Cria o Handler de Escrita
-    handler_escrita = ExcelHandler(file_path=file_path)
+    handler_escrita = ExcelStorageHandler(file_path=file_path)
     # 3. Executa o Save (que usa strategy.unmap_transactions)
     handler_escrita.save_sheets(dfs_interno, strategy)
 

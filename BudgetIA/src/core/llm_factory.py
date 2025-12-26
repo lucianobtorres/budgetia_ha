@@ -1,3 +1,4 @@
+from typing import Any
 from core.llm_enums import LLMProviderType
 from core.llm_providers.base_provider import LLMProvider
 from core.llm_providers.gemini_provider import GeminiProvider
@@ -16,7 +17,7 @@ class LLMProviderFactory:
     }
 
     @classmethod
-    def create_provider(cls, provider_type: LLMProviderType, **kwargs) -> LLMProvider:
+    def create_provider(cls, provider_type: LLMProviderType, **kwargs: "Any") -> LLMProvider:
         """
         Cria uma instância do provedor solicitado.
         """

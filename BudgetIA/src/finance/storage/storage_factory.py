@@ -1,7 +1,7 @@
 from typing import Optional
 
 from finance.storage.base_storage_handler import BaseStorageHandler
-from finance.storage.excel_storage_handler import ExcelHandler
+from finance.storage.excel_storage_handler import ExcelStorageHandler
 from finance.storage.google_drive_handler import GoogleDriveFileHandler
 from finance.storage.google_sheets_storage_handler import GoogleSheetsStorageHandler
 from finance.storage.storage_enums import StorageType
@@ -14,7 +14,7 @@ class StorageHandlerFactory:
     """
 
     _REGISTRY: dict[StorageType, type[BaseStorageHandler]] = {
-        StorageType.LOCAL_EXCEL: ExcelHandler,
+        StorageType.LOCAL_EXCEL: ExcelStorageHandler,
         StorageType.GOOGLE_DRIVE_FILE: GoogleDriveFileHandler,
         StorageType.GOOGLE_SHEETS: GoogleSheetsStorageHandler,
     }

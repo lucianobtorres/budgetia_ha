@@ -1,4 +1,5 @@
 # src/finance/repositories/transaction_repository.py
+from typing import Any
 import pandas as pd
 
 import config
@@ -81,22 +82,28 @@ class TransactionRepository:
         if ColunasTransacoes.ID not in df.columns:
             return False
         
-        # Filtra removendo o ID
-        df_novo = df[df[ColunasTransacoes.ID] != transaction_id]
+        # Ensure robust numeric comparison for ID
+        ids = pd.to_numeric(df[ColunasTransacoes.ID], errors='coerce').fillna(-1).astype(int)
         
-        if len(df_novo) == len(df):
-            return False # Nada foi removido
+        if transaction_id not in ids.values:
+             return False
+
+        # Keep rows where ID is NOT the target
+        df_novo = df[ids != transaction_id]
             
         self._context.update_dataframe(self._aba_nome, df_novo)
         return True
 
-    def update_transaction(self, transaction_id: int, novos_dados: dict) -> bool:
+    def update_transaction(self, transaction_id: int, novos_dados: dict[str, Any]) -> bool:
         """Atualiza uma transação existente pelo ID."""
         df = self.get_all_transactions()
         if ColunasTransacoes.ID not in df.columns:
             return False
             
-        mask = df[ColunasTransacoes.ID] == transaction_id
+        # Robust ID matching
+        ids = pd.to_numeric(df[ColunasTransacoes.ID], errors='coerce').fillna(-1).astype(int)
+        mask = ids == transaction_id
+        
         if not mask.any():
             return False
             
@@ -104,17 +111,35 @@ class TransactionRepository:
         # Mapeia chaves do dict (que vêm do Pydantic) para colunas do DataFrame
         # Ex: "descricao" -> "Descricao"
         
-        # Mapeamento reverso simples ou uso direto das constantes se o input usar as constantes
-        # Assumindo que o input usa os nomes das colunas ou chaves compatíveis
+        # Mapeamento de chaves amigáveis (do input) para colunas reais
+        field_map = {
+            "data": ColunasTransacoes.DATA,
+            "tipo": ColunasTransacoes.TIPO,
+            "categoria": ColunasTransacoes.CATEGORIA,
+            "descricao": ColunasTransacoes.DESCRICAO,
+            "valor": ColunasTransacoes.VALOR,
+            "status": ColunasTransacoes.STATUS
+        }
         
         idx = df.index[mask][0]
         
-        for col, valor in novos_dados.items():
-            if col in df.columns and col != ColunasTransacoes.ID:
-                if col == ColunasTransacoes.DATA:
-                     df.at[idx, col] = pd.to_datetime(valor)
+        for field, valor in novos_dados.items():
+            # Determina o nome real da coluna
+            col_name = field
+            if field in field_map:
+                col_name = field_map[field]
+            
+            if col_name in df.columns and col_name != ColunasTransacoes.ID:
+                if col_name == ColunasTransacoes.DATA:
+                     df.at[idx, col_name] = pd.to_datetime(valor)
+                elif col_name == ColunasTransacoes.VALOR:
+                     # Garante float
+                     try:
+                        df.at[idx, col_name] = float(valor)
+                     except:
+                        df.at[idx, col_name] = valor
                 else:
-                     df.at[idx, col] = valor
+                     df.at[idx, col_name] = valor
                      
         self._context.update_dataframe(self._aba_nome, df)
         return True

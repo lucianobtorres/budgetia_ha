@@ -17,7 +17,7 @@ SCOPES = [
 ]
 
 
-class GoogleSheetsStorageHandler(BaseStorageHandler):
+class GoogleSheetsStorageHandler(BaseStorageHandler): # type: ignore[misc]
     """
     Implementação concreta do BaseStorageHandler que lê e escreve
     em uma Planilha Google (Google Sheets).
@@ -194,10 +194,10 @@ class GoogleSheetsStorageHandler(BaseStorageHandler):
         """
         try:
             # Força o gspread a buscar os metadados mais recentes da API
-            self.spreadsheet.fetch_properties()
+            self.spreadsheet.fetch_properties() # type: ignore[attr-defined]
 
             # A propriedade 'updated' é uma string ISO 8601 (ex: "2025-11-17T18:00:00.000Z")
-            return self.spreadsheet.updated
+            return self.spreadsheet.updated # type: ignore[attr-defined, no-any-return]
         except Exception as e:
             print(
                 f"AVISO: Não foi possível obter modifiedTime (updated) do GSheet: {e}"

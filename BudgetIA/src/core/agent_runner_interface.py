@@ -14,6 +14,14 @@ class AgentRunner(ABC):
         """
         pass
 
+    @abstractmethod
+    def interact_with_details(self, user_input: str) -> dict:
+        """
+        Processa a entrada e retorna resposta + passos intermediários.
+        Retorno esperado: {"output": str, "intermediate_steps": list}
+        """
+        pass
+
     @property
     @abstractmethod
     def active_llm_info(self) -> str:

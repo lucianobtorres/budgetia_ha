@@ -5,9 +5,13 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from .base_provider import LLMProvider
 
 
+import config
+
 class GeminiProvider(LLMProvider):
     def __init__(
-        self, default_model: str = "gemini-1.5-flash", default_temperature: float = 0.7
+        self,
+        default_model: str = config.LLMModels.DEFAULT_GEMINI,
+        default_temperature: float = 0.7,
     ):
         super().__init__("GOOGLE_API_KEY", default_model, default_temperature)
 

@@ -24,7 +24,7 @@ CREDENTIALS_PATH = config.GSPREAD_CREDENTIALS_PATH
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 
 
-class GoogleDriveFileHandler(BaseStorageHandler):
+class GoogleDriveFileHandler(BaseStorageHandler): # type: ignore[misc]
     """
     Implementação do BaseStorageHandler para arquivos Excel (.xlsx)
     armazenados diretamente no Google Drive.
@@ -42,9 +42,7 @@ class GoogleDriveFileHandler(BaseStorageHandler):
         try:
             # --- CORREÇÃO DA AUTENTICAÇÃO ---
             # 1. Carrega as credenciais diretamente da biblioteca google.oauth2
-            creds: Credentials = Credentials.from_service_account_file(
-                CREDENTIALS_PATH, scopes=SCOPES
-            )
+            creds: Credentials = Credentials.from_service_account_file(CREDENTIALS_PATH, scopes=SCOPES) # type: ignore[no-untyped-call]
 
             # 2. Constrói o serviço passando o objeto 'creds' (que o 'build' entende)
             self.drive_service = build("drive", "v3", credentials=creds)
@@ -263,7 +261,7 @@ class GoogleDriveFileHandler(BaseStorageHandler):
             )
 
             # Retorna a string ISO 8601 (ex: "2025-11-17T18:00:00.000Z")
-            return file_metadata.get("modifiedTime")
+            return file_metadata.get("modifiedTime") # type: ignore[no-any-return]
         except Exception as e:
             print(f"AVISO: Não foi possível obter modifiedTime do GDrive: {e}")
             return None

@@ -23,9 +23,14 @@ PROJECT_ROOT = CURRENT_DIR.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+# 4. Adiciona a pasta 'src' ao sys.path para suportar imports diretos (ex: 'from config import ...')
+SRC_DIR = PROJECT_ROOT / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
 # Agora, o Python saberá onde encontrar a pasta 'src'
-# e o import 'from src.core...' funcionará.
-print(f"--- DEBUG conftest.py: Adicionado '{PROJECT_ROOT}' ao sys.path ---")
+# e tanto 'import src.core...' quanto 'import config...' funcionarão.
+print(f"--- DEBUG conftest.py: Adicionado '{PROJECT_ROOT}' e '{SRC_DIR}' ao sys.path ---")
 
 TEST_ENCRYPTION_KEY = Fernet.generate_key()
 

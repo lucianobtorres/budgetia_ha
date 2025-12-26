@@ -120,7 +120,7 @@ class GoogleAuthService:
                     f"O arquivo de credenciais da Service Account não foi encontrado no caminho: {sa_path}."
                 )
 
-            creds_sa = service_account.Credentials.from_service_account_file(
+            creds_sa = service_account.Credentials.from_service_account_file(  # type: ignore[no-untyped-call]
                 sa_path,
                 scopes=config.GOOGLE_OAUTH_SCOPES,
             )
@@ -193,17 +193,17 @@ class GoogleAuthService:
         if not token_json:
             return None
 
-        creds = Credentials.from_authorized_user_info(
+        creds = Credentials.from_authorized_user_info(  # type: ignore[no-untyped-call]
             json.loads(token_json), config.GOOGLE_OAUTH_SCOPES
         )
 
         # Se o token de acesso expirou, atualiza-o
         if creds.expired and creds.refresh_token:
-            creds.refresh(Request())
+            creds.refresh(Request())  # type: ignore[no-untyped-call]
             # Salva o token atualizado
             self.config_service.save_google_oauth_tokens(creds.to_json())
 
-        return creds
+        return creds  # type: ignore[no-any-return]
 
     def list_google_drive_files(self) -> list[dict[str, Any]]:
         """
@@ -238,7 +238,7 @@ class GoogleAuthService:
             print(
                 f"--- DEBUG GoogleAuth: Encontrados {len(files)} arquivos no Drive do usuário. ---"
             )
-            return files
+            return files  # type: ignore[no-any-return]
 
         except Exception as e:
             raise Exception(f"Erro ao listar arquivos do Google Drive: {e}") from e
@@ -366,7 +366,7 @@ class GoogleAuthService:
 
         try:
             # Tenta revogar o token no servidor do Google
-            creds.revoke(Request())
+            creds.revoke(Request())  # type: ignore[no-untyped-call, attr-defined]
             print(
                 f"--- DEBUG GoogleAuth: Token OAuth revogado com sucesso para {self.config_service.username}. ---"
             )

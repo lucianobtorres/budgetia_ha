@@ -80,7 +80,7 @@ class DebtRepository:
             idx = idx_existente[0]
             dividas_df.loc[idx, ColunasDividas.SALDO_DEVEDOR] = saldo_devedor_atual
             dividas_df.loc[idx, ColunasDividas.TAXA_JUROS] = taxa_juros_mensal
-            dividas_df.loc[idx, ColunasDividas.DATA_PGTO] = pd.to_datetime(data_proximo_pgto, errors='coerce')
+            dividas_df.loc[idx, ColunasDividas.DATA_PGTO] = pd.to_datetime(data_proximo_pgto, errors='coerce') # type: ignore[call-overload]
             dividas_df.loc[idx, ColunasDividas.PARCELAS_PAGAS] = parcelas_pagas
             dividas_df.loc[idx, ColunasDividas.OBS] = observacoes
             dividas_df.loc[idx, ColunasDividas.VALOR_ORIGINAL] = valor_original
@@ -106,7 +106,8 @@ class DebtRepository:
                         ColunasDividas.PARCELAS_TOTAIS: parcelas_totais,
                         ColunasDividas.PARCELAS_PAGAS: parcelas_pagas,
                         ColunasDividas.VALOR_PARCELA: valor_parcela,
-                        ColunasDividas.DATA_PGTO: pd.to_datetime(data_proximo_pgto, errors='coerce'),
+                        ColunasDividas.DATA_PGTO: pd.to_datetime(data_proximo_pgto, errors='coerce'), # type: ignore[call-overload]
+                        ColunasDividas.DATA_INICIO: pd.Timestamp.now(),
                         ColunasDividas.OBS: observacoes,
                     }
                 ],

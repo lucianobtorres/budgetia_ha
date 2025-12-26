@@ -126,6 +126,10 @@ class OnboardingOrchestrator:
     def get_progress(self) -> float:
         return self.state_machine.get_progress()
 
+    def is_translation_analysis_complete(self) -> bool:
+        """Check if spreadsheet analysis has been completed."""
+        return self._translation_result is not None
+
     def get_initial_message(self) -> str | None:
         """Get initial message to display when entering a state (if applicable).
 

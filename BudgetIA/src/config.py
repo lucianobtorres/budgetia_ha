@@ -26,9 +26,12 @@ GOOGLE_OAUTH_REDIRECT_URI = "http://localhost:8501"
 # Precisamos de acesso total ao Drive para listar, compartilhar e ler.
 GOOGLE_OAUTH_SCOPES = ["https://www.googleapis.com/auth/drive"]
 
-PROMPTS_DIR = os.path.join(PROJECT_ROOT, "src", "prompts")
-os.makedirs(DATA_DIR, exist_ok=True)
-os.makedirs(PROMPTS_DIR, exist_ok=True)
+PROMPTS_DIR = os.path.join(PROJECT_ROOT, "src", "core", "prompts")
+try:
+    os.makedirs(DATA_DIR, exist_ok=True)
+    os.makedirs(PROMPTS_DIR, exist_ok=True)
+except Exception as e:
+    print(f"AVISO CONFIG: Erro ao criar diretórios: {e}")
 
 # Nomes dos arquivos centralizados aqui
 PLANILHA_FILENAME = "planilha_mestra.xlsx"
@@ -42,13 +45,32 @@ DADOS_EXEMPLO_PATH = os.path.join(DATA_DIR, DADOS_EXEMPLO_FILENAME)
 SYSTEM_PROMPT_PATH = os.path.join(PROMPTS_DIR, SYSTEM_PROMPT_FILENAME)
 
 # --- 2. Configurações de Modelos de IA ---
-# O os.getenv busca a variável de ambiente, se não encontrar, usa o valor padrão.
-# DEFAULT_GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
-# DEFAULT_GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
-DEFAULT_GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
-# Adicione outros modelos padrão aqui se necessário
-DEFAULT_GEMINI_MODEL2 = "gemini-2.5-flash"
-DEFAULT_GEMINI_MODEL = "gemini-2.0-flash-lite"
+class LLMModels:
+    """Centraliza as definições dos modelos de LLM suportados."""
+    
+    # GROQ Options
+    GROQ_LLAMA_3_3_70B = "llama-3.3-70b-versatile"
+    GROQ_LLAMA_3_1_8B = "llama-3.1-8b-instant"
+    GROQ_GPT_OSS_120B = "openai/gpt-oss-120b"
+    
+    # GEMINI Options
+    GEMINI_2_0_FLASH_LITE = "gemini-2.0-flash-lite"
+    GEMINI_2_5_FLASH = "gemini-2.5-flash"
+    GEMINI_1_5_FLASH = "gemini-1.5-flash"
+    
+    # OPENAI Options
+    OPENAI_GPT_3_5_TURBO = "gpt-3.5-turbo"
+    # OPENAI_GPT_4 = "gpt-4" # Exemplo futuro
+
+    # Defaults do Sistema
+    DEFAULT_GROQ = GROQ_GPT_OSS_120B
+    DEFAULT_GEMINI = GEMINI_2_0_FLASH_LITE 
+    # DEFAULT_GEMINI = GEMINI_2_5_FLASH # Alternativa
+    
+# Mantendo compatibilidade com código antigo que importava essas variáveis, 
+# mas agora apontando para a classe central.
+DEFAULT_GROQ_MODEL = os.getenv("GROQ_MODEL", LLMModels.DEFAULT_GROQ)
+DEFAULT_GEMINI_MODEL = LLMModels.DEFAULT_GEMINI
 
 SERVICE_ACCOUNT_EMAIL = None
 try:
@@ -132,6 +154,7 @@ class ColunasDividas:
     PARCELAS_PAGAS = "Parcelas Pagas"
     VALOR_PARCELA = "Valor Parcela"
     DATA_PGTO = "Data Próximo Pgto"
+    DATA_INICIO = "Data Início"
     OBS = "Observações"
 
 
@@ -223,6 +246,7 @@ LAYOUT_PLANILHA: dict[str, list[str]] = {
         ColunasDividas.PARCELAS_PAGAS,
         ColunasDividas.VALOR_PARCELA,
         ColunasDividas.DATA_PGTO,
+        ColunasDividas.DATA_INICIO,
         ColunasDividas.OBS,
     ],
     NomesAbas.METAS: [
@@ -269,6 +293,7 @@ LAYOUT_DTYPES: dict[str, str] = {
     ColunasDividas.PARCELAS_PAGAS: "Int64",
     ColunasDividas.VALOR_PARCELA: "float64",
     ColunasDividas.DATA_PGTO: "datetime64[ns]",
+    ColunasDividas.DATA_INICIO: "datetime64[ns]",
     # Metas
     ColunasMetas.ID: "Int64",
     ColunasMetas.VALOR_ALVO: "float64",

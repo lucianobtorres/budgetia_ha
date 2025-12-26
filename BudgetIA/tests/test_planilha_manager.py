@@ -8,7 +8,7 @@ from BudgetIA.src import config
 from BudgetIA.src.core.user_config_service import UserConfigService
 from finance.factory import FinancialSystemFactory
 from finance.planilha_manager import PlanilhaManager
-from finance.storage.excel_storage_handler import ExcelHandler
+from finance.storage.excel_storage_handler import ExcelStorageHandler
 
 # Precisamos do DataContext para o nosso mock
 
@@ -16,7 +16,7 @@ from finance.storage.excel_storage_handler import ExcelHandler
 @pytest.fixture
 def mock_excel_handler() -> MagicMock:
     """Cria um mock completo do ExcelHandler para um ARQUIVO EXISTENTE."""
-    handler = MagicMock(spec=ExcelHandler)
+    handler = MagicMock(spec=ExcelStorageHandler)
     handler.file_path = "dummy_test.xlsx"
 
     mock_dfs = {

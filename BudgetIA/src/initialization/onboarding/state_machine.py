@@ -1,4 +1,5 @@
 # src/initialization/onboarding/state_machine.py
+from typing import Any
 from enum import Enum, auto
 
 
@@ -42,7 +43,7 @@ class OnboardingStateMachine:
     Garante que o fluxo siga uma ordem lógica e válida.
     """
 
-    def __init__(self, initial_state: OnboardingState = OnboardingState.WELCOME, on_transition=None):
+    def __init__(self, initial_state: OnboardingState = OnboardingState.WELCOME, on_transition: Any = None):
         self._current_state = initial_state
         self._on_transition = on_transition # Callback(new_state)
 
@@ -96,7 +97,15 @@ class OnboardingStateMachine:
         Returns:
             bool: True se a transição ocorreu, False se foi rejeitada.
         """
-        if self.can_transition_to(new_state):
+        # Permanecer no mesmo estado é sempre válido
+        if self._current_state == new_state:
+            print(
+                f"--- ONBOARDING: Permanecendo no estado {self._current_state.name} ---"
+            )
+            return True
+
+        allowed = self._valid_transitions.get(self._current_state, set())
+        if new_state in allowed:
             print(
                 f"--- ONBOARDING: Transição de {self._current_state.name} para {new_state.name} ---"
             )

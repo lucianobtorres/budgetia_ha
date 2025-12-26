@@ -46,6 +46,8 @@ def load_all_financial_tools(
         "view_data_tool.py",
         "calculate_balance_tool.py",
         "check_budget_status_tool.py",
+        "delete_transaction_tool.py", # CRUD
+        "update_transaction_tool.py", # CRUD
         "generate_monthly_summary_tool.py",
         "register_ai_insight_tool.py",
         "define_budget_tool.py", # Importante para controle

@@ -1,4 +1,5 @@
 # src/finance/repositories/budget_repository.py
+from typing import Any
 import pandas as pd
 
 import config
@@ -115,7 +116,7 @@ class BudgetRepository:
         self._context.update_dataframe(self._aba_nome, df_novo)
         return True
 
-    def update_budget_by_id(self, budget_id: int, dados: dict) -> bool:
+    def update_budget_by_id(self, budget_id: int, dados: dict[str, Any]) -> bool:
         """Atualiza um orçamento pelo ID."""
         df = self._context.get_dataframe(self._aba_nome)
         

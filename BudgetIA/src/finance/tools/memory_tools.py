@@ -23,7 +23,7 @@ class SearchMemoryInput(BaseModel):
 
 # --- Tool Implementations ---
 
-class LearnFactTool(BaseTool):
+class LearnFactTool(BaseTool): # type: ignore[misc]
     name: str = "learn_user_fact"
     description: str = (
         "Use this tool to REMEMBER a new fact or preference about the user long-term. "
@@ -35,9 +35,9 @@ class LearnFactTool(BaseTool):
         self.memory_service = memory_service
 
     def run(self, category: str, fact: str) -> str:
-        return self.memory_service.add_fact(category, fact)
+        return self.memory_service.add_fact(category, fact) # type: ignore[no-any-return]
 
-class UpdateFactTool(BaseTool):
+class UpdateFactTool(BaseTool): # type: ignore[misc]
     name: str = "update_user_fact"
     description: str = (
         "Use this tool to UPDATE an existing fact when the user changes their mind. "
@@ -49,9 +49,9 @@ class UpdateFactTool(BaseTool):
         self.memory_service = memory_service
 
     def run(self, old_fact_snippet: str, new_fact: str) -> str:
-        return self.memory_service.update_fact(old_fact_snippet, new_fact)
+        return self.memory_service.update_fact(old_fact_snippet, new_fact) # type: ignore[no-any-return]
 
-class ForgetFactTool(BaseTool):
+class ForgetMemoryTool(BaseTool): # type: ignore[misc]
     name: str = "forget_user_fact"
     description: str = (
         "Use this tool to DELETE a fact that is no longer true or relevant. "
@@ -65,7 +65,7 @@ class ForgetFactTool(BaseTool):
     def run(self, fact_snippet: str) -> str:
         return self.memory_service.forget_fact(fact_snippet)
 
-class SearchMemoryTool(BaseTool):
+class StoreMemoryTool(BaseTool): # type: ignore[misc]
     name: str = "search_user_memory"
     description: str = (
         "Use this tool to explicitely SEARCH for facts about the user if they are not in your context. "

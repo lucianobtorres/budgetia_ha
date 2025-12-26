@@ -12,7 +12,7 @@ from core.user_config_service import UserConfigService
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import config
-from agent_implementations.factory import AgentFactory
+from infrastructure.agents.factory import AgentFactory
 from finance.factory import FinancialSystemFactory
 from finance.planilha_manager import PlanilhaManager
 from finance.storage.storage_factory import StorageHandlerFactory
@@ -57,10 +57,8 @@ def initialize_financial_system(
         # --- 3. Inicialização da IA e do Agente ---
         print("--- DEBUG INITIALIZER: Configurando LLM e Agente... ---")
         primary_provider = LLMProviderFactory.create_provider(
-            # LLMProviderType.GROQ, default_model="llama-3.3-70b-Versatile"
             LLMProviderType.GROQ,
-            default_model="openai/gpt-oss-120b",
-            # default_model="llama-3.1-8b-instant",
+            default_model=config.LLMModels.DEFAULT_GROQ,
         )
         # primary_provider = LLMProviderFactory.create_provider(
         #     LLMProviderType.GEMINI, default_model=config.DEFAULT_GEMINI_MODEL
@@ -69,7 +67,9 @@ def initialize_financial_system(
         llm_orchestrator.get_configured_llm()
 
         agent_runner = AgentFactory.create_agent(
-            llm_orchestrator=llm_orchestrator, plan_manager=plan_manager
+            llm_orchestrator=llm_orchestrator,
+            plan_manager=plan_manager,
+            config_service=config_service,
         )
 
         print("--- DEBUG INITIALIZER: Inicialização BEM SUCEDIDA. ---")

@@ -20,7 +20,7 @@ class LLMProvider(ABC):
             )
         else:
             print(
-                f"LOG: Chave da API para {self.__class__.__name__} carregada com sucesso! ✨"
+                f"LOG: Chave da API para {self.__class__.__name__} carregada com sucesso!"
             )
 
         self.api_key_env_var = api_key_env_var

@@ -36,17 +36,22 @@ dependencies = [
     "agno (>=2.3.10,<3.0.0)",
     "google-genai (>=1.55.0,<2.0.0)",
     "requests (>=2.31.0,<3.0.0)",
+    "pywebpush (>=2.1.2,<3.0.0)",
 ]
 
 [tool.poetry]
-packages = [{ include = "*", from = "src" }]
+packages = [
+    { include = "*", from = "src" },
+    { include = "scripts" }
+]
 
 [tool.poetry.scripts]
-start-web = "start:main"
-start-api = "run_api:main"
-start-bot = "bot.main:main"
-start-scheduler = "scheduler.main:main"
-start-pwa = "run_frontend:main"
+run-web = "scripts.run_web:main"
+run-pwa = "scripts.run_pwa:main"
+run-api = "scripts.run_api:main"
+run-bot = "interfaces.bot.main:main"
+run-scheduler = "interfaces.scheduler.main:main"
+run-cli = "main:main"
 
 # --- Scripts de Qualidade ---
 #format = "black src tests"  # Executa o Black
@@ -63,6 +68,8 @@ black = "^25.1.0"
 isort = "^6.0.1"
 ruff = "^0.12.4"
 pandas-stubs = "^2.2.2"
+types-requests = "^2.32.4.20250913"
+types-pyyaml = "^6.0.12.20250915"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

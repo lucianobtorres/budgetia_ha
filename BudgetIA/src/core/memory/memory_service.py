@@ -1,7 +1,7 @@
 import json
 import os
 from datetime import datetime
-from typing import List, Dict, Optional
+from typing import Any
 # import fcntl  -- REMOVED for Windows compatibility
 # Note: On Windows specifically, fcntl is not available. 
 # We will implement a simple file lock using a context manager or just rely on atomic writes for now since it's single user primarily.
@@ -16,20 +16,21 @@ class MemoryService:
         self.memory_file = os.path.join(user_data_dir, "memory.json")
         self._ensure_memory_file()
 
-    def _ensure_memory_file(self):
+    def _ensure_memory_file(self) -> None:
         """Creates the memory file if it doesn't exist."""
         if not os.path.exists(self.memory_file):
             self._save_memory([])
 
-    def _load_memory(self) -> List[Dict]:
+    def _load_memory(self) -> list[dict[str, Any]]:
         """Loads all facts from the JSON file."""
         try:
             with open(self.memory_file, "r", encoding="utf-8") as f:
-                return json.load(f)
+                data: list[dict[str, Any]] = json.load(f)
+                return data
         except (FileNotFoundError, json.JSONDecodeError):
             return []
 
-    def _save_memory(self, memory: List[Dict]):
+    def _save_memory(self, memory: list[dict[str, Any]]) -> None:
         """Saves facts to the JSON file atomically."""
         temp_file = self.memory_file + ".tmp"
         with open(temp_file, "w", encoding="utf-8") as f:
@@ -95,7 +96,7 @@ class MemoryService:
         else:
             return "No matching fact found to forget."
 
-    def search_facts(self, query: str = "") -> List[Dict]:
+    def search_facts(self, query: str = "") -> list[dict[str, Any]]:
         """
         Searches facts by keyword or returns all if query is empty.
         Simple keyword matching for now (Phase 1).

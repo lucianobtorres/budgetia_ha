@@ -4,9 +4,9 @@ from datetime import datetime, timedelta
 import pandas as pd
 import pytest
 
-from app.notifications.models.notification_message import NotificationPriority
-from app.notifications.rules.transport_missing_rule import TransportMissingRule
-from config import ColunasTransacoes
+from application.notifications.models.notification_message import NotificationPriority
+from application.notifications.rules.economy.transport_missing_rule import TransportMissingRule
+from src.config import ColunasTransacoes
 
 
 class TestTransportMissingRule:

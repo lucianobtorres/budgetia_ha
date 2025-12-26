@@ -18,7 +18,7 @@ from finance.strategies.base_strategy import BaseMappingStrategy
 
 
 # --- 2. FAZER A CLASSE HERDAR DA INTERFACE ---
-class ExcelHandler(BaseStorageHandler):
+class ExcelStorageHandler(BaseStorageHandler): # type: ignore[misc]
     """Classe especialista em ler e escrever DataFrames para um arquivo Excel."""
 
     def __init__(self, file_path: str) -> None:
