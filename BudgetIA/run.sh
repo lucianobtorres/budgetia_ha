@@ -40,6 +40,25 @@ if [ ! -d "/data/budgetia_files" ]; then
     mkdir -p /data/budgetia_files
 fi
 
+# 2.1 Persistindo TUDO de /app/data (User Configs, Uploads, Novas Planilhas)
+if [ ! -d "/data/app_data" ]; then
+    echo "📁 Criando diretório de persistência da aplicação (/data/app_data)..."
+    mkdir -p /data/app_data
+fi
+
+# Copia arquivos iniciais da imagem para a persistência (se não existirem lá)
+# Ex: dados_exemplo.json, etc.
+if [ -d "/app/data" ]; then
+    echo "📦 Migrando dados iniciais para persistência..."
+    cp -rn /app/data/* /data/app_data/ || true
+    # Remove o diretório original para criar o link
+    rm -rf /app/data
+fi
+
+# Cria o link simbólico: O app escreve em /app/data -> Realmente escreve em /data/app_data
+ln -s /data/app_data /app/data
+echo "🔗 Link simbólico /app/data -> /data/app_data criado."
+
 # Copiar planilha inicial se não existir na persistência
 if [ ! -f "/data/budgetia_files/planilha_mestra.xlsx" ]; then
     if [ -f "/app/planilha_mestra.xlsx" ]; then
