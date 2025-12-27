@@ -11,7 +11,7 @@ RUN git clone https://github.com/lucianobtorres/BudgetIA.git .
 WORKDIR /app/BudgetIA/pwa
 
 # Install dependencies
-RUN npm ci
+RUN npm install
 
 # Build PWA
 RUN npm run build
