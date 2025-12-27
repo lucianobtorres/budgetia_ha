@@ -16,6 +16,9 @@ if [ -f "$OPTIONS_PATH" ]; then
     export SECRET_KEY=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('secret_key', ''))")
     export UPSTASH_REDIS_URL=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('upstash_redis_url', ''))")
     export PLANILHA_PATH=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('planilha_path', ''))")
+    
+    # Derivar chave de criptografia Fernet (32 bytes base64) a partir da SECRET_KEY para persistência de dados do usuário
+    export USER_DATA_ENCRYPTION_KEY=$(python3 -c "import base64, hashlib, os; secret = os.environ.get('SECRET_KEY', 'default-fallback-secret'); print(base64.urlsafe_b64encode(hashlib.sha256(secret.encode()).digest()).decode())")
 else
     echo "⚠️  options.json não encontrado. Usando variáveis de ambiente."
 fi
