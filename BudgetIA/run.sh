@@ -18,6 +18,15 @@ if [ -f "$OPTIONS_PATH" ]; then
     export SECRET_KEY=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('secret_key', ''))")
     export UPSTASH_REDIS_URL=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('upstash_redis_url', ''))")
     export PLANILHA_PATH=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('planilha_path', ''))")
+
+    # Tratamento da Conta de Serviço (JSON Payload)
+    # Se o usuário colou o JSON na config, salvamos em arquivo e exportamos o caminho.
+    SA_JSON_CONTENT=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('google_service_account_json', ''))")
+    if [ ! -z "$SA_JSON_CONTENT" ]; then
+        echo "🔑 Configurando Conta de Serviço via JSON..."
+        echo "$SA_JSON_CONTENT" > /data/service_account.json
+        export GSPREAD_CREDENTIALS_PATH="/data/service_account.json"
+    fi
     
     # Derivar chave de criptografia Fernet (32 bytes base64) a partir da SECRET_KEY para persistência de dados do usuário
     export USER_DATA_ENCRYPTION_KEY=$(python3 -c "import base64, hashlib, os; secret = os.environ.get('SECRET_KEY', 'default-fallback-secret'); print(base64.urlsafe_b64encode(hashlib.sha256(secret.encode()).digest()).decode())")
