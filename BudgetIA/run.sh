@@ -13,6 +13,7 @@ if [ -f "$OPTIONS_PATH" ]; then
     export GEMINI_API_KEY=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('gemini_api_key', ''))")
     export GOOGLE_OAUTH_CLIENT_ID=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('google_oauth_client_id', ''))")
     export GOOGLE_OAUTH_CLIENT_SECRET=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('google_oauth_client_secret', ''))")
+    export GOOGLE_OAUTH_REDIRECT_URI=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('google_oauth_redirect_uri', ''))")
     export SECRET_KEY=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('secret_key', ''))")
     export UPSTASH_REDIS_URL=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('upstash_redis_url', ''))")
     export PLANILHA_PATH=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('planilha_path', ''))")

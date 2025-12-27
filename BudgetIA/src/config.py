@@ -22,7 +22,7 @@ GOOGLE_OAUTH_CLIENT_ID = os.getenv("GOOGLE_OAUTH_CLIENT_ID")
 GOOGLE_OAUTH_CLIENT_SECRET = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET")
 
 # O URI de redirecionamento que você configurou no Google Console
-GOOGLE_OAUTH_REDIRECT_URI = "http://localhost:8501"
+GOOGLE_OAUTH_REDIRECT_URI = os.getenv("GOOGLE_OAUTH_REDIRECT_URI", "http://localhost:8501")
 
 # --- CONFIGURAÇÃO DE SEGURANÇA (JWT) ---
 # Usar um segredo forte em produção!
