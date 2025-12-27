@@ -5,6 +5,7 @@ import { cn } from '../../utils/cn';
 import { toast } from 'sonner';
 import { Drawer } from '../ui/Drawer';
 import { Button } from '../ui/Button';
+import { telemetry } from '../../services/telemetry';
 
 interface Notification {
     id: string;
@@ -47,8 +48,7 @@ export function NotificationBell() {
 
     const loadNotifications = async () => {
         try {
-            const data = await fetchAPI('/notifications?unread_only=false');
-            console.log("Notifications Data Loaded:", data); // Debugging
+            const data = await fetchAPI('/notifications/?unread_only=false');
             if (data) setNotifications(data);
         } catch (error) {
             console.error("Error loading notifications", error);
@@ -62,6 +62,16 @@ export function NotificationBell() {
         try {
             await fetchAPI(`/notifications/${id}/read`, { method: 'POST' });
             // Handle both field conventions in local state update
+            
+            // TELEMETRY: Positive feedback (Clicked/Read)
+            // Localiza a notificação para pegar a categoria/regra
+            const notif = notifications.find(n => n.id === id);
+            if (notif && notif.category) {
+                 // Assumindo que o nome da regra está na categoria ou mensagem se for estruturada
+                 // Como simplificação, usaremos a categoria como proxy do rule_name por enquanto
+                 telemetry.logFeedback(notif.category, 'positive');
+            }
+
             setNotifications(prev => prev.map(n => 
                 n.id === id ? { ...n, read: true, lida: true } : n
             ));
@@ -74,6 +84,18 @@ export function NotificationBell() {
         e.stopPropagation();
         try {
             await fetchAPI(`/notifications/${id}`, { method: 'DELETE' });
+            
+            // TELEMETRY: Dismissed feedback
+            const notif = notifications.find(n => n.id === id);
+            if (notif && notif.category) {
+                 const isRead = notif.read || notif.lida;
+                 // Se deletou sem ler = Ignored/Dismissed
+                 // Se deletou lido = Neutral/Cleanup (não logamos negativo)
+                 if (!isRead) {
+                    telemetry.logFeedback(notif.category, 'dismissed');
+                 }
+            }
+
             setNotifications(prev => prev.filter(n => n.id !== id));
             toast.success("Notificação removida");
         } catch (error) {

@@ -7,10 +7,11 @@ interface TransactionCardProps {
     transaction: Transaction;
     onDelete: (id: number) => void;
     onEdit?: (transaction: Transaction) => void;
+    onCategoryClick?: (category: string) => void;
     categoryColor?: string;
 }
 
-export function TransactionCard({ transaction, onDelete, onEdit, categoryColor }: TransactionCardProps) {
+export function TransactionCard({ transaction, onDelete, onEdit, onCategoryClick, categoryColor }: TransactionCardProps) {
     const isExpense = transaction["Tipo (Receita/Despesa)"] === "Despesa";
     const dateObj = new Date(transaction.Data);
     const day = dateObj.getDate();
@@ -38,13 +39,20 @@ export function TransactionCard({ transaction, onDelete, onEdit, categoryColor }
                 <div className="flex flex-col min-w-0">
                     <span className="text-sm font-medium text-white truncate">{transaction.Descricao}</span>
                     <div className="flex items-center gap-2 mt-1">
-                        {/* Chip using Global Colors - Solid Background */}
-                        <span 
-                            className="px-2 py-0.5 rounded-full text-[10px] font-semibold text-white/90 shadow-sm"
+                        {/* Chip using Global Colors - Clickable */}
+                        <button 
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onCategoryClick?.(transaction.Categoria);
+                            }}
+                            className={cn(
+                                "px-2 py-0.5 rounded-full text-[10px] font-semibold text-white/90 shadow-sm transition-transform hover:scale-105 active:scale-95",
+                                onCategoryClick ? "cursor-pointer hover:brightness-110" : "cursor-default"
+                            )}
                             style={{ backgroundColor: displayColor }}
                         >
                            {transaction.Categoria}
-                        </span>
+                        </button>
                     </div>
                 </div>
             </div>

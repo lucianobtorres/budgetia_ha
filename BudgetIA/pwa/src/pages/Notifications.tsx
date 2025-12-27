@@ -23,7 +23,7 @@ export default function Notifications() {
     const loadNotifications = async () => {
         try {
             // Fetch all notifications (unread_only=false) to see history
-            const data = await fetchAPI('/notifications?unread_only=false');
+            const data = await fetchAPI('/notifications/?unread_only=false');
             if (data) setNotifications(data);
         } catch (error) {
             console.error("Error loading notifications", error);

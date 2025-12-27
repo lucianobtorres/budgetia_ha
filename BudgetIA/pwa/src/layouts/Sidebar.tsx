@@ -1,8 +1,10 @@
 import { Home, CreditCard, User, LogOut, Link as LinkIcon } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
+import { AuthService } from "../services/auth";
 import { DownloadCloud } from "lucide-react";
 import { cn } from "../utils/cn";
+import { telemetry } from "../services/telemetry";
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: Home },
@@ -24,6 +26,11 @@ export function Sidebar() {
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
+  // Telemetria de Navegação
+  useEffect(() => {
+    telemetry.logAction('view_page', { path: location.pathname });
+  }, [location.pathname]);
+
   const handleInstallClick = () => {
     if (deferredPrompt) {
         deferredPrompt.prompt();
@@ -39,7 +46,7 @@ export function Sidebar() {
     <div className="hidden md:flex h-screen w-auto min-w-[16rem] flex-col bg-gray-900 text-white border-r border-gray-800 transition-all duration-300">
       <div className="flex h-16 items-center px-6 gap-3 border-b border-gray-800/50">
         <div className="relative h-9 w-9 overflow-hidden rounded-lg shadow-black/50 shadow-sm ring-1 ring-white/10 shrink-0">
-             <img src="/pwa-192x192.png" alt="Icon" className="h-full w-full object-cover" />
+             <img src="/pwa-512x512.png" alt="Icon" className="h-full w-full object-cover" />
         </div>
         <h1 className="text-xl font-bold tracking-tight text-white whitespace-nowrap">
             Budget<span className="text-emerald-500">IA</span>
@@ -78,6 +85,9 @@ export function Sidebar() {
                 Instalar App
             </button>
         )}
+
+        
+
       </nav>
       <div className="p-4 border-t border-gray-800">
         <div className="flex items-center justify-between">
@@ -95,8 +105,7 @@ export function Sidebar() {
             <button 
                 onClick={() => {
                     if(confirm("Deseja sair?")) {
-                        localStorage.removeItem('budgetia_user_id');
-                        window.location.reload();
+                        AuthService.logout();
                     }
                 }}
                 className="text-gray-500 hover:text-red-400 p-1.5 rounded-md hover:bg-gray-800 transition-colors"

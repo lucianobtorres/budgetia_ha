@@ -74,35 +74,37 @@ def atualizar_transacao(
     manager: PlanilhaManager = Depends(get_planilha_manager)
 ) -> dict[str, Any]:
     try:
-        df = manager.visualizar_dados(NomesAbas.TRANSACOES)
-        if df is None or df.empty:
-             raise HTTPException(status_code=404, detail="Nenhuma transação encontrada.")
+        with manager.lock_file(timeout_seconds=60):
+            manager.refresh_data()
+            df = manager.visualizar_dados(NomesAbas.TRANSACOES)
+            if df is None or df.empty:
+                raise HTTPException(status_code=404, detail="Nenhuma transação encontrada.")
         
-        # Ensure ID column is int for comparison
-        if ColunasTransacoes.ID in df.columns:
-             # We assume IDs are generally clean integers, but safety first
-             df[ColunasTransacoes.ID] = pd.to_numeric(df[ColunasTransacoes.ID], errors='coerce').fillna(0).astype(int)
+            # Ensure ID column is int for comparison
+            if ColunasTransacoes.ID in df.columns:
+                # We assume IDs are generally clean integers, but safety first
+                df[ColunasTransacoes.ID] = pd.to_numeric(df[ColunasTransacoes.ID], errors='coerce').fillna(0).astype(int)
         
-        # Find index
-        mask = df[ColunasTransacoes.ID] == transaction_id
-        if not mask.any():
-            raise HTTPException(status_code=404, detail="Transação não encontrada.")
+            # Find index
+            mask = df[ColunasTransacoes.ID] == transaction_id
+            if not mask.any():
+                raise HTTPException(status_code=404, detail="Transação não encontrada.")
             
-        idx = df.index[mask][0]
+            idx = df.index[mask][0]
         
-        # Update row
-        # Convert date string to datetime if needed, or keep as is if manager handles it. 
-        # PlanilhaManager usually expects datetime or compatible.
-        df.at[idx, ColunasTransacoes.DATA] = pd.to_datetime(transaction.data)
-        df.at[idx, ColunasTransacoes.TIPO] = transaction.tipo
-        df.at[idx, ColunasTransacoes.CATEGORIA] = transaction.categoria
-        df.at[idx, ColunasTransacoes.DESCRICAO] = str(transaction.descricao)
-        df.at[idx, ColunasTransacoes.VALOR] = float(transaction.valor)
-        df.at[idx, ColunasTransacoes.STATUS] = transaction.status
+            # Update row
+            # Convert date string to datetime if needed, or keep as is if manager handles it. 
+            # PlanilhaManager usually expects datetime or compatible.
+            df.at[idx, ColunasTransacoes.DATA] = pd.to_datetime(transaction.data)
+            df.at[idx, ColunasTransacoes.TIPO] = transaction.tipo
+            df.at[idx, ColunasTransacoes.CATEGORIA] = transaction.categoria
+            df.at[idx, ColunasTransacoes.DESCRICAO] = str(transaction.descricao)
+            df.at[idx, ColunasTransacoes.VALOR] = float(transaction.valor)
+            df.at[idx, ColunasTransacoes.STATUS] = transaction.status
         
-        manager.update_dataframe(NomesAbas.TRANSACOES, df)
-        manager.recalculate_budgets() # Important to update budgets!
-        manager.save()
+            manager.update_dataframe(NomesAbas.TRANSACOES, df)
+            manager.recalculate_budgets() # Important to update budgets!
+            manager.save()
         
         return {"message": "Transação atualizada com sucesso.", "data": transaction}
     except HTTPException:
@@ -116,10 +118,12 @@ def delete_item(
     manager: PlanilhaManager = Depends(get_planilha_manager)
 ) -> dict[str, str]:
     try:
-        success = manager.delete_transaction(transaction_id)
-        if not success:
-            raise HTTPException(status_code=404, detail="Transação não encontrada")
-        manager.save()
+        with manager.lock_file(timeout_seconds=60):
+            manager.refresh_data()
+            success = manager.delete_transaction(transaction_id)
+            if not success:
+                raise HTTPException(status_code=404, detail="Transação não encontrada")
+            manager.save()
         return {"message": "Transação removida."}
     except HTTPException:
         raise
@@ -139,19 +143,21 @@ def update_transactions_bulk(
         if not transactions:
             return {"message": "Nenhuma alteração enviada."}
             
-        # Converte lista de dicts de volta para DataFrame
-        df_new = pd.DataFrame(transactions)
-        
-        # GARANTE que a coluna de Data seja datetime, pois o JSON envia string
-        if ColunasTransacoes.DATA in df_new.columns:
-            df_new[ColunasTransacoes.DATA] = pd.to_datetime(
-                df_new[ColunasTransacoes.DATA], errors='coerce'
-            )
+        with manager.lock_file(timeout_seconds=120): # Bulk pode demorar
+            manager.refresh_data()
+            # Converte lista de dicts de volta para DataFrame
+            df_new = pd.DataFrame(transactions)
+            
+            # GARANTE que a coluna de Data seja datetime, pois o JSON envia string
+            if ColunasTransacoes.DATA in df_new.columns:
+                df_new[ColunasTransacoes.DATA] = pd.to_datetime(
+                    df_new[ColunasTransacoes.DATA], errors='coerce'
+                )
 
-        # Atualiza via manager
-        manager.update_dataframe(NomesAbas.TRANSACOES, df_new)
-        manager.recalculate_budgets()
-        manager.save()
+            # Atualiza via manager
+            manager.update_dataframe(NomesAbas.TRANSACOES, df_new)
+            manager.recalculate_budgets()
+            manager.save()
         
         return {"message": f"{len(transactions)} transações atualizadas com sucesso."}
     except Exception as e:
@@ -167,14 +173,28 @@ def adicionar_transacao(
     Usa o mesmo Schema que a IA usa.
     """
     try:
-        manager.adicionar_registro(
-            data=transaction.data,
-            tipo=transaction.tipo,
-            categoria=transaction.categoria,
-            descricao=str(transaction.descricao),
-            valor=transaction.valor,
-            status=transaction.status
-        )
+        with manager.lock_file(timeout_seconds=60):
+            # Atomic: Refresh -> Add -> Save
+            manager.refresh_data()
+            manager.adicionar_registro(
+                data=transaction.data,
+                tipo=transaction.tipo,
+                categoria=transaction.categoria,
+                descricao=str(transaction.descricao),
+                valor=transaction.valor,
+                status=transaction.status
+            )
+            # Save is automatic inside adicionar_registro? NO.
+            # Manager.adicionar_registro calls repo.add which updates DF. 
+            # It DOES NOT call save().
+            # Wait, looking at the ORIGINAL code below:
+            # manager.adicionar_registro(...)
+            # return ...
+            # THERE WAS NO manager.save() call in the original code? 
+            # Let me check the original file again.
+            
+            manager.save() # Ensure save is called
+            
         return {"message": "Transação adicionada com sucesso", "data": transaction}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao salvar transação: {e}")

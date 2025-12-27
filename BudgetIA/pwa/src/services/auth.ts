@@ -22,6 +22,7 @@ export const AuthService = {
         const data = await res.json();
         // Set local storage immediately upon success
         localStorage.setItem(STORAGE_KEYS.USER_ID, data.user.username);
+        localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, data.access_token);
         return data;
     },
 
@@ -55,6 +56,7 @@ export const AuthService = {
 
     logout() {
         localStorage.removeItem(STORAGE_KEYS.USER_ID);
+        localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
         window.location.reload();
     },
 

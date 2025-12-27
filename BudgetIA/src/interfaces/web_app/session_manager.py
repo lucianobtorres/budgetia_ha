@@ -10,8 +10,10 @@ from pathlib import Path
 from core.llm_manager import LLMOrchestrator
 from core.user_config_service import UserConfigService
 from core.llm_providers.groq_provider import GroqProvider
-from config import DEFAULT_GROQ_MODEL
+from config import DEFAULT_GROQ_MODEL, ACCESS_TOKEN_EXPIRE_MINUTES
 from interfaces.web_app.ui_components.ui_login import LoginUI
+from interfaces.api.utils.jwt import create_access_token
+from datetime import timedelta
 
 # TODO: Cache resource might need to be moved to a simpler provider if pickling issues arise
 @st.cache_resource
@@ -87,11 +89,20 @@ class SessionManager:
 
     @staticmethod
     def _ensure_api_client(username: str) -> None:
-        """Garante que o Cliente da API esteja instanciado na sessão."""
+        """Garante que o Cliente da API esteja instanciado na sessão com um Token válido."""
         if "api_client" not in st.session_state:
             from interfaces.web_app.api_client import BudgetAPIClient
+            
+            # --- TOKEN GENERATION (SHARED SECRET) ---
+            # Como o Streamlit é um client confiável (server-side), ele minta seu próprio token
+            # para falar com a API.
+            access_token_expires = timedelta(minutes=float(ACCESS_TOKEN_EXPIRE_MINUTES))
+            token = create_access_token(
+                data={"sub": username}, expires_delta=access_token_expires
+            )
+            
             api_url = os.getenv("API_URL", "http://127.0.0.1:8000")
-            st.session_state.api_client = BudgetAPIClient(base_url=api_url, user_id=username)
+            st.session_state.api_client = BudgetAPIClient(base_url=api_url, user_id=username, token=token)
 
     @staticmethod
     def _run_background_routines() -> None:

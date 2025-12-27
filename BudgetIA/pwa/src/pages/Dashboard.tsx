@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSummary, useExpenses } from '../hooks/useDashboard';
 import { ArrowUpCircle, ArrowDownCircle, Wallet, ChevronRight } from 'lucide-react';
@@ -7,18 +6,54 @@ import Chat from './Chat';
 import { Skeleton } from '../components/ui/Skeleton';
 import BudgetSummaryWidget from '../components/dashboard/BudgetSummaryWidget';
 import { CategoryStackedBar } from '../components/dashboard/CategoryStackedBar';
-import CategoryDrawer from '../components/dashboard/CategoryDrawer';
 import { NotificationBell } from '../components/layout/NotificationBell';
 import { KpiCard } from '../components/dashboard/KpiCard';
 import { EmptyState } from '../components/ui/EmptyState';
+import { useDrawer } from '../context/DrawerContext';
+import { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
+import { telemetry } from '../services/telemetry';
+import { useTour } from '../context/TourContext';
 
 export default function Dashboard() {
-  const [isCategoryDrawerOpen, setCategoryDrawerOpen] = useState(false);
+  const { openDrawer } = useDrawer();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const { data: summary, isLoading: loadingSummary } = useSummary();
   const { data: expenses, isLoading: loadingExpenses } = useExpenses();
+  const { startTour } = useTour(); // Hook do Tour
 
   const loading = loadingSummary || loadingExpenses;
+  const hasData = summary && (summary.total_receitas > 0 || summary.total_despesas > 0);
+
+  // Telemetria & Tour
+  useEffect(() => {
+      telemetry.logAction('view_dashboard');
+      
+      if (!loading) {
+         // Lógica Adaptativa: Se tem dados => Tour Avançado, senão => Onboarding
+         const tourName = hasData ? 'dashboard_full' : 'dashboard_empty';
+         
+         // Check if we should restart tour from Profile
+         const shouldRestart = location.state?.restartTour;
+
+         if (shouldRestart) {
+             // Delay to ensure UI is ready
+             setTimeout(() => {
+                 startTour(tourName as any, true);
+                 // Clear state to prevent loop on refresh? (React router state persists on refresh usually, but logic here is safe enough if hasData doesn't change wildly)
+                 // Ideally we clear it, but modifying history stack is complex.
+                 // Since 'true' forces it, it's fine.
+             }, 800);
+         } else {
+             // Normal flow (checks localStorage internally)
+             // Pequeno delay para garantir que o DOM renderizou
+             setTimeout(() => {
+                startTour(tourName as any);
+             }, 1000);
+         }
+      }
+  }, [loading, hasData, location]);
 
   const handleChatAction = () => {
       // Invalidate all dashboard queries to refresh data
@@ -48,18 +83,18 @@ export default function Dashboard() {
       );
   }
 
-  const hasData = summary && (summary.total_receitas > 0 || summary.total_despesas > 0);
-
   // If no data (New User), show guidance
   if (!loading && !hasData) {
       return (
         <div className="h-full flex flex-col gap-4 pb-0 md:pb-6 overflow-hidden">
-             <div className="flex-none pt-safe pt-4 flex items-start justify-between">
+             <div id="welcome-header" className="flex-none pt-safe pt-4 flex items-start justify-between">
                 <div>
                    <h2 className="text-xl md:text-3xl font-bold tracking-tight text-white mb-1 md:mb-2">Bem-vindo(a)!</h2>
                    <p className="text-sm md:text-base text-gray-400">Vamos começar sua jornada financeira.</p>
                 </div>
-                <NotificationBell />
+                <div id="notification-bell">
+                     <NotificationBell />
+                </div>
              </div>
              
              <div className="flex-1 flex flex-col items-center justify-between min-h-0">
@@ -72,7 +107,7 @@ export default function Dashboard() {
                     />
                  </div>
                  {/* Chat Widget always available for onboarding instructions - Fixed height at bottom */}
-                 <div className="w-full flex-none h-[400px]">
+                 <div id="chat-widget" className="w-full flex-none h-[400px]">
                       <Chat variant="widget" className="h-full w-full" onAction={handleChatAction} />
                  </div>
              </div>
@@ -83,19 +118,22 @@ export default function Dashboard() {
   return (
     <div className="h-full flex flex-col gap-4 pb-0 md:pb-6 overflow-hidden">
       {/* Header - Visible on all screens, adaptable size */}
-      <div className="flex-none pt-safe flex items-start justify-between">
+      <div id="welcome-header" className="flex-none pt-safe flex items-start justify-between">
         <div>
            <h2 className="text-xl md:text-3xl font-bold tracking-tight text-white mb-1 md:mb-2">Visão Geral</h2>
            <p className="text-sm md:text-base text-gray-400">Acompanhe seu desempenho financeiro.</p>
         </div>
-        <NotificationBell />
+        <div id="notification-bell">
+            <NotificationBell />
+        </div>
       </div>
       
       {/* Top Section: KPIs & Charts - Scrollable internally, capped height to ensure Chat space */}
       <div className="flex-shrink-0 max-h-[55vh] space-y-4 overflow-y-auto scrollbar-none px-1 pb-2">
          {/* Compact KPI Grid */}
-         <div className="grid grid-cols-3 gap-2 md:gap-4 md:grid-cols-3">
+         <div id="kpi-grid" className="grid grid-cols-3 gap-2 md:gap-4 md:grid-cols-3">
             <KpiCard 
+                id="kpi-saldo"
                 title="Saldo" 
                 value={(summary?.total_receitas || 0) - (summary?.total_despesas || 0)} 
                 icon={Wallet} 
@@ -119,12 +157,15 @@ export default function Dashboard() {
          </div>
 
          {/* Budget Summary Section */}
-         <BudgetSummaryWidget />
+         <div id="budget-widget">
+            <BudgetSummaryWidget />
+         </div>
 
          {/* iOS Style Chart Section */}
          {/* iOS Style Chart Section - Mimics BudgetSummaryWidget */}
          <div 
-            onClick={() => setCategoryDrawerOpen(true)}
+            id="category-chart"
+            onClick={() => openDrawer('CATEGORY_EXPENSES')}
             className="cursor-pointer group relative overflow-hidden rounded-xl border border-gray-800 bg-gray-900/50 p-4 transition-all hover:border-blue-500/30 hover:bg-gray-900/80"
          >
             <div className="flex items-center justify-between mb-3">
@@ -153,14 +194,9 @@ export default function Dashboard() {
       </div>
 
        {/* Chat Section - Takes remaining height on mobile, full height col on desktop */}
-       <div className="flex-1 min-h-0 md:min-h-[400px] md:h-full">
+       <div id="chat-widget" className="flex-1 min-h-0 md:min-h-[400px] md:h-full">
             <Chat variant="widget" className="h-full w-full" onAction={handleChatAction} />
        </div>
-
-       <CategoryDrawer 
-            isOpen={isCategoryDrawerOpen} 
-            onClose={() => setCategoryDrawerOpen(false)} 
-       />
     </div>
   );
 }

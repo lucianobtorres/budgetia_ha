@@ -1,6 +1,7 @@
 import { cn } from '../../utils/cn';
 
 interface KpiCardProps {
+    id?: string;
     title: string;
     value: number;
     icon: any; // Lucide Icon type is generic
@@ -8,7 +9,7 @@ interface KpiCardProps {
     compact?: boolean;
 }
 
-export function KpiCard({ title, value, icon: Icon, color, compact }: KpiCardProps) {
+export function KpiCard({ id, title, value, icon: Icon, color, compact }: KpiCardProps) {
     let gradient = "from-gray-500/10";
     let border = "border-gray-800";
     
@@ -17,7 +18,7 @@ export function KpiCard({ title, value, icon: Icon, color, compact }: KpiCardPro
     else if (color.includes('red')) { gradient = "from-red-500/10"; border = "border-red-500/20"; }
 
     return (
-        <div className={cn(
+        <div id={id} className={cn(
             "rounded-xl border bg-gradient-to-br to-transparent shadow-sm transition-all",
             gradient,
             border,

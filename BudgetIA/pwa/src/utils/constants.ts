@@ -1,5 +1,8 @@
 export const STORAGE_KEYS = {
     USER_ID: 'budgetia_user_id',
+    AUTH_TOKEN: 'budgetia_auth_token',
+    THEME: 'budgetia_theme',
+    SIDEBAR_OPEN: 'budgetia_sidebar_open'
 } as const;
 
 export const TRANSACTION_CATEGORIES = [

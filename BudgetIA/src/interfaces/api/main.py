@@ -12,6 +12,7 @@ from interfaces.api.routers import (
     onboarding,
     presence,
     profile,
+    telemetry,
     transactions,
 )
 
@@ -53,6 +54,7 @@ app.include_router(notifications.router)
 app.include_router(presence.router)
 app.include_router(auth.router)
 app.include_router(onboarding.router)
+app.include_router(telemetry.router)
 
 if __name__ == "__main__":
     import uvicorn

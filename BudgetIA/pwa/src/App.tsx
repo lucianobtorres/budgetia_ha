@@ -16,6 +16,9 @@ import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
 import { useAuthSession } from "./hooks/useAuthSession";
+import { DrawerProvider } from "./context/DrawerContext";
+import { GlobalDrawers } from "./components/layout/GlobalDrawers";
+import { TourProvider } from "./context/TourContext";
 
 import ConnectionErrorPage from "./pages/ConnectionErrorPage";
 
@@ -32,22 +35,27 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-        <Toaster position="top-right" theme="dark" richColors />
-        <Routes>
-        <Route path="/onboarding" element={
-            onboardingStatus === 'COMPLETE' ? <Navigate to="/" replace /> : <Onboarding />
-        } />
-        <Route path="/google-callback" element={<GoogleCallback />} />
-        <Route path="/" element={<Layout />}>
-            <Route index element={<Dashboard />} />
-            <Route path="chat" element={<Chat />} />
-            <Route path="transactions" element={<Transactions />} />
-            <Route path="notifications" element={<Notifications />} />
-            <Route path="connections" element={<Connections />} />
-            <Route path="profile" element={<Profile />} />
-            <Route path="*" element={<NotFound />} />
-        </Route>
-        </Routes>
+        <DrawerProvider>
+            <TourProvider>
+                <Toaster position="top-right" theme="dark" richColors />
+                <GlobalDrawers />
+                <Routes>
+                <Route path="/onboarding" element={
+                    onboardingStatus === 'COMPLETE' ? <Navigate to="/" replace /> : <Onboarding />
+                } />
+                <Route path="/google-callback" element={<GoogleCallback />} />
+                <Route path="/" element={<Layout />}>
+                    <Route index element={<Dashboard />} />
+                    <Route path="chat" element={<Chat />} />
+                    <Route path="transactions" element={<Transactions />} />
+                    <Route path="notifications" element={<Notifications />} />
+                    <Route path="connections" element={<Connections />} />
+                    <Route path="profile" element={<Profile />} />
+                    <Route path="*" element={<NotFound />} />
+                </Route>
+                </Routes>
+            </TourProvider>
+        </DrawerProvider>
     </QueryClientProvider>
   );
 }

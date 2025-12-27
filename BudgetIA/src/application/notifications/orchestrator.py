@@ -12,12 +12,14 @@ from core.user_config_service import UserConfigService
 from finance.planilha_manager import PlanilhaManager
 
 
+from core.behavior.user_behavior_service import UserBehaviorService
 from application.services.push_notification_service import PushNotificationService
 
 class ProactiveNotificationOrchestrator:
     """
     Coordena a verificação de regras e o envio de notificações de forma proativa.
     Agora suporta Múltiplos Canais (Omnichannel) e Push Notifications.
+    Também integra com a 'Memória Adaptativa' (UserBehaviorService).
     """
 
     def __init__(
@@ -25,21 +27,20 @@ class ProactiveNotificationOrchestrator:
         rules: list[IFinancialRule],
         channels: list[INotificationChannel],
         config_service: UserConfigService,
-        push_service: PushNotificationService | None = None, # NEW Dependency
+        push_service: PushNotificationService | None = None,
     ):
         """
         Inicializa o orchestrator.
         """
         self.rules = rules
-        # Mapeia nome -> instância
         self.channels_map = {ch.channel_name: ch for ch in channels}
-        # Garante que InAppChannel esteja disponível
         if "in_app" not in self.channels_map:
             self.channels_map["in_app"] = InAppChannel()
             
         self.config_service = config_service
-        self.notification_service = NotificationService(config_service, push_service) # Pass Push Service
+        self.notification_service = NotificationService(config_service, push_service)
         self.presence_service = PresenceService()
+        self.behavior_service = UserBehaviorService(config_service.username) # Instancia a memória
 
     def _select_channels(
         self, user_config: dict[str, Any]
@@ -61,7 +62,6 @@ class ProactiveNotificationOrchestrator:
         
         for ch_name in external_channels:
             channel = self.channels_map.get(ch_name)
-            # Verifica se o canal existe (foi injetado) e se está configurado pelo usuário
             if channel and channel.is_configured_for_user(user_config):
                 recipient = channel.get_recipient_id(user_config)
                 if recipient:
@@ -76,6 +76,7 @@ class ProactiveNotificationOrchestrator:
             "rules_checked": 0,
             "rules_triggered": 0,
             "failures": [],
+            "rules_silenced": 0 
         }
 
         try:
@@ -99,6 +100,13 @@ class ProactiveNotificationOrchestrator:
         # 3. Executar Regras
         for rule in self.rules:
             stats["rules_checked"] += 1
+
+            # --- JARVIS CHECK: A regra deve ser silenciada? ---
+            if self.behavior_service.should_silence_rule(rule.rule_name, threshold=3):
+                print(f"LOG (Orchestrator): Regra '{rule.rule_name}' SILENCIADA pelo Jarvis (ignorada frequentemente).")
+                stats["rules_silenced"] += 1
+                continue # Pula esta regra
+
             print(f"\nLOG (Orchestrator): Executando regra '{rule.rule_name}'...")
 
             try:
@@ -109,17 +117,18 @@ class ProactiveNotificationOrchestrator:
                     message = result.to_message()
                     
                     # Salva no Notification Center (DB Local)
-                    self.notification_service.add_notification(
+                    notification_id = self.notification_service.add_notification(
                         message=message.text, 
                         category=message.category,
                         priority=message.priority.value if hasattr(message.priority, 'value') else "medium"
                     )
 
+                    # --- JARVIS LOG: Registra que a regra foi disparada (aguardando feedback) ---
+                    # O ID da notificação pode ser usado no futuro para linkar o feedback
+                    
                     # BROADCAST para todos os canais alvo
                     for channel, recipient in targets:
                         try:
-                            # Envio Async
-                            # Nota: 'send' deve retornar True/False
                             success = await channel.send(recipient, message)
                             if success:
                                 stats["notifications_sent"] += 1

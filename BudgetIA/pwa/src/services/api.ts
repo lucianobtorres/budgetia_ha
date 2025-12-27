@@ -5,13 +5,17 @@ export async function fetchAPI(endpoint: string, options: RequestInit = {}) {
     const url = `${API_BASE_URL}${endpoint}`;
     
     // Get User ID from localStorage or default to fallback
-    // In a real app, this would come from an Auth Context or Login flow
     const userId = localStorage.getItem(STORAGE_KEYS.USER_ID) || DEFAULT_USER_FALLBACK;
+    const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
 
-    const defaultHeaders = {
+    const defaultHeaders: Record<string, string> = {
         'Content-Type': 'application/json',
-        'X-User-ID': userId,
+        'X-User-ID': userId, // Mantendo por compatibilidade com logs antigos se necessário
     };
+    
+    if (token) {
+        defaultHeaders['Authorization'] = `Bearer ${token}`;
+    }
 
     const config = {
         ...options,

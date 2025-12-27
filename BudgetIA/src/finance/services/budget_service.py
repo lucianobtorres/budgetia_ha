@@ -74,14 +74,20 @@ class BudgetService:
             )
         # --- Fim da lógica de data ---
 
-        gastos_por_categoria = df_despesas.groupby(ColunasTransacoes.CATEGORIA)[
+        # Normalize transaction categories for matching
+        df_despesas['cat_norm'] = df_despesas[ColunasTransacoes.CATEGORIA].astype(str).str.strip().str.lower()
+
+        gastos_por_categoria = df_despesas.groupby('cat_norm')[
             ColunasTransacoes.VALOR
         ].sum()
 
         def calcular_gasto(row: pd.Series) -> float:
-            categoria = row[ColunasTransacoes.CATEGORIA]
-            if categoria in gastos_por_categoria:
-                return float(gastos_por_categoria[categoria])
+            categoria_raw = row[ColunasTransacoes.CATEGORIA]
+            # Normalize budget category for matching
+            categoria_norm = str(categoria_raw).strip().lower()
+            
+            if categoria_norm in gastos_por_categoria:
+                return float(gastos_por_categoria[categoria_norm])
             return 0.0  # Se não houver gasto, retorna 0 (não o valor antigo)
 
         df_orc_atualizado[ColunasOrcamentos.GASTO] = df_orc_atualizado.apply(
@@ -117,7 +123,7 @@ class BudgetService:
             df_orc_atualizado.apply(
                 lambda row: (
                     "Estourado"
-                    if row[ColunasOrcamentos.PERCENTUAL] > 100
+                    if row[ColunasOrcamentos.PERCENTUAL] > 100 or (row[ColunasOrcamentos.LIMITE] == 0 and row[ColunasOrcamentos.GASTO] > 0)
                     else ("Alerta" if row[ColunasOrcamentos.PERCENTUAL] > 90 else "OK")
                 ),
                 axis=1,

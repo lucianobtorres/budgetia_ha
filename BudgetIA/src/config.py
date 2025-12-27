@@ -22,6 +22,12 @@ GOOGLE_OAUTH_CLIENT_SECRET = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET")
 # O URI de redirecionamento que você configurou no Google Console
 GOOGLE_OAUTH_REDIRECT_URI = "http://localhost:8501"
 
+# --- CONFIGURAÇÃO DE SEGURANÇA (JWT) ---
+# Usar um segredo forte em produção!
+SECRET_KEY = os.getenv("SECRET_KEY", "super_secret_dev_key_change_in_prod_12345")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 Dias para dev (PWA persistência)
+
 # Os "escopos" (permissões) que pediremos ao usuário.
 # Precisamos de acesso total ao Drive para listar, compartilhar e ler.
 GOOGLE_OAUTH_SCOPES = ["https://www.googleapis.com/auth/drive"]

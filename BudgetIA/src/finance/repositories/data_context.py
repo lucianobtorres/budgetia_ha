@@ -3,7 +3,7 @@
 import pandas as pd
 
 import config
-from core.cache_service import CacheService
+from infrastructure.caching.redis_cache_service import RedisCacheService
 
 from ..storage.base_storage_handler import BaseStorageHandler
 from ..strategies.base_strategy import BaseMappingStrategy
@@ -20,7 +20,7 @@ class FinancialDataContext:
         self,
         storage_handler: BaseStorageHandler,
         strategy: BaseMappingStrategy,
-        cache_service: CacheService,
+        cache_service: RedisCacheService,
         cache_key: str,
     ) -> None:
         """
@@ -50,7 +50,7 @@ class FinancialDataContext:
         """
         Usa o handler e a estratégia para carregar os dados.
         """
-        cached_data, cached_timestamp = self.cache.get_dfs(self.cache_key)
+        cached_data, cached_timestamp = self.cache.get_entry(self.cache_key)
         source_timestamp = self.storage.get_source_modified_time()
 
         # --- 3. DECIDIR (O SEU INSIGHT) ---
@@ -78,7 +78,7 @@ class FinancialDataContext:
         self.is_cache_hit = False
         if not is_new_file:
             final_source_timestamp = self.storage.get_source_modified_time()
-            self.cache.set_dfs(self.cache_key, self.data, final_source_timestamp)
+            self.cache.set_entry(self.cache_key, self.data, final_source_timestamp)
 
         return bool(is_new_file)
 
@@ -120,6 +120,6 @@ class FinancialDataContext:
 
         # 3. Atualiza o cache (rápido)
         print("LOG: Atualizando o cache (CacheService)...")
-        self.cache.set_dfs(self.cache_key, self.data, final_source_timestamp)
+        self.cache.set_entry(self.cache_key, self.data, final_source_timestamp)
 
         print("LOG: Salvamento e atualização de cache concluídos.")

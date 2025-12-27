@@ -1,4 +1,6 @@
-from fastapi import Depends, Header, HTTPException
+from fastapi import Depends, Header, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from interfaces.api.utils.jwt import decode_access_token
 
 from infrastructure.agents.factory import AgentFactory
 from core.agent_runner_interface import AgentRunner
@@ -8,9 +10,7 @@ from finance.factory import FinancialSystemFactory
 from finance.planilha_manager import PlanilhaManager
 from finance.storage.excel_storage_handler import ExcelStorageHandler
 
-# Por enquanto, assumimos um usuário único local (o mesmo do Streamlit)
-# Em uma versão real, isso viria de um JWT Token no Header
-DEFAULT_USERNAME = "default_user"
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 # --- CACHE DE SISTEMAS FINANCEIROS ---
 # Mapeia user_id -> PlanilhaManager
@@ -20,12 +20,28 @@ _managers_cache: dict[str, PlanilhaManager] = {}
 
 # @lru_cache # Cache removido pois agora depende do Header dinâmico
 def get_user_config_service(
-    x_user_id: str = Header(default=DEFAULT_USERNAME),
+    token: str = Depends(oauth2_scheme),
 ) -> UserConfigService:
-    """Dependency que fornece o Config Service (baseado no Header)."""
+    """Dependency que valida o JWT e retorna o Config Service."""
+    payload = decode_access_token(token)
+    if payload is None:
+         raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Credenciais inválidas ou expiradas",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    username: str = payload.get("sub")
+    if username is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token inválido: sub ausente",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     # Debug para confirmar quem está chamando
-    print(f"--- API Dependency: Criando ConfigService para user='{x_user_id}' ---")
-    return UserConfigService(username=x_user_id)
+    print(f"--- API Dependency: Acesso AUTENTICADO para user='{username}' ---")
+    return UserConfigService(username=username)
 
 
 def get_planilha_manager(

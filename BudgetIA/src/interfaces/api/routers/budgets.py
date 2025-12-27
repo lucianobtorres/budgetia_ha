@@ -34,9 +34,11 @@ def add_orcamento(
     manager: PlanilhaManager = Depends(get_planilha_manager)
 ) -> dict[str, str]:
     try:
-        # Usa o método correto do manager
-        msg = manager.adicionar_ou_atualizar_orcamento(categoria, valor_limite, periodo, observacoes)
-        manager.save()
+        with manager.lock_file(timeout_seconds=30):
+            manager.refresh_data()
+            # Usa o método correto do manager
+            msg = manager.adicionar_ou_atualizar_orcamento(categoria, valor_limite, periodo, observacoes)
+            manager.save()
         return {"message": msg}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -51,16 +53,18 @@ def update_orcamento_item(
     manager: PlanilhaManager = Depends(get_planilha_manager)
 ) -> dict[str, str]:
     try:
-        dados = {
-            ColunasOrcamentos.CATEGORIA: categoria,
-            ColunasOrcamentos.LIMITE: valor_limite,
-            ColunasOrcamentos.PERIODO: periodo,
-            ColunasOrcamentos.OBS: observacoes
-        }
-        success = manager.update_budget(budget_id, dados)
-        if not success:
-             raise HTTPException(status_code=404, detail="Orçamento não encontrado")
-        manager.save()
+        with manager.lock_file(timeout_seconds=30):
+            manager.refresh_data()
+            dados = {
+                ColunasOrcamentos.CATEGORIA: categoria,
+                ColunasOrcamentos.LIMITE: valor_limite,
+                ColunasOrcamentos.PERIODO: periodo,
+                ColunasOrcamentos.OBS: observacoes
+            }
+            success = manager.update_budget(budget_id, dados)
+            if not success:
+                 raise HTTPException(status_code=404, detail="Orçamento não encontrado")
+            manager.save()
         return {"message": "Orçamento atualizado."}
     except HTTPException:
         raise
@@ -73,12 +77,14 @@ def delete_orcamento_item(
     manager: PlanilhaManager = Depends(get_planilha_manager)
 ) -> dict[str, str]:
     try:
-        success = manager.delete_budget(budget_id)
-        if not success:
-            raise HTTPException(status_code=404, detail="Orçamento não encontrado")
-        manager.save()
+        with manager.lock_file(timeout_seconds=30):
+            manager.refresh_data()
+            success = manager.delete_budget(budget_id)
+            if not success:
+                raise HTTPException(status_code=404, detail="Orçamento não encontrado")
+            manager.save()
         return {"message": "Orçamento removido."}
     except HTTPException:
-         raise
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

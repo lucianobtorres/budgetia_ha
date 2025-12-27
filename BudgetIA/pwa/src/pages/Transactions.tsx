@@ -1,23 +1,41 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTransactions, useDeleteTransaction, useCreateTransaction, useUpdateTransaction, type Transaction } from "../hooks/useTransactions";
+import { useTour } from "../context/TourContext";
 import { useCategoryColorMap } from "../hooks/useCategoryColorMap";
 import { TransactionCard } from "../components/transactions/TransactionCard";
 import TransactionModal from "../components/transactions/TransactionFormDrawer";
 import { Skeleton } from "../components/ui/Skeleton";
 import { Filter, Search, Plus } from "lucide-react";
+import { useLocation } from "react-router-dom";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { EmptyState } from "../components/ui/EmptyState";
 
 
+import { useDrawer } from "../context/DrawerContext";
+
 export default function Transactions() {
+    const { openDrawer } = useDrawer();
+    const { startTour } = useTour();
+    const location = useLocation();
+
     // Current date for default filter
     const now = new Date();
     // Use string to handle "all" option
     const [filterValue, setFilterValue] = useState<string>(`${now.getFullYear()}-${now.getMonth() + 1}`);
     const [searchTerm, setSearchTerm] = useState("");
+
+    // Initial Category from navigation state
+    const [categoryFilter, setCategoryFilter] = useState(location.state?.initialCategory || 'all');
     
+    useEffect(() => {
+        // Small delay to ensure table is rendered (even if skeletal)
+        setTimeout(() => {
+            startTour('transactions_walkthrough');
+        }, 1000);
+    }, []);
+
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingTx, setEditingTx] = useState<Transaction | null>(null);
@@ -37,19 +55,47 @@ export default function Transactions() {
     const { getCategoryColor } = useCategoryColorMap();
 
     const { mutate: deleteTransaction } = useDeleteTransaction();
-    const { mutateAsync: createTransaction } = useCreateTransaction();
-    const { mutateAsync: updateTransaction } = useUpdateTransaction();
+    const { mutateAsync: createTransaction, isPending: isCreating } = useCreateTransaction();
+    const { mutateAsync: updateTransaction, isPending: isUpdating } = useUpdateTransaction();
 
     // Category sorting is handled by backend or default, color is now hash-based.
     // No need for complex rank calculation here.
 
-    const filteredTransactions = transactions?.filter(t => 
-        t.Descricao.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        t.Categoria.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+
+
+    // Extract unique categories from loaded transactions for the filter dropdown
+    const uniqueCategories = Array.from(new Set(transactions?.map(t => t.Categoria) || [])).sort();
+
+    // Smart Navigation Handler
+    useEffect(() => {
+        const initialCategory = location.state?.initialCategory;
+        if (initialCategory) {
+            setCategoryFilter(initialCategory);
+            
+            // If category is not in current view (e.g. filtered by month), switch to 'all'
+            if (transactions && filterValue !== 'all') {
+                const hasCategory = transactions.some(t => t.Categoria === initialCategory);
+                if (!hasCategory) {
+                    setFilterValue('all');
+                }
+            }
+        }
+    }, [location.state, transactions, filterValue]); // Re-run when transactions load to verify
+
+    const filteredTransactions = transactions?.filter(t => {
+        const matchesSearch = t.Descricao.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                              t.Categoria.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesCategory = categoryFilter === 'all' || t.Categoria === categoryFilter;
+        
+        return matchesSearch && matchesCategory;
+    });
 
     const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         setFilterValue(e.target.value);
+    };
+
+    const handleCategoryClick = (category: string) => {
+        openDrawer('CATEGORY_EXPENSES', { highlightCategory: category });
     };
 
     const handleSave = async (data: any) => {
@@ -93,41 +139,61 @@ export default function Transactions() {
     return (
         <div className="h-full flex flex-col gap-4 overflow-hidden">
             {/* Header - Fixed */}
-            <PageHeader
-                title="Transações"
-                description="Gerencie suas receitas e despesas."
-                action={
-                    <Button 
-                        onClick={() => { setEditingTx(null); setIsModalOpen(true); }}
-                        variant="primary"
-                        size="icon"
-                        className="rounded-xl shadow-lg hover:bg-emerald-600 transition-colors"
-                        icon={Plus}
-                    />
-                }
-            />
+            <div id="tx-header">
+                <PageHeader
+                    title="Transações"
+                    description="Gerencie suas receitas e despesas."
+                    action={
+                        <Button 
+                            id="tx-add-btn"
+                            onClick={() => { setEditingTx(null); setIsModalOpen(true); }}
+                            variant="primary"
+                            size="icon"
+                            className="rounded-xl shadow-lg hover:bg-emerald-600 transition-colors"
+                            icon={Plus}
+                        />
+                    }
+                />
+            </div>
 
                 {/* Filters Row */}
-                <div className="flex items-center gap-2">
-                    {/* Month Select */}
-                    <div className="relative flex-1 max-w-[180px]">
-                        <div className="absolute inset-y-0 left-2 flex items-center pointer-events-none text-gray-400">
-                             <Filter size={14} />
+                {/* Filters Row */}
+                <div id="tx-filters" className="flex flex-col md:flex-row gap-3">
+                    <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 scrollbar-none">
+                        {/* Month Select */}
+                        <div className="relative flex-1 min-w-[140px] md:flex-none">
+                            <div className="absolute inset-y-0 left-2 flex items-center pointer-events-none text-gray-400">
+                                 <Filter size={14} />
+                            </div>
+                            <select 
+                                value={filterValue}
+                                onChange={handleFilterChange}
+                                className="w-full pl-8 pr-4 py-2 bg-gray-900 border border-gray-800 rounded-xl text-sm text-white appearance-none focus:border-emerald-500 outline-none capitalize transition-colors"
+                            >
+                                <option value="all">Todo o Período</option>
+                                {months.map(m => (
+                                    <option key={m.value} value={m.value}>{m.label}</option>
+                                ))}
+                            </select>
                         </div>
-                        <select 
-                            value={filterValue}
-                            onChange={handleFilterChange}
-                            className="w-full pl-8 pr-4 py-2 bg-gray-900 border border-gray-800 rounded-xl text-sm text-white appearance-none focus:border-emerald-500 outline-none capitalize transition-colors"
-                        >
-                            <option value="all">Ver Tudo</option>
-                            {months.map(m => (
-                                <option key={m.value} value={m.value}>{m.label}</option>
-                            ))}
-                        </select>
+
+                        {/* Category Select */}
+                        <div className="relative flex-1 min-w-[140px] md:flex-none">
+                            <select 
+                                value={categoryFilter}
+                                onChange={(e) => setCategoryFilter(e.target.value)}
+                                className="w-full px-4 py-2 bg-gray-900 border border-gray-800 rounded-xl text-sm text-white appearance-none focus:border-emerald-500 outline-none capitalize transition-colors"
+                            >
+                                <option value="all">Todas as Categorias</option>
+                                {uniqueCategories.map(cat => (
+                                    <option key={cat} value={cat}>{cat}</option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
 
                     {/* Search Input */}
-                    <div className="relative flex-1">
+                    <div className="relative w-full md:flex-1">
                         <Input 
                             type="text" 
                             placeholder="Buscar..." 
@@ -140,7 +206,7 @@ export default function Transactions() {
 
 
             {/* List - Scrollable */}
-            <div className="flex-1 overflow-y-auto scrollbar-none pb-20">
+            <div id="tx-list" className="flex-1 overflow-y-auto scrollbar-none pb-20">
                 {isLoading ? (
                     <div className="space-y-3">
                          {[1,2,3,4,5].map(i => (
@@ -167,6 +233,7 @@ export default function Transactions() {
                                         }
                                     }} 
                                     onEdit={handleEdit}
+                                    onCategoryClick={handleCategoryClick}
                                 />
                             ))
                         ) : (
@@ -188,6 +255,7 @@ export default function Transactions() {
                 onClose={() => setIsModalOpen(false)}
                 onSave={handleSave}
                 initialData={initialFormData}
+                isLoading={isCreating || isUpdating}
             />
         </div>
     );

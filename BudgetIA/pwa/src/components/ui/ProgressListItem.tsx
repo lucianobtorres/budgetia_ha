@@ -16,6 +16,8 @@ interface Props {
     // Interactions
     onEdit?: () => void;
     onDelete?: () => void;
+    action?: React.ReactNode;
+    alwaysShowActions?: boolean;
 }
 
 export function ProgressListItem({ 
@@ -26,7 +28,9 @@ export function ProgressListItem({
     limit, 
     totalReference,
     onEdit, 
-    onDelete 
+    onDelete,
+    action,
+    alwaysShowActions = false
 }: Props) {
     const isBudgetMode = limit !== undefined;
     
@@ -41,11 +45,16 @@ export function ProgressListItem({
         percentage = (value / (totalReference || 1)) * 100;
     }
 
+    const actionOpacityClass = alwaysShowActions 
+        ? "opacity-100" 
+        : "opacity-100 md:opacity-0 group-hover:opacity-100";
+
     return (
         <div className="group relative rounded-xl border border-gray-800 bg-gray-900/40 p-4 transition-all hover:bg-gray-900/60 hover:border-gray-700">
             {/* Actions (Absolute) - Only if handlers provided */}
-            {(onEdit || onDelete) && (
-                <div className="absolute top-3 right-3 flex space-x-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity bg-gray-900/80 rounded-lg p-1 z-10">
+            {(onEdit || onDelete || action) && (
+                <div className={`absolute top-3 right-3 flex items-center space-x-1 ${actionOpacityClass} transition-opacity bg-gray-900/80 rounded-lg p-1 z-10`}>
+                    {action}
                     {onEdit && (
                         <button 
                             onClick={(e) => { e.stopPropagation(); onEdit(); }}

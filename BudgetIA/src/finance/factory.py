@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from config import LAYOUT_PLANILHA
-from core.cache_service import CacheService
+from infrastructure.caching.redis_cache_service import RedisCacheService
 from finance.planilha_manager import PlanilhaManager
 from finance.repositories.budget_repository import BudgetRepository
 from finance.repositories.data_context import FinancialDataContext
@@ -69,7 +69,8 @@ class FinancialSystemFactory:
         )
 
         # 1. Cache Service
-        cache_service = CacheService()
+        # 1. Cache Service
+        cache_service = RedisCacheService()
         cache_key = f"dfs:{config_service.username}"
 
         # 2. Estratégia de Mapeamento

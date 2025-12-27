@@ -47,6 +47,27 @@ class PlanilhaManager:
         # Mantido para compatibilidade
         self.is_new_file = self._context.is_new_file
 
+        # --- CONCURRENCY CONTROL ---
+        from infrastructure.locking.lock_manager import RedisLockManager
+        self.lock_manager = RedisLockManager(self._context.storage.file_path)
+
+    @property
+    def lock_file(self):
+        """Atalho para o context manager de lock."""
+        return self.lock_manager.acquire
+
+    def refresh_data(self) -> None:
+        """
+        Recarrega os dados do disco forçosamente para garantir 
+        que estamos trabalhando com a versão mais recente antes de salvar.
+        Útil para transações atômicas (Lock -> Refresh -> Update -> Save).
+        """
+        print("LOG (PM): Recarregando dados do disco (Atomic Refresh)...")
+        dfs, _ = self._context.storage.load_sheets(
+            self._context.layout_config, self._context.strategy
+        )
+        self._context.data = dfs
+
     def save(self, add_intelligence: bool = False) -> None:
         self._context.save(add_intelligence)
 

@@ -40,14 +40,16 @@ def update_profile_bulk(
         if not itens:
             return {"message": "Nenhuma alteração enviada."}
             
-        df_new = pd.DataFrame(itens)
-        
-        # Limpeza essencial
-        if ColunasPerfil.CAMPO in df_new.columns:
-            df_new = df_new.dropna(subset=[ColunasPerfil.CAMPO])
-        
-        manager.update_dataframe(NomesAbas.PERFIL_FINANCEIRO, df_new)
-        manager.save()
+        with manager.lock_file(timeout_seconds=30):
+            manager.refresh_data()
+            df_new = pd.DataFrame(itens)
+            
+            # Limpeza essencial
+            if ColunasPerfil.CAMPO in df_new.columns:
+                df_new = df_new.dropna(subset=[ColunasPerfil.CAMPO])
+            
+            manager.update_dataframe(NomesAbas.PERFIL_FINANCEIRO, df_new)
+            manager.save()
         
         return {"message": "Perfil atualizado com sucesso."}
     except Exception as e:

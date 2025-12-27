@@ -13,9 +13,11 @@ class BudgetAPIClient:
     Cliente para comunicação com a API do BudgetIA.
     Permite que o Frontend (Streamlit) seja agnóstico à implementação do backend.
     """
-    def __init__(self, base_url: str = "http://127.0.0.1:8000", user_id: str = "default_user"):
+    def __init__(self, base_url: str = "http://127.0.0.1:8000", user_id: str = "default_user", token: Optional[str] = None):
         self.base_url = base_url.rstrip("/")
         self.headers = {"X-User-ID": user_id}
+        if token:
+            self.headers["Authorization"] = f"Bearer {token}"
 
     def _make_request(self, method: str, endpoint: str, **kwargs: Any) -> Any:
         """Centralized request handler with exception mapping."""

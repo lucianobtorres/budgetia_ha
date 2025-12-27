@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useBudgetsList, useCreateBudget, useUpdateBudget, useDeleteBudget, type Budget } from '../../hooks/useBudgets';
 import { useCategoryColorMap } from '../../hooks/useCategoryColorMap';
 import { Plus, Edit2, Trash2, AlertTriangle } from 'lucide-react';
@@ -11,17 +11,47 @@ import { ProgressListItem } from '../ui/ProgressListItem';
 interface Props {
     isOpen: boolean;
     onClose: () => void;
+    highlightCategory?: string;
+    highlightId?: number;
 }
 
-export default function BudgetDrawer({ isOpen, onClose }: Props) {
+export default function BudgetDrawer({ isOpen, onClose, highlightCategory, highlightId }: Props) {
     const { data: rawBudgets } = useBudgetsList();
     const { mutate: deleteBudget } = useDeleteBudget();
-    const { mutateAsync: createBudget } = useCreateBudget();
-    const { mutateAsync: updateBudget } = useUpdateBudget();
+    const { mutateAsync: createBudget, isPending: isCreating } = useCreateBudget();
+    const { mutateAsync: updateBudget, isPending: isUpdating } = useUpdateBudget();
     const { getCategoryColor } = useCategoryColorMap();
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
+    
+    // Refs for scroll elements
+    const itemRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+    // Scroll to highlight when drawer opens
+    useEffect(() => {
+        if (isOpen && rawBudgets) {
+            let targetKey: string | undefined;
+
+            if (highlightCategory) {
+                // Find budget with this category
+                const target = rawBudgets.find(b => b.Categoria === highlightCategory);
+                if (target) targetKey = target.Categoria;
+            } else if (highlightId) {
+                const target = rawBudgets.find(b => b["ID Orcamento"] === highlightId);
+                if (target) targetKey = target.Categoria;
+            }
+
+            if (targetKey && itemRefs.current[targetKey]) {
+                 setTimeout(() => {
+                    itemRefs.current[targetKey!]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    // Flash effect
+                    itemRefs.current[targetKey!]?.classList.add('bg-white/5');
+                    setTimeout(() => itemRefs.current[targetKey!]?.classList.remove('bg-white/5'), 1000);
+                }, 300);
+            }
+        }
+    }, [isOpen, highlightCategory, highlightId, rawBudgets]);
 
     // Sort budgets by Spent Amount (Descending) for color ranking
     const budgets = rawBudgets ? [...rawBudgets].sort((a, b) => (b['Valor Gasto Atual'] || 0) - (a['Valor Gasto Atual'] || 0)) : [];
@@ -155,17 +185,25 @@ export default function BudgetDrawer({ isOpen, onClose }: Props) {
                             </div>
                         ) : (
                             budgets.map((budget, idx) => {
+                                const isHighlighted = (highlightCategory && budget.Categoria === highlightCategory) || 
+                                                      (highlightId && budget["ID Orcamento"] === highlightId);
+                                
                                 return (
-                                    <ProgressListItem
-                                        key={idx}
-                                        title={budget.Categoria}
-                                        subtitle={budget['Período Orçamento']}
-                                        color={getCategoryColor(budget.Categoria)}
-                                        value={budget['Valor Gasto Atual'] || 0}
-                                        limit={budget['Valor Limite'] || 0}
-                                        onEdit={() => { setEditingBudget(budget as Budget); setIsModalOpen(true); }}
-                                        onDelete={() => handleDelete(budget["ID Orcamento"])}
-                                    />
+                                    <div 
+                                        key={idx} 
+                                        ref={el => itemRefs.current[budget.Categoria] = el}
+                                        className={`transition-colors rounded-xl ${isHighlighted ? 'bg-white/10 ring-1 ring-white/20' : ''}`}
+                                    >
+                                        <ProgressListItem
+                                            title={budget.Categoria}
+                                            subtitle={budget['Período Orçamento']}
+                                            color={getCategoryColor(budget.Categoria)}
+                                            value={budget['Valor Gasto Atual'] || 0}
+                                            limit={budget['Valor Limite'] || 0}
+                                            onEdit={() => { setEditingBudget(budget as Budget); setIsModalOpen(true); }}
+                                            onDelete={() => handleDelete(budget["ID Orcamento"])}
+                                        />
+                                    </div>
                                 )
                             })
                         )}
@@ -177,6 +215,7 @@ export default function BudgetDrawer({ isOpen, onClose }: Props) {
                     onClose={() => setIsModalOpen(false)}
                     onSave={handleSave}
                     initialData={getInitialData()}
+                    isLoading={isCreating || isUpdating}
                 />
             </div>
         </Drawer>
