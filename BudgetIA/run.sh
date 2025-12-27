@@ -10,6 +10,7 @@ if [ -f "$OPTIONS_PATH" ]; then
     export LOG_LEVEL=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('log_level', 'info'))")
     export OPENAI_API_KEY=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('openai_api_key', ''))")
     export GROQ_API_KEY=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('groq_api_key', ''))")
+    export GROQ_MODEL=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('groq_model', ''))")
     export GEMINI_API_KEY=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('gemini_api_key', ''))")
     export GOOGLE_OAUTH_CLIENT_ID=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('google_oauth_client_id', ''))")
     export GOOGLE_OAUTH_CLIENT_SECRET=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('google_oauth_client_secret', ''))")

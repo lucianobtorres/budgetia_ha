@@ -1,5 +1,5 @@
 name: "BudgetIA (Monorepo)"
-version: "1.0.4"
+version: "1.0.5"
 slug: "budgetia"
 description: "Assistente Financeiro Pessoal com IA Local/Remota, Planilhas e Dashboard Rico."
 url: "https://github.com/lucianobtorres/budgetia_ha"
@@ -18,6 +18,7 @@ options:
   log_level: info
   openai_api_key: ""
   groq_api_key: ""
+  groq_model: "llama-3.3-70b-versatile"
   gemini_api_key: ""
   google_oauth_client_id: ""
   google_oauth_client_secret: ""
@@ -29,6 +30,7 @@ schema:
   log_level: list(debug|info|warning|error)
   openai_api_key: str?
   groq_api_key: str?
+  groq_model: str?
   gemini_api_key: str?
   google_oauth_client_id: str?
   google_oauth_client_secret: str?
