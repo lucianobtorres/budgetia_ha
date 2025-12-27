@@ -113,7 +113,7 @@ class GoogleAuthService:
         """
         try:
             # --- 1. Autenticar a Service Account (o robô) ---
-            sa_path = Path(config.SERVICE_ACCOUNT_CREDENTIALS_PATH)
+            sa_path = Path(config.GSPREAD_CREDENTIALS_PATH)
 
             if not sa_path.exists():
                 raise FileNotFoundError(
