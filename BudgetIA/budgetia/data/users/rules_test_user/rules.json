@@ -1,0 +1,10 @@
+[
+    {
+        "id": "pizza_monthly",
+        "type": "threshold",
+        "category": "Pizza",
+        "threshold": 100.0,
+        "period": "monthly",
+        "custom_message": null
+    }
+]

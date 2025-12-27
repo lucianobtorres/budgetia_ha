@@ -1,0 +1,42 @@
+[
+  {
+    "role": "user",
+    "content": "Adicione uma despesa de R$ 15 em Transporte hoje."
+  },
+  {
+    "role": "assistant",
+    "content": "Despesa de R$ 15 em Transporte adicionada com sucesso! Seu novo saldo é R$ 4.240,01. Tem mais alguma transação para registrar ou alguma pergunta?"
+  },
+  {
+    "role": "user",
+    "content": "como estão os meus gastos esse mês?"
+  },
+  {
+    "role": "assistant",
+    "content": "Desculpe, ocorreu um erro interno: FinancialDataContext.get_dataframe() got an unexpected keyword argument 'aba_nome'"
+  },
+  {
+    "role": "user",
+    "content": "Mas como estão os gastos?"
+  },
+  {
+    "role": "assistant",
+    "content": "Desculpe, ocorreu um erro interno: FinancialDataContext.get_dataframe() got an unexpected keyword argument 'aba_nome'"
+  },
+  {
+    "role": "user",
+    "content": "Quero saber como estão os meus gastos desse mês"
+  },
+  {
+    "role": "assistant",
+    "content": "No mês de Novembro de 2025, suas despesas totalizaram R$843,99. Suas receitas foram de R$5500,00, resultando em um saldo positivo de R$4656,01 para o mês."
+  },
+  {
+    "role": "user",
+    "content": "tenho muitas despesas de alimentação esse mês? Qual o orçamento disso?"
+  },
+  {
+    "role": "assistant",
+    "content": "Suas despesas com alimentação este mês somam R$1319.49.\n\nNão consegui verificar o orçamento para a categoria \"Alimentação\" devido a um erro interno. Sinto muito por isso.\n\nGostaria de definir um orçamento para alimentação ou para outras categorias?"
+  }
+]

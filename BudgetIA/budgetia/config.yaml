@@ -1,8 +1,8 @@
-name: "BudgetIA"
-version: "1.0.2"
+name: "BudgetIA (Monorepo)"
+version: "1.0.0"
 slug: "budgetia"
 description: "Assistente Financeiro Pessoal com IA Local/Remota, Planilhas e Dashboard Rico."
-url: "https://github.com/lucianobtorres/BudgetIA"
+url: "https://github.com/lucianobtorres/budgetia_ha"
 startup: application
 arch:
   - aarch64

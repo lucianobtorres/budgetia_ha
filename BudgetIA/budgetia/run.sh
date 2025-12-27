@@ -1,14 +1,12 @@
 #!/bin/bash
 set -e
 
-echo "🟢 Iniciando BudgetIA Add-on..."
+echo "🟢 Iniciando BudgetIA Add-on (Monorepo Mode)..."
 
-# 1. Carregar Opções do Home Assistant (se existirem)
+# 1. Carregar Opções do Home Assistant
 OPTIONS_PATH="/data/options.json"
 if [ -f "$OPTIONS_PATH" ]; then
     echo "⚙️  Carregando opções..."
-    # Usa jq para ler JSON. jq vem no python-slim? Não. 
-    # Fallback: Python one-liner para ler JSON
     export LOG_LEVEL=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('log_level', 'info'))")
     export OPENAI_API_KEY=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('openai_api_key', ''))")
     export GROQ_API_KEY=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('groq_api_key', ''))")
@@ -23,17 +21,12 @@ else
 fi
 
 # 2. Configurar Persistência
-# O HA monta um volume persistente em /data.
-# Se o app espera os dados em outro lugar, linkamos.
-# No Dockerfile: WORKDIR /app. Dados originais em /app/data.
-# Queremos que /app/data aponte para /data do container (volume).
-
 if [ ! -d "/data/budgetia_files" ]; then
     echo "📁 Criando diretório de dados persistentes..."
     mkdir -p /data/budgetia_files
 fi
 
-# Copiar planilha inicial se não existir
+# Copiar planilha inicial se não existir na persistência
 if [ ! -f "/data/budgetia_files/planilha_mestra.xlsx" ]; then
     if [ -f "/app/planilha_mestra.xlsx" ]; then
         echo "📄 Inicializando planilha mestra..."
@@ -41,17 +34,11 @@ if [ ! -f "/data/budgetia_files/planilha_mestra.xlsx" ]; then
     fi
 fi
 
-# Ajustar config para usar o caminho persistente (via ENV ou link simbólico)
-# Aqui faremos um link simbólico: O app lê 'planilha_mestra.xlsx' do diretório atual (/app).
-# Vamos forçar que isso seja um link para /data/budgetia_files/planilha_mestra.xlsx
-
+# Linkar persistência
 ln -sf /data/budgetia_files/planilha_mestra.xlsx /app/planilha_mestra.xlsx
-echo "🔗 Persistência configurada."
 
 # 3. Iniciar Servidor
 echo "🚀 Iniciando Servidor API + Frontend..."
-# Usa uvicorn diretamente, apontando para a pasta src
-# Adicionamos /app/src ao PYTHONPATH
 export PYTHONPATH=$PYTHONPATH:/app/src
 export STATIC_DIR="/app/static"
 

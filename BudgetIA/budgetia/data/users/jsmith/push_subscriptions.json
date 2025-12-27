@@ -1,0 +1,10 @@
+[
+  {
+    "endpoint": "https://fcm.googleapis.com/fcm/send/duYYyczA8NE:APA91bGsOx4qrcMqXd6xU2u_i6IJpZ67d15WWQ5-UeK73erS-lvRY3BC_BwizCB3V6SFfdNoiMaSFTzU7Z7WmY0ZExs0ORntPR9rlKhymWgRqe1q6IQ9OPaJMyGVPepYxCLpM5OzAGZu",
+    "keys_auth": "w-jxW3WduIDfhomnpXrZrA",
+    "keys_p256dh": "BCg5uTb1ps_oH1AZ_94QuivPSYov3AeaP925SeLLAzJAUjiOU4Gj_7Ao_TQI4KfftndaTFcEaV9SSt4MHcxr_GI",
+    "user_id": "jsmith",
+    "created_at": "2025-12-24 02:39:30.049201",
+    "device_name": "Browser"
+  }
+]
