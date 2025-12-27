@@ -1,0 +1,58 @@
+#!/bin/bash
+set -e
+
+echo "🟢 Iniciando BudgetIA Add-on..."
+
+# 1. Carregar Opções do Home Assistant (se existirem)
+OPTIONS_PATH="/data/options.json"
+if [ -f "$OPTIONS_PATH" ]; then
+    echo "⚙️  Carregando opções..."
+    # Usa jq para ler JSON. jq vem no python-slim? Não. 
+    # Fallback: Python one-liner para ler JSON
+    export LOG_LEVEL=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('log_level', 'info'))")
+    export OPENAI_API_KEY=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('openai_api_key', ''))")
+    export GROQ_API_KEY=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('groq_api_key', ''))")
+    export GEMINI_API_KEY=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('gemini_api_key', ''))")
+    export GOOGLE_OAUTH_CLIENT_ID=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('google_oauth_client_id', ''))")
+    export GOOGLE_OAUTH_CLIENT_SECRET=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('google_oauth_client_secret', ''))")
+    export SECRET_KEY=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('secret_key', ''))")
+    export UPSTASH_REDIS_URL=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('upstash_redis_url', ''))")
+    export PLANILHA_PATH=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('planilha_path', ''))")
+else
+    echo "⚠️  options.json não encontrado. Usando variáveis de ambiente."
+fi
+
+# 2. Configurar Persistência
+# O HA monta um volume persistente em /data.
+# Se o app espera os dados em outro lugar, linkamos.
+# No Dockerfile: WORKDIR /app. Dados originais em /app/data.
+# Queremos que /app/data aponte para /data do container (volume).
+
+if [ ! -d "/data/budgetia_files" ]; then
+    echo "📁 Criando diretório de dados persistentes..."
+    mkdir -p /data/budgetia_files
+fi
+
+# Copiar planilha inicial se não existir
+if [ ! -f "/data/budgetia_files/planilha_mestra.xlsx" ]; then
+    if [ -f "/app/planilha_mestra.xlsx" ]; then
+        echo "📄 Inicializando planilha mestra..."
+        cp /app/planilha_mestra.xlsx /data/budgetia_files/
+    fi
+fi
+
+# Ajustar config para usar o caminho persistente (via ENV ou link simbólico)
+# Aqui faremos um link simbólico: O app lê 'planilha_mestra.xlsx' do diretório atual (/app).
+# Vamos forçar que isso seja um link para /data/budgetia_files/planilha_mestra.xlsx
+
+ln -sf /data/budgetia_files/planilha_mestra.xlsx /app/planilha_mestra.xlsx
+echo "🔗 Persistência configurada."
+
+# 3. Iniciar Servidor
+echo "🚀 Iniciando Servidor API + Frontend..."
+# Usa uvicorn diretamente, apontando para a pasta src
+# Adicionamos /app/src ao PYTHONPATH
+export PYTHONPATH=$PYTHONPATH:/app/src
+export STATIC_DIR="/app/static"
+
+exec python3 -m uvicorn interfaces.api.main:app --host 0.0.0.0 --port 8000 --log-level ${LOG_LEVEL:-info}
