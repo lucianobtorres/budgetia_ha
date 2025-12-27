@@ -78,4 +78,17 @@ echo "🚀 Iniciando Servidor API + Frontend..."
 export PYTHONPATH=$PYTHONPATH:/app/src
 export STATIC_DIR="/app/static"
 
-exec python3 -m uvicorn interfaces.api.main:app --host 0.0.0.0 --port 8000 --log-level ${LOG_LEVEL:-info}
+# Ler configs de SSL
+USE_SSL=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('ssl', False))")
+CERT_FILE=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('certfile', ''))")
+KEY_FILE=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('keyfile', ''))")
+
+CMD="python3 -m uvicorn interfaces.api.main:app --host 0.0.0.0 --port 8000 --log-level ${LOG_LEVEL:-info}"
+
+if [ "$USE_SSL" = "True" ]; then
+    echo "🔒 SSL Habilitado. Usando cert: /ssl/$CERT_FILE"
+    CMD="$CMD --ssl-keyfile /ssl/$KEY_FILE --ssl-certfile /ssl/$CERT_FILE"
+fi
+
+echo "Executando: $CMD"
+exec $CMD

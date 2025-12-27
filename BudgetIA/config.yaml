@@ -1,5 +1,5 @@
 name: "BudgetIA (Monorepo)"
-version: "1.0.9"
+version: "1.0.10"
 slug: "budgetia"
 description: "Assistente Financeiro Pessoal com IA Local/Remota, Planilhas e Dashboard Rico."
 url: "https://github.com/lucianobtorres/budgetia_ha"
@@ -30,6 +30,9 @@ options:
   secret_key: "change_me_in_production"
   upstash_redis_url: ""
   planilha_path: ""
+  ssl: false
+  certfile: "fullchain.pem"
+  keyfile: "privkey.pem"
 schema:
   log_level: list(debug|info|warning|error)
   openai_api_key: str?
@@ -46,6 +49,9 @@ schema:
   secret_key: str?
   upstash_redis_url: str?
   planilha_path: str?
+  ssl: bool?
+  certfile: str?
+  keyfile: str?
 ports:
   8000/tcp: 8000
 ports_description:
