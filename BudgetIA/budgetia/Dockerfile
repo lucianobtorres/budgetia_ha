@@ -38,8 +38,8 @@ ENV PATH="$POETRY_HOME/bin:$PATH"
 COPY . /app
 
 # Install Dependencies
-# We use the local poetry.lock/pyproject.toml found in /app
-RUN poetry install --only main --no-interaction --no-ansi --no-root
+# We remove poetry.lock to rely on pyproject.toml and avoid sync errors
+RUN rm -f poetry.lock && poetry install --only main --no-interaction --no-ansi --no-root
 
 # Copy built frontend assets from Stage 1 into the static folder
 COPY --from=frontend /app/pwa/dist /app/static
