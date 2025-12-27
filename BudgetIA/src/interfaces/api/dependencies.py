@@ -69,8 +69,17 @@ def get_planilha_manager(
         # print(f"--- API: Usando Manager em Cache para {cache_key} ---")
         return _managers_cache[cache_key]
 
-    # 3. Cria o Handler de Storage (Local)
-    storage_handler = ExcelStorageHandler(file_path=path_str)
+    # 3. Cria o Handler de Storage (Local, Google Sheets ou Google Drive Excel)
+    from finance.storage.storage_factory import StorageHandlerFactory
+
+    try:
+        storage_handler = StorageHandlerFactory.create_handler(path_str)
+        print(f"--- API: Handler de Storage criado: {type(storage_handler).__name__} para {path_str} ---")
+    except ValueError as e:
+        print(f"--- API ERRO: Falha ao criar handler de storage: {e} ---")
+        raise HTTPException(
+            status_code=500, detail=f"Erro de configuração de storage: {str(e)}"
+        )
 
     # 4. Usa a Factory existente para montar tudo (Repositories, Services, Context)
     manager = FinancialSystemFactory.create_manager(

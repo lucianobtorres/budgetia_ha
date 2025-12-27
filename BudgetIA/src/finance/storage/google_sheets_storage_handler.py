@@ -47,9 +47,34 @@ class GoogleSheetsStorageHandler(BaseStorageHandler): # type: ignore[misc]
             raise ValueError(
                 f"Planilha Google não encontrada ou não compartilhada: {spreadsheet_url_or_key}"
             )
+        except gspread.exceptions.APIError as e:
+            if "400" in str(e) and "supported" in str(e):
+                error_msg = (
+                    "ERRO DE FORMATO: Você forneceu um link para um arquivo Excel (.xlsx) no Google Drive. "
+                    "O sistema BudgetIA precisa de uma 'Planilha Google' nativa.\n"
+                    "SOLUÇÃO: Abra seu arquivo no Google Drive, vá em 'Arquivo' -> 'Salvar como Planilha Google' "
+                    "e use o novo link gerado."
+                )
+                print(f"AVISO CRÍTICO: {error_msg}")
+                raise ValueError(error_msg)
+            else:
+                print(f"ERRO (GSheetsHandler): Falha de API ao abrir planilha: {e}")
+                raise
         except Exception as e:
             print(f"ERRO (GSheetsHandler): Falha ao autenticar ou abrir planilha: {e}")
             raise
+
+    @property
+    def resource_id(self) -> str:
+        """
+        Retorna o ID Único da Planilha Google (Spreadsheet ID).
+        Usado como chave para o Redis Lock.
+        """
+        try:
+            return self.spreadsheet.id # type: ignore[attr-defined, no-any-return]
+        except Exception:
+            # Fallback se algo der errado (ex: não aberto ainda)
+            return "unknown_gsheets_resource"
 
     @property
     def is_new_file(self) -> bool:

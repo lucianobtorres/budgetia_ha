@@ -14,6 +14,8 @@ DATA_DIR = os.path.join(PROJECT_ROOT, "data")
 
 DEFAULT_CRED_FILENAME = "gen-lang-client-0988185244-c9e312f68267.json"
 GSPREAD_CREDENTIALS_PATH = os.getenv("GSPREAD_CREDENTIALS_PATH")
+if GSPREAD_CREDENTIALS_PATH:
+    GSPREAD_CREDENTIALS_PATH = GSPREAD_CREDENTIALS_PATH.strip("'").strip('"')
 
 # --- NOVAS CHAVES PARA O LOGIN DE USUÁRIO (OAUTH 2.0) ---
 GOOGLE_OAUTH_CLIENT_ID = os.getenv("GOOGLE_OAUTH_CLIENT_ID")
@@ -78,24 +80,71 @@ class LLMModels:
 DEFAULT_GROQ_MODEL = os.getenv("GROQ_MODEL", LLMModels.DEFAULT_GROQ)
 DEFAULT_GEMINI_MODEL = LLMModels.DEFAULT_GEMINI
 
+
+# Caminho padrão robusto
+SERVICE_ACCOUNT_CREDENTIALS_PATH = os.path.join(DATA_DIR, DEFAULT_CRED_FILENAME)
+
+# Lógica de seleção do arquivo
+CHOSEN_CRED_PATH = None
+
+# 1. Tenta pegar do Env Var
+if GSPREAD_CREDENTIALS_PATH:
+    # Se for caminho relativo, tenta resolver a partir do ROOT ou DATA_DIR
+    if not os.path.isabs(GSPREAD_CREDENTIALS_PATH):
+        # Tenta em Data Dir primeiro
+        candidate = os.path.join(DATA_DIR, GSPREAD_CREDENTIALS_PATH)
+        if os.path.exists(candidate):
+            CHOSEN_CRED_PATH = candidate
+        else:
+             # Tenta no Project Root
+            candidate = os.path.join(PROJECT_ROOT, GSPREAD_CREDENTIALS_PATH)
+            if os.path.exists(candidate):
+                CHOSEN_CRED_PATH = candidate
+            else:
+                 # Assume que o usuário sabe o que está fazendo (mesmo que não exista agora)
+                 CHOSEN_CRED_PATH = GSPREAD_CREDENTIALS_PATH
+    else:
+        CHOSEN_CRED_PATH = GSPREAD_CREDENTIALS_PATH
+else:
+    # 2. Fallback para o padrão
+    CHOSEN_CRED_PATH = SERVICE_ACCOUNT_CREDENTIALS_PATH
+
+# Debug prints
+print(f"DEBUG: Project Root: {PROJECT_ROOT}")
+print(f"DEBUG: Data Dir: {DATA_DIR}")
+print(f"DEBUG: Env Var Path: {GSPREAD_CREDENTIALS_PATH}")
+print(f"DEBUG: Chosen Path: {CHOSEN_CRED_PATH}")
+if CHOSEN_CRED_PATH:
+    print(f"DEBUG: Exists? {os.path.exists(CHOSEN_CRED_PATH)}")
+    try:
+        if not os.path.exists(CHOSEN_CRED_PATH) and not os.path.isabs(CHOSEN_CRED_PATH):
+            print(f"DEBUG: CWD: {os.getcwd()}")
+            print(f"DEBUG: Abs Path via CWD: {os.path.abspath(CHOSEN_CRED_PATH)}")
+            try:
+                print(f"DEBUG: Contents of {DATA_DIR}: {os.listdir(DATA_DIR)}")
+            except Exception as e:
+                print(f"DEBUG: Could not list data dir: {e}")
+    except OSError:
+        pass
+
+# Tenta carregar para pegar o email
 SERVICE_ACCOUNT_EMAIL = None
-try:
-    if GSPREAD_CREDENTIALS_PATH is not None:
-        with open(GSPREAD_CREDENTIALS_PATH) as f:
+if CHOSEN_CRED_PATH:
+    try:
+        with open(CHOSEN_CRED_PATH) as f:
             creds_json = json.load(f)
             SERVICE_ACCOUNT_EMAIL = creds_json.get("client_email")
-            if not SERVICE_ACCOUNT_EMAIL:
-                print(
-                    f"AVISO CRÍTICO: 'client_email' não encontrado em {GSPREAD_CREDENTIALS_PATH}"
-                )
-except FileNotFoundError:
-    print(
-        f"AVISO CRÍTICO: Arquivo de credenciais GSpread não encontrado em {GSPREAD_CREDENTIALS_PATH}"
-    )
-except Exception as e:
-    print(f"AVISO CRÍTICO: Falha ao ler 'client_email' do JSON de credenciais: {e}")
+    except FileNotFoundError:
+        print(f"AVISO CRÍTICO: Arquivo de credenciais não encontrado em: {CHOSEN_CRED_PATH}")
+    except Exception as e:
+        print(f"AVISO CRÍTICO: Erro ao ler credenciais: {e}")
+
+# Atualiza a variável que o resto do sistema usa
+GSPREAD_CREDENTIALS_PATH = CHOSEN_CRED_PATH
 
 UPSTASH_REDIS_URL = os.getenv("UPSTASH_REDIS_URL")
+if UPSTASH_REDIS_URL:
+    UPSTASH_REDIS_URL = UPSTASH_REDIS_URL.strip("'").strip('"')
 
 # Você pode adicionar uma verificação se quiser
 if not UPSTASH_REDIS_URL:

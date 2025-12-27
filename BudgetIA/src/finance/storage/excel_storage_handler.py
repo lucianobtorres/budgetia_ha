@@ -41,6 +41,11 @@ class ExcelStorageHandler(BaseStorageHandler): # type: ignore[misc]
         # A flag is_new_file será determinada pelo load_sheets
         self.is_new_file = not os.path.exists(self.file_path)
 
+    @property
+    def resource_id(self) -> str:
+        """Data path is the resource ID for local files."""
+        return self.file_path
+
     def load_sheets(
         self,
         layout_config: dict[str, list[str]],

@@ -83,6 +83,16 @@ class GoogleDriveFileHandler(BaseStorageHandler): # type: ignore[misc]
         return None
 
     @property
+    def resource_id(self) -> str:
+        """
+        Retorna o ID Único do Arquivo no Google Drive.
+        Usado como chave para o Redis Lock.
+        """
+        if self.file_id:
+            return self.file_id
+        return self.file_url
+
+    @property
     def is_new_file(self) -> bool:
         """Retorna se o arquivo é considerado novo (não encontrado)."""
         return self._is_new_file

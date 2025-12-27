@@ -13,15 +13,23 @@ class RedisLockManager:
     @classmethod
     def get_client(cls):
          if cls._client is None:
-             if UPSTASH_REDIS_URL:
+             if UPSTASH_REDIS_URL and (
+                 UPSTASH_REDIS_URL.startswith("redis://") or 
+                 UPSTASH_REDIS_URL.startswith("rediss://") or 
+                 UPSTASH_REDIS_URL.startswith("unix://")
+             ):
                  # Ensure protocol compatibility if necessary
                  url = UPSTASH_REDIS_URL
                  if url.startswith("redis://") and "upstash" in url:
                       url = url.replace("redis://", "rediss://")
                  
-                 cls._client = redis.from_url(url, decode_responses=False)
+                 try:
+                    cls._client = redis.from_url(url, decode_responses=False)
+                 except Exception as e:
+                    print(f"AVISO: Falha ao conectar Redis Cache: {e}")
+                    cls._client = None
              else:
-                 print("AVISO: UPSTASH_REDIS_URL não configurada. Locks distribuídos DESATIVADOS.")
+                 print("AVISO: UPSTASH_REDIS_URL inválida ou não configurada. Locks distribuídos DESATIVADOS.")
          return cls._client
 
     def __init__(self, resource_id: str):

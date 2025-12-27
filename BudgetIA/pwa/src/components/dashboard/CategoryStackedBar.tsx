@@ -2,11 +2,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/
 import { cn } from "../../utils/cn";
 import { useCategoryColorMap } from "../../hooks/useCategoryColorMap";
 
-interface CategoryStackedBarProps {
-  data: { name: string; value: number }[];
-  totalValue?: number;
-}
-
 export function CategoryStackedBar({ data }: { data: { name: string; value: number }[] }) {
   const { getCategoryColor } = useCategoryColorMap();
   
@@ -22,7 +17,7 @@ export function CategoryStackedBar({ data }: { data: { name: string; value: numb
     <div className="w-full space-y-3">
         {/* The Bar - Thinner (h-2) similar to budget bar */}
       <div className="h-2 w-full flex rounded-full overflow-hidden bg-gray-800">
-        {chartData.map((item, index) => {
+        {chartData.map((item) => {
           if (item.value <= 0) return null;
           const percentage = (item.value / total) * 100;
           // Use Global Consistent Color
@@ -56,7 +51,7 @@ export function CategoryStackedBar({ data }: { data: { name: string; value: numb
 
       {/* The Legend - With Values */}
       <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[10px] md:text-xs text-gray-400">
-        {chartData.map((item, index) => {
+        {chartData.map((item) => {
            if (item.value <= 0) return null;
            const color = getCategoryColor(item.name);
            return (

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useBudgetsList, useCreateBudget, useUpdateBudget, useDeleteBudget, type Budget } from '../../hooks/useBudgets';
 import { useCategoryColorMap } from '../../hooks/useCategoryColorMap';
-import { Plus, Edit2, Trash2, AlertTriangle } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import BudgetModal from './BudgetFormDrawer';
 import { Button } from '../ui/Button';
@@ -191,7 +191,7 @@ export default function BudgetDrawer({ isOpen, onClose, highlightCategory, highl
                                 return (
                                     <div 
                                         key={idx} 
-                                        ref={el => itemRefs.current[budget.Categoria] = el}
+                                        ref={el => { itemRefs.current[budget.Categoria] = el; }}
                                         className={`transition-colors rounded-xl ${isHighlighted ? 'bg-white/10 ring-1 ring-white/20' : ''}`}
                                     >
                                         <ProgressListItem

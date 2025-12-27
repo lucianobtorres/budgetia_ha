@@ -121,6 +121,11 @@ class UserConfigService:
 
         if not path_str:
             print("[DEBUG get_planilha_path] Nenhum caminho encontrado no config")
+            # Fallback para Variável de Ambiente (HA Add-on)
+            env_path = os.getenv("PLANILHA_PATH")
+            if env_path:
+                print(f"[DEBUG get_planilha_path] Usando Fallback ENV: {env_path}")
+                return env_path
             return None
 
         # Validação (a mesma que corrigimos antes)
@@ -138,6 +143,13 @@ class UserConfigService:
         print(f"[DEBUG get_planilha_path] Arquivo não existe! Removendo do config.")
         config_data.pop(config.PLANILHA_KEY, None)
         self.save_config(config_data)
+        
+        # Última tentativa: ENV
+        env_path = os.getenv("PLANILHA_PATH")
+        if env_path:
+             print(f"[DEBUG get_planilha_path] Usando Fallback ENV após falha local: {env_path}")
+             return env_path
+             
         return None
 
     def save_planilha_path(self, path_str: str) -> None:

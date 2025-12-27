@@ -3,7 +3,10 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 import streamlit_authenticator as stauth
 
-USERS_FILE = Path("data/users.yaml")
+import os
+import config
+
+USERS_FILE = Path(os.path.join(config.DATA_DIR, "users.yaml"))
 
 def load_users() -> Dict[str, Any]:
     """Carrega o arquivo de usuários."""

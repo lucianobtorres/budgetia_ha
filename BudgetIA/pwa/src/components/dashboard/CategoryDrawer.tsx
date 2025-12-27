@@ -8,7 +8,7 @@ import { Drawer } from '../ui/Drawer';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { TRANSACTION_CATEGORIES } from '../../utils/constants';
 import { ProgressListItem } from '../ui/ProgressListItem';
-import { Target, ChevronRight, CreditCard } from 'lucide-react';
+import { Target, CreditCard } from 'lucide-react';
 
 interface Props {
     isOpen: boolean;
@@ -47,7 +47,15 @@ export default function CategoryDrawer({ isOpen, onClose, highlightCategory }: P
         // Create entries for 0-value categories from the standard list
         const zeroExpenses = TRANSACTION_CATEGORIES
             .filter(cat => !activeNames.has(cat))
-            .map(cat => ({ name: cat, value: 0 }));
+            .map(cat => ({ 
+                name: cat, 
+                value: 0, 
+                date: '', 
+                type: 'Despesa' as const, 
+                amount: 0, 
+                id: 0, 
+                category: cat 
+            }));
             
         // Combine and Sort
         const all = [...activeExpenses, ...zeroExpenses];
@@ -95,7 +103,7 @@ export default function CategoryDrawer({ isOpen, onClose, highlightCategory }: P
                              <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
                                     <Pie
-                                        data={pieData}
+                                        data={pieData as any[]}
                                         dataKey="value"
                                         nameKey="name"
                                         cx="50%"
@@ -112,7 +120,7 @@ export default function CategoryDrawer({ isOpen, onClose, highlightCategory }: P
                                     <Tooltip 
                                         contentStyle={{ backgroundColor: '#111827', border: '1px solid #374151', borderRadius: '8px', color: '#F3F4F6' }}
                                         itemStyle={{ color: '#F3F4F6' }}
-                                        formatter={(value: any) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)}
+                                        formatter={(value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0)}
                                     />
                                 </PieChart>
                             </ResponsiveContainer>
@@ -141,7 +149,7 @@ export default function CategoryDrawer({ isOpen, onClose, highlightCategory }: P
                 <div className="flex-1 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-800">
                     <div className="space-y-2">
                         {sortedData.length > 0 ? (
-                            sortedData.map((cat, idx) => {
+                            sortedData.map((cat) => {
                                 const color = getCategoryColor(cat.name);
                                 const hasBudget = !!getBudgetForCategory(cat.name);
                                 const isHighlighted = highlightCategory === cat.name;

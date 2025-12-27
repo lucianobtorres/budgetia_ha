@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, type ReactNode } from 'react';
 
 // Define the types of drawers available
 export type DrawerType = 'CATEGORY_EXPENSES' | 'BUDGETS';

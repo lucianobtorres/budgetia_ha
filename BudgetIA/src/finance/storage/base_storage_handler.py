@@ -63,3 +63,13 @@ class BaseStorageHandler(ABC):
         Retorna uma string (ISO format) ou None se não aplicável.
         """
         pass
+
+    @property
+    @abstractmethod
+    def resource_id(self) -> str:
+        """
+        Retorna um identificador único para o recurso de armazenamento.
+        Usado para controle de concorrência (Locks).
+        Pode ser um caminho de arquivo, ID de planilha Google, ou ID de arquivo Drive.
+        """
+        pass

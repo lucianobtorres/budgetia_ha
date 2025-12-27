@@ -2,7 +2,8 @@ import { cleanupOutdatedCaches, precacheAndRoute } from 'workbox-precaching'
 import { clientsClaim } from 'workbox-core'
 
 // --- Workbox Standard Configuration ---
-declare let self: ServiceWorkerGlobalScope
+// Declare self as any to allow Service Worker properties without strict lib checks
+declare const self: any;
 
 self.skipWaiting()
 clientsClaim()
@@ -14,7 +15,7 @@ cleanupOutdatedCaches()
 // --- Push Notification Logic ---
 
 // 1. Listen for Push Event
-self.addEventListener('push', (event) => {
+self.addEventListener('push', (event: any) => {
   if (!event.data) return
 
   try {
@@ -37,7 +38,7 @@ self.addEventListener('push', (event) => {
 })
 
 // 2. Handle Notification Click
-self.addEventListener('notificationclick', (event) => {
+self.addEventListener('notificationclick', (event: any) => {
   event.notification.close() // Close the notification
 
   // Open the app or focus if already open
@@ -47,7 +48,7 @@ self.addEventListener('notificationclick', (event) => {
     self.clients.matchAll({
       type: 'window',
       includeUncontrolled: true
-    }).then((clientList) => {
+    }).then((clientList: any) => {
       // If a window is already open, focus it
       for (const client of clientList) {
         if (client.url === urlToOpen && 'focus' in client) {

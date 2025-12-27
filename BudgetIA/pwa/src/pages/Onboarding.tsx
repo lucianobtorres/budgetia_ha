@@ -1,5 +1,5 @@
 import { useRef, useEffect } from "react";
-import { Play, ShieldCheck, Cloud, FileSpreadsheet } from "lucide-react";
+import { ShieldCheck, Cloud, FileSpreadsheet } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { useOnboarding } from "../hooks/useOnboarding";

@@ -49,7 +49,7 @@ class PlanilhaManager:
 
         # --- CONCURRENCY CONTROL ---
         from infrastructure.locking.lock_manager import RedisLockManager
-        self.lock_manager = RedisLockManager(self._context.storage.file_path)
+        self.lock_manager = RedisLockManager(self._context.storage.resource_id)
 
     @property
     def lock_file(self):
