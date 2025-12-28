@@ -125,3 +125,21 @@ class UserBehaviorService:
             return True
             
         return False
+
+    # --- Estado dos Tours (Onboarding) ---
+
+    def get_seen_tours(self) -> List[str]:
+        """Retorna lista de IDs de tours já completados pelo usuário."""
+        data = self._load_data()
+        return data.get("tours_seen", [])
+
+    def mark_tour_seen(self, tour_id: str) -> None:
+        """Marca um tour como visto."""
+        data = self._load_data()
+        
+        if "tours_seen" not in data:
+            data["tours_seen"] = []
+            
+        if tour_id not in data["tours_seen"]:
+            data["tours_seen"].append(tour_id)
+            self._save_data(data)

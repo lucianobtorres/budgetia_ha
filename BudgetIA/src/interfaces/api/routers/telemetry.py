@@ -50,3 +50,34 @@ def log_feedback(
     except Exception as e:
         print(f"ERRO TELEMETRY FEEDBACK: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/tours")
+def get_seen_tours(
+    config_service: UserConfigService = Depends(get_user_config_service)
+):
+    """
+    Retorna a lista de tours que o usuário já completou/dispensou.
+    Usado para sincronizar estado entre dispositivos.
+    """
+    try:
+        service = UserBehaviorService(config_service.username)
+        return {"seen_tours": service.get_seen_tours()}
+    except Exception as e:
+        print(f"ERRO TELEMETRY TOURS: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/tours/{tour_id}")
+def mark_tour_seen(
+    tour_id: str,
+    config_service: UserConfigService = Depends(get_user_config_service)
+):
+    """
+    Marca um tour como visto no servidor.
+    """
+    try:
+        service = UserBehaviorService(config_service.username)
+        service.mark_tour_seen(tour_id)
+        return {"status": "ok", "tour_id": tour_id}
+    except Exception as e:
+        print(f"ERRO TELEMETRY MARK TOUR: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

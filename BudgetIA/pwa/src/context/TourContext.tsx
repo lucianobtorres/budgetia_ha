@@ -17,14 +17,26 @@ const TourContext = createContext<TourContextType | undefined>(undefined);
 export function TourProvider({ children }: { children: ReactNode }) {
     const [activeTourId, setActiveTourId] = useState<TourId | null>(null);
     const [activeStepsState, setActiveStepsState] = useState<TourStep[]>([]);
-    const [currentStepIndex, setCurrentStepIndex] = useState(0); // Renaming for clarity if needed, but keeping simple
+    const [currentStepIndex, setCurrentStepIndex] = useState(0);
     const [completedTours, setCompletedTours] = useState<string[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
 
+    // Initial fetch from Server
     useEffect(() => {
-        const saved = localStorage.getItem('budgetia_completed_tours');
-        if (saved) {
-            setCompletedTours(JSON.parse(saved));
-        }
+        const fetchSeenTours = async () => {
+            try {
+                const response = await fetch('/api/telemetry/tours');
+                if (response.ok) {
+                    const data = await response.json();
+                    setCompletedTours(data.seen_tours || []);
+                }
+            } catch (error) {
+                console.error("Failed to fetch seen tours:", error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        fetchSeenTours();
     }, []);
 
     const startTour = (tourId: TourId, force = false) => {
@@ -33,9 +45,10 @@ export function TourProvider({ children }: { children: ReactNode }) {
             return;
         }
 
-        // Check localStorage directly to avoid closure staleness issues with useEffect/state
-        const storedCompleted = JSON.parse(localStorage.getItem('budgetia_completed_tours') || '[]');
-        if (!force && (completedTours.includes(tourId) || storedCompleted.includes(tourId))) {
+        if (isLoading) return; // Wait for server sync
+
+        // Check server state
+        if (!force && completedTours.includes(tourId)) {
             return; // Já visto
         }
 
@@ -65,7 +78,6 @@ export function TourProvider({ children }: { children: ReactNode }) {
     const nextStep = () => {
         if (!activeTourId) return;
         
-        // Use filtered steps state
         if (currentStepIndex < activeStepsState.length - 1) {
             setCurrentStepIndex(prev => prev + 1);
         } else {
@@ -79,12 +91,20 @@ export function TourProvider({ children }: { children: ReactNode }) {
         }
     };
 
+    const markAsSeenOnServer = async (tourId: string) => {
+        try {
+            await fetch(`/api/telemetry/tours/${tourId}`, { method: 'POST' });
+        } catch (error) {
+            console.error("Failed to sync tour state:", error);
+        }
+    };
+
     const completeTour = () => {
         if (!activeTourId) return;
 
         const newCompleted = [...completedTours, activeTourId];
         setCompletedTours(newCompleted);
-        localStorage.setItem('budgetia_completed_tours', JSON.stringify(newCompleted));
+        markAsSeenOnServer(activeTourId);
         
         telemetry.logAction('tour_completed', { tour_id: activeTourId });
         
@@ -99,7 +119,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
             // UX Decision: If user dismisses (clicks X), we consider it "Done" to avoid nagging.
             const newCompleted = [...completedTours, activeTourId];
             setCompletedTours(newCompleted);
-            localStorage.setItem('budgetia_completed_tours', JSON.stringify(newCompleted));
+            markAsSeenOnServer(activeTourId);
 
             setActiveTourId(null);
             setActiveStepsState([]);
@@ -110,7 +130,8 @@ export function TourProvider({ children }: { children: ReactNode }) {
 
     const resetTours = () => {
         setCompletedTours([]);
-        localStorage.removeItem('budgetia_completed_tours');
+        // Note: Currently we don't have a specific endpoint to clear history on server, 
+        // as this is mostly a debug feature.
         telemetry.logAction('tour_reset', {});
     };
 

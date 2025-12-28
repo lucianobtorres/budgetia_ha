@@ -1,51 +1,59 @@
-# Stage 1: Frontend Build
-FROM node:20-alpine as frontend
-WORKDIR /app
-
-# Copy PWA source code
-COPY pwa /app/pwa
-
-WORKDIR /app/pwa
-RUN npm install
-RUN npm run build
-
-# Stage 2: Backend & Runtime
-FROM python:3.11-slim-bookworm
-
-# Add-on Labels
-LABEL io.hass.version="1.0.0" io.hass.type="addon" io.hass.arch="armhf|aarch64|i386|amd64"
-
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    POETRY_HOME="/opt/poetry" \
-    POETRY_VIRTUALENVS_CREATE=false
+# Builder stage
+FROM python:3.12-slim as builder
 
 WORKDIR /app
 
-# Install system dependencies
+# Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    libmagic1 \
     build-essential \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Poetry
-RUN curl -sSL https://install.python-poetry.org | python3 -
-ENV PATH="$POETRY_HOME/bin:$PATH"
+# Install poetry
+RUN pip install poetry
 
-# Copy Backend Source Code (Using .dockerignore to exclude unnecessary files if needed)
-# Since we are in the 'budgetia' context, we COPY . . which includes src, pwa(built), etc.
-COPY . /app
+# Copy project files
+COPY pyproject.toml poetry.lock ./
+COPY src ./src
+COPY pwa ./pwa
+COPY README.md ./
 
-# Install Dependencies
-# We remove poetry.lock to rely on pyproject.toml and avoid sync errors
-RUN rm -f poetry.lock && poetry install --only main --no-interaction --no-ansi --no-root
+# Export requirements and build wheel
+RUN poetry export -f requirements.txt --output requirements.txt --without-hashes
 
-# Copy built frontend assets from Stage 1 into the static folder
-COPY --from=frontend /app/pwa/dist /app/static
+# Runtime stage
+FROM python:3.12-slim
 
-# Ensure run.sh is executable
-RUN chmod +x /app/run.sh
+WORKDIR /app
 
-# Entrypoint
-CMD ["/app/run.sh"]
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements from builder
+COPY --from=builder /app/requirements.txt .
+
+# Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy source code and scripts
+COPY src ./src
+COPY pwa ./pwa
+COPY planilha_mestra.xlsx .
+COPY run.sh .
+
+# Create data directory
+RUN mkdir -p /app/data
+
+# Make run script executable
+RUN chmod +x run.sh
+
+# Environment variables
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app
+
+# Expose port (documented in config.yaml)
+EXPOSE 8000
+
+CMD ["./run.sh"]
