@@ -53,8 +53,18 @@ class FinancialDataContext:
         cached_data, cached_timestamp = self.cache.get_entry(self.cache_key)
         source_timestamp = self.storage.get_source_modified_time()
 
-        # --- 3. DECIDIR (O SEU INSIGHT) ---
-        if cached_data is not None and cached_timestamp == source_timestamp:
+        # --- 3. VALIDAÇÃO MAIS RIGOROSA DE CACHE ---
+        is_valid_cache = False
+        if cached_data is not None and isinstance(cached_data, dict):
+            # Verifica se contém a aba principal (Transações) e se não está vazia (opcional)
+            if config.NomesAbas.TRANSACOES in cached_data:
+                is_valid_cache = True
+            else:
+                print(
+                    f"--- [LOG DataContext] Cache INVALIDADO (Dados corrompidos/incompletos no Redis). ---"
+                )
+
+        if is_valid_cache and cached_timestamp == source_timestamp:
             print(
                 "--- [LOG DataContext] Cache HIT (Timestamps correspondem). Carregando dados do Redis. ---"
             )
