@@ -109,35 +109,55 @@ class GoogleAuthService:
     def download_sheets_as_excel_for_analysis(self, file_id: str) -> str:
         """
         Baixa um Google Sheet (nativo ou não-nativo) como .xlsx para análise local.
-        Implementa a lógica de alternar entre 'export' (Sheets nativo) e 'get_media' (XLSX não-nativo).
+        Prioriza credenciais do USUÁRIO (OAuth) para evitar erros 404 em arquivos privados.
+        Faz fallback para Service Account se necessário.
         """
+        drive_service = None
+        using_user_creds = False
+
+        # --- 1. Tentar Autenticar com Credenciais do Usuário (Prioridade) ---
         try:
-            # --- 1. Autenticar a Service Account (o robô) ---
-            sa_path = Path(config.GSPREAD_CREDENTIALS_PATH)
-
-            if not sa_path.exists():
-                raise FileNotFoundError(
-                    f"O arquivo de credenciais da Service Account não foi encontrado no caminho: {sa_path}."
-                )
-
-            creds_sa = service_account.Credentials.from_service_account_file(  # type: ignore[no-untyped-call]
-                sa_path,
-                scopes=config.GOOGLE_OAUTH_SCOPES,
-            )
-            drive_service = build("drive", "v3", credentials=creds_sa)
-
+            user_creds = self.get_user_credentials()
+            if user_creds:
+                print(f"--- DEBUG GoogleAuth: Tentando download com credenciais de USUÁRIO para {self.config_service.username}... ---")
+                drive_service = build("drive", "v3", credentials=user_creds)
+                using_user_creds = True
+            else:
+                print("--- DEBUG GoogleAuth: Nenhuma credencial de usuário encontrada. Tentando Service Account... ---")
         except Exception as e:
-            raise Exception(
-                f"Erro ao carregar credenciais da Service Account para download: {e}"
-            )
+            print(f"--- AVISO GoogleAuth: Falha ao carregar credenciais de usuário: {e} ---")
 
-        # --- 2. Obter MIME Type do arquivo ---
-        file_metadata = (
-            drive_service.files().get(fileId=file_id, fields="mimeType").execute()
-        )
+        # --- 2. Fallback: Autenticar a Service Account (o robô) ---
+        if not drive_service:
+            try:
+                sa_path = Path(config.GSPREAD_CREDENTIALS_PATH)
+                if sa_path.exists():
+                    print("--- DEBUG GoogleAuth: Usando credenciais de SERVICE ACCOUNT (Fallback)... ---")
+                    creds_sa = service_account.Credentials.from_service_account_file(  # type: ignore[no-untyped-call]
+                        sa_path,
+                        scopes=config.GOOGLE_OAUTH_SCOPES,
+                    )
+                    drive_service = build("drive", "v3", credentials=creds_sa)
+                else:
+                     print(f"--- AVISO GoogleAuth: Service Account não encontrada em {sa_path} ---")
+            except Exception as e:
+                 print(f"--- ERRO GoogleAuth: Falha ao carregar Service Account: {e} ---")
+
+        if not drive_service:
+            raise Exception("Não foi possível autenticar nem com Usuário nem com Service Account.")
+
+        # --- 3. Obter MIME Type do arquivo ---
+        try:
+            file_metadata = (
+                drive_service.files().get(fileId=file_id, fields="mimeType").execute()
+            )
+        except Exception as e:
+            auth_type = "USUÁRIO" if using_user_creds else "SERVICE ACCOUNT"
+            raise Exception(f"Erro ao acessar arquivo usando {auth_type}: {e} (Verifique se o arquivo existe e se você tem permissão)")
+
         mime_type = file_metadata.get("mimeType")
 
-        # --- 3. Determinar o método de download ---
+        # --- 4. Determinar o método de download ---
 
         # MIME Type para XLSX (o formato que o Pandas precisa)
         xlsx_mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -165,7 +185,7 @@ class GoogleAuthService:
                 f"Tipo de arquivo não suportado ({mime_type}). Apenas Google Sheets e XLSX."
             )
 
-        # --- 4. Salvar o arquivo localmente ---
+        # --- 5. Salvar o arquivo localmente ---
         file_name = f"{file_id}_temp_analysis.xlsx"
 
         # Cria um diretório temporário específico para o usuário

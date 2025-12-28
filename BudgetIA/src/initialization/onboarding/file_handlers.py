@@ -319,21 +319,33 @@ class GoogleSheetsHandler(IFileHandler):
                 handler_type="google",
             )
         
-        # 2. Trata o callback do Google (se o 'code' estiver no contexto)
+        # 2. Verifica se o usuário JÁ está autenticado antes de pedir de novo
+        # Isso evita loops de login desnecessários.
+        existing_creds = self.auth_service.get_user_credentials()
+        if existing_creds:
+            print("[DEBUG GoogleHandler] Usuário já possui credenciais válidas. Pulando fluxo de OAuth.")
+            return AcquisitionResult(
+                success=False,
+                handler_type="google",
+                requires_ui_action="show_file_selection",  # <--- Direto para seleção
+                error_message="Você já está conectado. Selecione sua planilha.",
+            )
+
+        # 3. Trata o callback do Google (se o 'code' estiver no contexto)
         auth_code = context.get("google_auth_code")
-        redirect_uri = context.get("redirect_uri")  # ← NOVO: Pega URI do contexto
+        redirect_uri = context.get("redirect_uri")
 
         if auth_code:
             try:
                 self.auth_service.exchange_code_for_tokens(
                     auth_code,
-                    redirect_uri=redirect_uri # ← Passa para o serviço
+                    redirect_uri=redirect_uri
                 )  # Troca código por tokens
                 # Tokens salvos. Avança para seleção de arquivo.
                 return AcquisitionResult(
                     success=False,
                     handler_type="google",
-                    requires_ui_action="show_file_selection",  # <--- Próximo passo
+                    requires_ui_action="show_file_selection",
                     error_message="Autenticação concluída. Por favor, selecione sua planilha.",
                 )
             except Exception as e:
@@ -344,21 +356,11 @@ class GoogleSheetsHandler(IFileHandler):
                     error_message=f"Erro ao trocar o código por tokens. Tente novamente: {e}",
                 )
 
-        # 3. Se já estamos autenticados (ou após a troca), mas a URL não foi selecionada
-        # Ou se o usuário clicou para conectar e já tinha credenciais antigas válidas.
-        if self.auth_service.get_user_credentials():
-            return AcquisitionResult(
-                success=False,
-                handler_type="google",
-                requires_ui_action="show_file_selection",  # <--- Próximo passo
-                error_message="Por favor, selecione sua planilha do Google Drive.",
-            )
-
-        # 4. Se não tem credenciais nem URL, solicita OAuth (início do fluxo)
+        # 4. Se não tem credenciais nem código, solicita OAuth
         return AcquisitionResult(
             success=False,
             file_path=None,
             handler_type="google",
             requires_ui_action="show_google_oauth",  # <--- Inicia o fluxo
-            error_message="Aguardando seleção do Google Sheets",
+            error_message="Aguardando conexão com Google Sheets",
         )
