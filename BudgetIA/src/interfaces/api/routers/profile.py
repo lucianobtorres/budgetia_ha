@@ -1,7 +1,7 @@
 from typing import Any
 import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Body
-from interfaces.api.dependencies import get_planilha_manager, get_user_config_service
+from interfaces.api.dependencies import get_planilha_manager, get_user_config_service, get_onboarding_orchestrator
 from finance.planilha_manager import PlanilhaManager
 from core.user_config_service import UserConfigService
 from core.google_auth_service import GoogleAuthService
@@ -114,8 +114,7 @@ def reset_account(
     fast_track: bool = Body(False, embed=True),
     config_service: UserConfigService = Depends(get_user_config_service),
     # Injetamos o Orchestrator para garantir que o estado em memória seja limpo também
-    from interfaces.api.dependencies import get_onboarding_orchestrator
-    orchestrator = Depends(get_onboarding_orchestrator)
+    orchestrator: Any = Depends(get_onboarding_orchestrator)
 ) -> dict[str, str]:
     """
     ZONA DE PERIGO: Reseta a conta do usuário.
