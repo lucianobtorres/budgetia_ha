@@ -42,6 +42,10 @@ dependencies = [
 ]
 
 [tool.poetry]
+name = "budgetia"
+version = "0.1.0"
+description = "Assistente Financeiro Pessoal"
+authors = ["Luciano Borges <lucianobtorres@gmail.com>"]
 packages = [
     { include = "*", from = "src" },
     { include = "scripts" }
