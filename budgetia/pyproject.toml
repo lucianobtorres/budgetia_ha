@@ -1,0 +1,130 @@
+[project]
+name = "budgetia"
+version = "0.1.0"
+description = ""
+authors = [{ name = "Luciano Borges", email = "lucianobtorres@gmail.com" }]
+readme = "README.md"
+requires-python = ">=3.11,<4.0"
+dependencies = [
+    "pandas (>=2.3.1,<3.0.0)",
+    "openpyxl (>=3.1.5,<4.0.0)",
+    "python-dotenv (>=1.1.1,<2.0.0)",
+    "langchain-google-genai (>=2.1.7,<3.0.0)",
+    "langchain-community (>=0.3.27,<0.4.0)",
+    "langchain-core (>=0.3.68,<0.4.0)",
+    "langchain-text-splitters (>=0.3.8,<0.4.0)",
+    "tabulate (>=0.9.0,<0.10.0)",
+    "streamlit (>=1.46.1,<2.0.0)",
+    "langchain-groq (>=0.3.6,<0.4.0)",
+    "langchain-openai (>=0.3.27,<0.4.0)",
+    "xlsxwriter (>=3.2.5,<4.0.0)",
+    "numpy-financial (>=1.0.0,<2.0.0)",
+    "transformers (>=4.57.0,<5.0.0)",
+    "gspread (>=6.2.1,<7.0.0)",
+    "schedule (>=1.2.2,<2.0.0)",
+    "gspread-dataframe (>=4.0.0,<5.0.0)",
+    "python-telegram-bot (>=21.0,<22.0)",
+    "google-api-python-client (>=2.0.0,<3.0.0)",
+    "streamlit-authenticator (>=0.3.0,<0.4.0)",
+    "cryptography (>=42.0.0,<43.0.0)",
+    "google-auth-oauthlib (>=1.2.3,<2.0.0)",
+    "google-auth-httplib2 (>=0.2.1,<0.3.0)",
+    "python-magic (>=0.4.27,<0.5.0)",
+    "redis (>=7.0.1,<8.0.0)",
+    "fastapi (>=0.124.2,<0.125.0)",
+    "uvicorn (>=0.38.0,<0.39.0)",
+    "agno (>=2.3.10,<3.0.0)",
+    "google-genai (>=1.55.0,<2.0.0)",
+    "requests (>=2.31.0,<3.0.0)",
+    "pywebpush (>=2.1.2,<3.0.0)",
+    "python-jose[cryptography] (>=3.5.0,<4.0.0)",
+    "passlib[bcrypt] (>=1.7.4,<2.0.0)",
+]
+
+[tool.poetry]
+packages = [
+    { include = "*", from = "src" },
+    { include = "scripts" }
+]
+
+[tool.poetry.scripts]
+run-web = "scripts.run_web:main"
+run-pwa = "scripts.run_pwa:main"
+run-api = "scripts.run_api:main"
+run-bot = "interfaces.bot.main:main"
+run-scheduler = "interfaces.scheduler.main:main"
+run-cli = "main:main"
+
+# --- Scripts de Qualidade ---
+#format = "black src tests"  # Executa o Black
+#sort = "isort src tests"    # Executa o isort
+#check-types = "mypy src"   # Executa o Mypy (verificação de tipagem)
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.4.1"
+pytest-asyncio = "^1.1.0"
+pytest-cov = "^7.0.0"
+httpx = "^0.28.1"
+mypy = "^1.17.0"
+black = "^25.1.0"
+isort = "^6.0.1"
+ruff = "^0.12.4"
+pandas-stubs = "^2.2.2"
+types-requests = "^2.32.4.20250913"
+types-pyyaml = "^6.0.12.20250915"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 88
+target-version = ['py311']
+
+[tool.ruff]
+line-length = 88
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort (organizador de imports)
+    "UP", # pyupgrade
+]
+ignore = ["E501"] # Ignora erro de "linha muito longa", pois o Black cuida disso
+
+[tool.mypy]
+python_version = "3.11"
+disable_error_code = ["misc"]
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_any_generics = true
+no_implicit_optional = true
+warn_return_any = true
+strict = true
+
+# Adiciona esta configuração para que o mypy entenda as bibliotecas que não têm tipagem
+[[tool.mypy.overrides]]
+module = [
+    "pandas.*",
+    "openpyxl.*",
+    "dotenv.*",
+    "tabulate.*",
+    "streamlit.*",
+    "xlsxwriter.*",
+    "numpy_financial.*"
+]
+ignore_missing_imports = true
+
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+pythonpath = ["src"]
+addopts = [
+    "-v",                        # Modo verboso: mostra mais detalhes de cada teste
+    "--cov=src",                 # Medir a cobertura de testes na pasta 'src'
+    "--cov-report=term-missing", # Mostrar um relatório de cobertura no terminal, incluindo as linhas que faltaram
+]
+testpaths = ["tests"]
+filterwarnings = [
+    "ignore::FutureWarning",
+]

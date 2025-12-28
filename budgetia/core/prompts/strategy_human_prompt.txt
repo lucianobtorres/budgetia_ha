@@ -1,0 +1,6 @@
+{base_templates}
+
+Aqui está o schema da planilha do usuário:
+{schema_usuario}
+
+Gere o código Python completo para a classe `CustomStrategy` conforme as instruções no prompt de sistema. Lembre-se das regras de import absoluto e do __init__!
