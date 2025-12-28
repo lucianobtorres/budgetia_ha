@@ -112,7 +112,10 @@ def delete_watchdog_rule(
 @router.post("/reset")
 def reset_account(
     fast_track: bool = Body(False, embed=True),
-    config_service: UserConfigService = Depends(get_user_config_service)
+    config_service: UserConfigService = Depends(get_user_config_service),
+    # Injetamos o Orchestrator para garantir que o estado em memória seja limpo também
+    from interfaces.api.dependencies import get_onboarding_orchestrator
+    orchestrator = Depends(get_onboarding_orchestrator)
 ) -> dict[str, str]:
     """
     ZONA DE PERIGO: Reseta a conta do usuário.
@@ -122,7 +125,11 @@ def reset_account(
                            pulando a introdução (Welcome).
     """
     try:
+        # 1. Reseta o arquivo físico
         config_service.clear_config()
+        
+        # 2. Reseta o estado em memória do Orquestrador (CRÍTICO para evitar 'zombie state')
+        orchestrator.reset_config()
         
         # Define o estado inicial para evitar que o app fique 'zumbi'
         # Se for fast_track, vai para aquisição. Se não, vai para WELCOME.
@@ -136,6 +143,11 @@ def reset_account(
         data["onboarding_state"] = target_state
         data["onboarding_status"] = target_state # Orchestrator usa essa!
         config_service.save_config(data)
+        
+        # Força o orchestrator a carregar esse novo estado
+        orchestrator.state_machine.transition_to(
+            OnboardingState[target_state]
+        )
 
         return {"message": "Conta resetada com sucesso.", "next_state": target_state}
     except Exception as e:

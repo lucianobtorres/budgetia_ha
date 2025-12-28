@@ -2,7 +2,7 @@
 from typing import Type
 from pydantic import BaseModel, Field
 
-from core.tools.base_tool import BaseTool
+from core.base_tool import BaseTool
 from core.memory.memory_service import MemoryService
 
 # --- Input Schemas ---
