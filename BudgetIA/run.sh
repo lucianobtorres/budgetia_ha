@@ -1,10 +1,7 @@
 #!/bin/bash
 set -e
 
-# Lê a versão do arquivo config.yaml usando Python (mais robusto que grep/cut)
-VERSION=$(python3 -c "import sys; print([l.split('\"')[1] for l in open('config.yaml') if 'version:' in l][0])")
-
-echo "🟢 Iniciando BudgetIA Add-on (Monorepo Mode) [v$VERSION]..."
+echo "🟢 Iniciando BudgetIA Add-on (Monorepo Mode)..."
 
 # 1. Carregar Opções do Home Assistant
 OPTIONS_PATH="/data/options.json"
