@@ -150,9 +150,21 @@ class BudgetRepository:
             df_transacoes=df_transacoes,
             df_orcamentos=df_orcamentos,
         )
+        # Verifica se houve mudança real nos dados
+        # Limpa colunas que podem ter diferenças de tipo/formatação irrelevantes para comparação
+        # (Ex: garantir que ambos sejam float ou int da mesma forma)
+        try:
+            # Faz uma comparação direta primeiro
+            if df_orcamentos.equals(df_orcamentos_atualizado):
+                 print("--- DEBUG (BudgetRepo): Orçamentos recalculados são IDÊNTICOS aos atuais. Pulando salvamento. ---")
+                 return
+        except Exception:
+            # Se der erro na comparação, ignora e salva por segurança
+            pass
+
         self._context.update_dataframe(self._aba_nome, df_orcamentos_atualizado)
 
         print(
-            "--- DEBUG (BudgetRepo): Solicitando salvamento do orçamento atualizado... ---"
+            "--- DEBUG (BudgetRepo): Solicitando salvamento do orçamento atualizado (Diferenças detectadas)... ---"
         )
         self._context.save()
