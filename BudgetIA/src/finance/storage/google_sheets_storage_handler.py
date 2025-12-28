@@ -182,6 +182,32 @@ class GoogleSheetsStorageHandler(BaseStorageHandler): # type: ignore[misc]
             )
             return None
 
+    def _retry_on_quota_error(self, func, *args, **kwargs):
+        """
+        Executa uma função com retry automático para erros de cota (429).
+        """
+        import time
+        max_retries = 5
+        base_wait = 2.0  # segundos
+
+        for attempt in range(max_retries):
+            try:
+                return func(*args, **kwargs)
+            except gspread.exceptions.APIError as e:
+                # Verifica se é erro de cota (429) ou 'Quota exceeded'
+                if e.response.status_code == 429 or "Quota exceeded" in str(e):
+                    wait_time = base_wait * (2 ** attempt)  # Backoff exponencial: 2, 4, 8...
+                    print(f"--- [AVISO GSheetsHandler] Cota excedida (429). Tentativa {attempt+1}/{max_retries}. Aguardando {wait_time}s... ---")
+                    time.sleep(wait_time)
+                else:
+                    raise  # Se não for erro de cota, explode normal
+            except Exception as e:
+                # Se for outro erro, explode
+                raise e
+        
+        # Se esgotou as tentativas
+        raise TimeoutError("Falha após múltiplas tentativas de superar erro de cota (429).")
+
     def save_sheets(
         self,
         dataframes: dict[str, pd.DataFrame],
@@ -193,7 +219,8 @@ class GoogleSheetsStorageHandler(BaseStorageHandler): # type: ignore[misc]
         """
         print("\n--- [LOG GSheetsHandler] Iniciando save_sheets ---")
         try:
-            abas_existentes = [ws.title for ws in self.spreadsheet.worksheets()]
+            # Pega lista de abas (com retry também, pois é chamada de API)
+            abas_existentes = self._retry_on_quota_error(lambda: [ws.title for ws in self.spreadsheet.worksheets()])
 
             for internal_sheet_name, df_interno in dataframes.items():
                 # 1. Pergunta à estratégia o nome real da aba
@@ -216,18 +243,44 @@ class GoogleSheetsStorageHandler(BaseStorageHandler): # type: ignore[misc]
                     print(
                         f"--- [LOG GSheetsHandler] Criando aba: '{sheet_name_to_save}' ---"
                     )
-                    worksheet = self.spreadsheet.add_worksheet(
+                    # Retry na criação
+                    worksheet = self._retry_on_quota_error(
+                        self.spreadsheet.add_worksheet,
                         title=sheet_name_to_save, rows=100, cols=20
                     )
                 else:
-                    worksheet = self.spreadsheet.worksheet(sheet_name_to_save)
+                    # Retry na obtenção
+                    worksheet = self._retry_on_quota_error(self.spreadsheet.worksheet, sheet_name_to_save)
 
-                # 4. Limpa e salva os dados usando gspread-dataframe
-                worksheet.clear()
-                # Converte tipos de dados que dão problema no JSON (como datas)
-                df_para_salvar = df_para_salvar.astype(str).replace("NaT", "")
+                # --- 4. SAFE SAVE GUARD (Proteção contra Wipe) ---
+                if df_para_salvar.empty or len(df_para_salvar) == 0:
+                    # Verifica se a aba atual TEM dados
+                    # (Tenta pegar A1 para ver se não está vazia, sem gastar muita cota)
+                    try:
+                        cell_a1 = self._retry_on_quota_error(worksheet.acell, 'A1')
+                        has_data =  cell_a1.value is not None and cell_a1.value != ""
+                    except:
+                        # Se der erro ou não tiver A1, vamos assumir que pode ter dados por segurança
+                        # ou tentar row_count (mas row_count sempre tem valor)
+                        # Vamos tentar get_all_values limitados? Não, gasta cota.
+                        # Melhor: Se A1 está vazio, chance alta de ser vazia.
+                        has_data = False 
+                    
+                    if has_data:
+                        print(f"--- [PROTECTION] ABORTANDO SALVAMENTO na aba '{sheet_name_to_save}'. ---")
+                        print(f"--- [PROTECTION] MOTIVO: O DataFrame interno está VAZIO, mas a aba destino NÃO está. ---")
+                        print(f"--- [PROTECTION] Isso previne perda de dados acidental. Verifique se o carregamento falhou. ---")
+                        continue # Pula para a próxima aba, NÃO limpa e não salva essa
 
-                set_with_dataframe(worksheet, df_para_salvar, resize=True)
+                # 5. Limpa e salva os dados usando gspread-dataframe (com retry)
+                def save_operation():
+                    worksheet.clear()
+                    # Converte tipos de dados que dão problema no JSON (como datas)
+                    df_str = df_para_salvar.astype(str).replace("NaT", "")
+                    set_with_dataframe(worksheet, df_str, resize=True)
+                
+                self._retry_on_quota_error(save_operation)
+                
                 print(
                     f"--- [LOG GSheetsHandler] Aba '{sheet_name_to_save}' salva com sucesso. ---"
                 )
