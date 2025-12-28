@@ -10,7 +10,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install poetry
-RUN pip install poetry
+# Install poetry (Pinned to 1.x for export compatibility)
+RUN pip install "poetry<2.0.0"
 
 # Copy project files
 COPY pyproject.toml poetry.lock ./
