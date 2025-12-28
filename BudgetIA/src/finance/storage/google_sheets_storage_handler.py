@@ -139,7 +139,18 @@ class GoogleSheetsStorageHandler(BaseStorageHandler): # type: ignore[misc]
                     is_new_file = True  # Marca que uma aba do sistema faltou
 
                 # 1. Aplica a estratégia de mapeamento (tradução)
-                # ... (restante do código)
+                if sheet_name_padrao == config.NomesAbas.TRANSACOES:
+                    dataframes[sheet_name_padrao] = strategy.map_transactions(df_bruto)
+                else:
+                    dataframes[sheet_name_padrao] = strategy.map_other_sheet(
+                        sheet_name_padrao, df_bruto, columns_padrao
+                    )
+
+            return dataframes, is_new_file
+
+        except Exception as e:
+            print(f"ERRO CRÍTICO ao carregar abas do Google Sheets: {e}")
+            return {}, False
 
     def get_source_modified_time(self) -> str | None:
         """
