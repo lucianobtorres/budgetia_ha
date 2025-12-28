@@ -1,8 +1,21 @@
-# Single Stage (Pre-built Frontend)
+# Stage 1: Frontend Build
+FROM node:20-alpine as frontend
+WORKDIR /app
+
+# Copy PWA source code
+COPY pwa /app/pwa
+
+# Build PWA
+WORKDIR /app/pwa
+RUN npm install
+RUN npm run build
+
+# Stage 2: Backend & Runtime
 FROM python:3.12-slim
 
 # Add-on Labels
-LABEL io.hass.version="1.0.21" io.hass.type="addon" io.hass.arch="armhf|aarch64|i386|amd64"
+# Use a specific version label that matches config.yaml
+LABEL io.hass.version="1.0.25" io.hass.type="addon" io.hass.arch="armhf|aarch64|i386|amd64"
 
 # Environment variables
 ENV PYTHONUNBUFFERED=1 \
@@ -35,8 +48,8 @@ COPY src ./src
 COPY planilha_mestra.xlsx .
 COPY run.sh .
 
-# Copy Pre-built Frontend Assets (Must be built locally!)
-COPY pwa/dist /app/static
+# Copy built frontend assets from Stage 1 into the static folder
+COPY --from=frontend /app/pwa/dist /app/static
 
 # Create data directory
 RUN mkdir -p /app/data
