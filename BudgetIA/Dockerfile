@@ -1,44 +1,37 @@
-# Builder stage
-FROM python:3.12-slim as builder
-
-WORKDIR /app
-
-# Install build dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install poetry
-# Install poetry (Pinned to 1.x for export compatibility)
-RUN pip install "poetry<2.0.0"
-
-# Copy project files
-COPY pyproject.toml poetry.lock ./
-COPY src ./src
-COPY pwa ./pwa
-COPY README.md ./
-
-# Export requirements and build wheel
-RUN poetry export -f requirements.txt --output requirements.txt --without-hashes
-
-# Runtime stage
+# Builder and Runtime in one (Simplificando como sugerido)
 FROM python:3.12-slim
 
+# Add-on Labels
+LABEL io.hass.version="1.0.18" io.hass.type="addon" io.hass.arch="armhf|aarch64|i386|amd64"
+
+# Environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    POETRY_HOME="/opt/poetry" \
+    POETRY_VIRTUALENVS_CREATE=false \
+    PYTHONPATH=/app
+
 WORKDIR /app
 
-# Install runtime dependencies
+# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    build-essential \
+    libmagic1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements from builder
-COPY --from=builder /app/requirements.txt .
+# Install Poetry (sem pinagem estrita de versao, pois usaremos 'install', nao 'export')
+RUN pip install poetry
 
-# Install dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy dependency definition
+COPY pyproject.toml poetry.lock ./
 
-# Copy source code and scripts
+# Install Dependencies directly (Global)
+# --only main: apenas deps de prod
+# --no-root: não instala o próprio pacote budgetia (pois copiamos src manualmente)
+RUN poetry install --only main --no-interaction --no-ansi --no-root
+
+# Copy Application Code
 COPY src ./src
 COPY pwa ./pwa
 COPY planilha_mestra.xlsx .
@@ -50,11 +43,8 @@ RUN mkdir -p /app/data
 # Make run script executable
 RUN chmod +x run.sh
 
-# Environment variables
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONPATH=/app
-
-# Expose port (documented in config.yaml)
+# Expose port
 EXPOSE 8000
 
+# Entrypoint
 CMD ["./run.sh"]
