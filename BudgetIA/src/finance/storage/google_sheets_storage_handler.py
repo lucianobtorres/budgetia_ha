@@ -143,7 +143,7 @@ class GoogleSheetsStorageHandler(BaseStorageHandler): # type: ignore[misc]
                     dataframes[sheet_name_padrao] = strategy.map_transactions(df_bruto)
                 else:
                     dataframes[sheet_name_padrao] = strategy.map_other_sheet(
-                        sheet_name_padrao, df_bruto, columns_padrao
+                        df_bruto, sheet_name_padrao
                     )
 
             return dataframes, is_new_file
