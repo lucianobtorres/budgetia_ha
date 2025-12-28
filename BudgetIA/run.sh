@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-# Lê a versão do arquivo config.yaml (simples grep, já que yq pode não estar disponível)
-VERSION=$(grep 'version:' config.yaml | cut -d '"' -f 2)
+# Lê a versão do arquivo config.yaml usando Python (mais robusto que grep/cut)
+VERSION=$(python3 -c "import sys; print([l.split('\"')[1] for l in open('config.yaml') if 'version:' in l][0])")
 
 echo "🟢 Iniciando BudgetIA Add-on (Monorepo Mode) [v$VERSION]..."
 

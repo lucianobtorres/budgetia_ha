@@ -115,6 +115,7 @@ class GoogleSheetsStorageHandler(BaseStorageHandler): # type: ignore[misc]
 
         try:
             abas_existentes = [ws.title for ws in self.spreadsheet.worksheets()]
+            print(f"--- [DEBUG GSheetsHandler] Abas encontradas na planilha: {abas_existentes} ---")
 
             # Itera sobre o layout padrão do sistema (Transacoes, Orcamentos...)
             for sheet_name_padrao, columns_padrao in layout_config.items():
@@ -138,7 +139,39 @@ class GoogleSheetsStorageHandler(BaseStorageHandler): # type: ignore[misc]
                     is_new_file = True  # Marca que uma aba do sistema faltou
 
                 # 1. Aplica a estratégia de mapeamento (tradução)
-                if sheet_name_padrao == config.NomesAbas.TRANSACOES:
+                # ... (restante do código)
+
+    def get_source_modified_time(self) -> str | None:
+        """
+        Retorna o timestamp 'updated' dos metadados da Planilha Google.
+        """
+        try:
+            # Em gspread moderno, propriedades são carregadas automaticamente ou via fetch_sheet_metadata
+            # Tentar acessar lastUpdateTime diretamente se disponível
+            # Caso contrário, forçar refresh simula o fetch_properties antigo
+            try:
+                # Tenta método novo (v6+) se existir (o método fetch_properties não existe mais)
+                # self.spreadsheet.fetch_sheet_metadata() 
+                pass 
+            except:
+                pass
+
+            # A propriedade 'updated' costumava vir do drive API, gspread mapeia alguns
+            # Vamos tentar 'lastUpdateTime' se existir no modelo
+            if hasattr(self.spreadsheet, 'lastUpdateTime'):
+                 return str(self.spreadsheet.lastUpdateTime)
+            
+            # Se não, tentar via _properties que é o dict cru
+            props = self.spreadsheet._properties
+            if 'modifiedTime' in props:
+                return str(props['modifiedTime'])
+            
+            return None
+        except Exception as e:
+            print(
+                f"AVISO: Não foi possível obter modifiedTime (updated) do GSheet: {e}"
+            )
+            return None                if sheet_name_padrao == config.NomesAbas.TRANSACOES:
                     dataframes[sheet_name_padrao] = strategy.map_transactions(df_bruto)
                 else:
                     dataframes[sheet_name_padrao] = strategy.map_other_sheet(
