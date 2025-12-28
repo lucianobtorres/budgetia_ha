@@ -124,28 +124,20 @@ def reset_account(
     try:
         config_service.clear_config()
         
-        if fast_track:
-            # define o status para pular a introdução
-            from initialization.onboarding.state_machine import OnboardingState
-            config_service.save_onboarding_state(OnboardingState.SPREADSHEET_ACQUISITION.name)
-            # Precisamos salvar como status também para consistência
-            # O Orchestrator lê de onboarding_status (persistido via .name)
-            # O UserConfigService.save_onboarding_state salva na chave 'onboarding_state'
-            # Vamos garantir que salvamos onde o Orchestrator lê.
-            # Olhando o código do Orchestrator:
-            # saved_status = config_service.get_onboarding_status() -> lê de 'onboarding_status'
-            # Então devemos injetar lá.
-            
-            # Pequeno fix: O metodo save_onboarding_state salva na key 'onboarding_state', 
-            # mas o Orchestrator le de 'onboarding_status'. 
-            # O Orchestrator persiste via config_data["onboarding_status"] = new_state.name
-            # Vamos fazer manualmente aqui para garantir.
-            
-            data = config_service.load_config()
-            data["onboarding_status"] = OnboardingState.SPREADSHEET_ACQUISITION.name
-            config_service.save_config(data)
+        # Define o estado inicial para evitar que o app fique 'zumbi'
+        # Se for fast_track, vai para aquisição. Se não, vai para WELCOME.
+        target_state = "SPREADSHEET_ACQUISITION" if fast_track else "WELCOME"
+        
+        # Salva o estado tanto na chave antiga quanto na nova (por compatibilidade)
+        from initialization.onboarding.state_machine import OnboardingState
+        
+        # Garante que salvamos corretamente
+        data = config_service.load_config()
+        data["onboarding_state"] = target_state
+        data["onboarding_status"] = target_state # Orchestrator usa essa!
+        config_service.save_config(data)
 
-        return {"message": "Conta resetada com sucesso."}
+        return {"message": "Conta resetada com sucesso.", "next_state": target_state}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

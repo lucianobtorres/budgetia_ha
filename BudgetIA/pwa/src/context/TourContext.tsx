@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, type ReactNode } from '
 import { TourOverlay } from '../components/ui/TourOverlay';
 import { TOURS, type TourStep } from '../config/tours';
 import { telemetry } from '../services/telemetry';
+import { fetchAPI } from '../services/api';
 
 type TourId = keyof typeof TOURS;
 
@@ -25,9 +26,9 @@ export function TourProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         const fetchSeenTours = async () => {
             try {
-                const response = await fetch('/api/telemetry/tours');
-                if (response.ok) {
-                    const data = await response.json();
+                // fetchAPI returns the parsed JSON directly
+                const data = await fetchAPI('/telemetry/tours');
+                if (data) {
                     setCompletedTours(data.seen_tours || []);
                 }
             } catch (error) {
@@ -93,7 +94,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
 
     const markAsSeenOnServer = async (tourId: string) => {
         try {
-            await fetch(`/api/telemetry/tours/${tourId}`, { method: 'POST' });
+            await fetchAPI(`/telemetry/tours/${tourId}`, { method: 'POST' });
         } catch (error) {
             console.error("Failed to sync tour state:", error);
         }
