@@ -69,11 +69,19 @@ def get_planilha_manager(
         # print(f"--- API: Usando Manager em Cache para {cache_key} ---")
         return _managers_cache[cache_key]
 
-    # 3. Cria o Handler de Storage (Local, Google Sheets ou Google Drive Excel)
+    # 3. Obtém credenciais de usuário (se houver) para acesso ao GSheets
+    from core.google_auth_service import GoogleAuthService
+    auth_service = GoogleAuthService(config_service)
+    user_credentials = auth_service.get_user_credentials()
+
+    if user_credentials:
+        print(f"--- API: Injetando credenciais de usuário para acesso à planilha ---")
+
+    # 4. Cria o Handler de Storage (Local, Google Sheets ou Google Drive Excel)
     from finance.storage.storage_factory import StorageHandlerFactory
 
     try:
-        storage_handler = StorageHandlerFactory.create_handler(path_str)
+        storage_handler = StorageHandlerFactory.create_handler(path_str, credentials=user_credentials)
         print(f"--- API: Handler de Storage criado: {type(storage_handler).__name__} para {path_str} ---")
     except ValueError as e:
         print(f"--- API ERRO: Falha ao criar handler de storage: {e} ---")

@@ -47,12 +47,13 @@ class StorageHandlerFactory:
         return StorageType.LOCAL_EXCEL
 
     @classmethod
-    def create_handler(cls, path: str) -> BaseStorageHandler:
+    def create_handler(cls, path: str, credentials: Optional[object] = None) -> BaseStorageHandler:
         """
         Cria o handler apropriado baseado no path fornecido.
 
         Args:
             path: Caminho ou URL do arquivo de armazenamento.
+            credentials: (Opcional) Credenciais de usuário autenticadas (para GSheets).
 
         Returns:
             Instância do handler apropriado para o tipo de storage.
@@ -76,7 +77,8 @@ class StorageHandlerFactory:
         elif storage_type == StorageType.GOOGLE_DRIVE_FILE:
             return handler_class(file_url=path)
         elif storage_type == StorageType.GOOGLE_SHEETS:
-            return handler_class(spreadsheet_url_or_key=path)
+            # Injeta as credenciais se for GSheets
+            return handler_class(spreadsheet_url_or_key=path, credentials=credentials) # type: ignore[call-arg]
         else:
             raise ValueError(f"Handler para tipo '{storage_type}' não implementado.")
 

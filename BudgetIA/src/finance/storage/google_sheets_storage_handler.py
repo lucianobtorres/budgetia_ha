@@ -23,13 +23,27 @@ class GoogleSheetsStorageHandler(BaseStorageHandler): # type: ignore[misc]
     em uma Planilha Google (Google Sheets).
     """
 
-    def __init__(self, spreadsheet_url_or_key: str):
+    def __init__(self, spreadsheet_url_or_key: str, credentials: Any | None = None):
         print(
             f"--- DEBUG (GSheetsHandler): __init__ chamado para: '{spreadsheet_url_or_key}' ---"
         )
         try:
-            # Autentica usando a Conta de Serviço
-            gc = gspread.service_account(filename=CREDENTIALS_PATH, scopes=SCOPES)
+            gc = None
+            # 1. Tenta usar credenciais de usuário explicitamente fornecidas (OAuth)
+            if credentials:
+                print("--- DEBUG (GSheetsHandler): Usando CREDENCIAIS DE USUÁRIO fornecidas. ---")
+                try:
+                    gc = gspread.authorize(credentials)
+                except Exception as e:
+                    print(f"--- AVISO (GSheetsHandler): Falha ao autorizar com credenciais de usuário: {e}. Tentando Service Account... ---")
+
+            # 2. Fallback: Autentica usando a Conta de Serviço (se não tiver user creds ou falhar)
+            if not gc:
+                print("--- DEBUG (GSheetsHandler): Usando SERVICE ACCOUNT (Fallback/Default). ---")
+                if Path(CREDENTIALS_PATH).exists():
+                     gc = gspread.service_account(filename=CREDENTIALS_PATH, scopes=SCOPES)
+                else:
+                     raise FileNotFoundError(f"Credenciais de User vazias e Service Account não encontrada em {CREDENTIALS_PATH}")
 
             # Abre a planilha (seja por URL ou pela Chave/ID)
             self.spreadsheet = gc.open_by_url(spreadsheet_url_or_key)
