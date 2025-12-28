@@ -161,8 +161,6 @@ class GoogleSheetsStorageHandler(BaseStorageHandler): # type: ignore[misc]
             # Tentar acessar lastUpdateTime diretamente se disponível
             # Caso contrário, forçar refresh simula o fetch_properties antigo
             try:
-                # Tenta método novo (v6+) se existir (o método fetch_properties não existe mais)
-                # self.spreadsheet.fetch_sheet_metadata() 
                 pass 
             except:
                 pass
@@ -182,25 +180,7 @@ class GoogleSheetsStorageHandler(BaseStorageHandler): # type: ignore[misc]
             print(
                 f"AVISO: Não foi possível obter modifiedTime (updated) do GSheet: {e}"
             )
-            return None                if sheet_name_padrao == config.NomesAbas.TRANSACOES:
-                    dataframes[sheet_name_padrao] = strategy.map_transactions(df_bruto)
-                else:
-                    dataframes[sheet_name_padrao] = strategy.map_other_sheet(
-                        df_bruto, sheet_name_padrao
-                    )
-
-            self._is_new_file = is_new_file
-            return dataframes, is_new_file
-
-        except Exception as e:
-            print(
-                f"ERRO CRÍTICO ao ler o Google Sheets: {e}. Retornando estrutura vazia."
-            )
-            # Fallback: cria estrutura vazia em memória
-            for sheet_name, columns in layout_config.items():
-                dataframes[sheet_name] = pd.DataFrame(columns=columns)
-            self._is_new_file = True
-            return dataframes, True
+            return None
 
     def save_sheets(
         self,
@@ -272,18 +252,3 @@ class GoogleSheetsStorageHandler(BaseStorageHandler): # type: ignore[misc]
         except Exception as e:
             return False, f"Erro inesperado de conexão com GSheets: {e}"
 
-    def get_source_modified_time(self) -> str | None:
-        """
-        Retorna o timestamp 'updated' dos metadados da Planilha Google.
-        """
-        try:
-            # Força o gspread a buscar os metadados mais recentes da API
-            self.spreadsheet.fetch_properties() # type: ignore[attr-defined]
-
-            # A propriedade 'updated' é uma string ISO 8601 (ex: "2025-11-17T18:00:00.000Z")
-            return self.spreadsheet.updated # type: ignore[attr-defined, no-any-return]
-        except Exception as e:
-            print(
-                f"AVISO: Não foi possível obter modifiedTime (updated) do GSheet: {e}"
-            )
-            return None
