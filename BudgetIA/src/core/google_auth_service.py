@@ -218,10 +218,16 @@ class GoogleAuthService:
         )
 
         # Se o token de acesso expirou, atualiza-o
+        # Se o token de acesso expirou, atualiza-o
         if creds.expired and creds.refresh_token:
-            creds.refresh(Request())  # type: ignore[no-untyped-call]
-            # Salva o token atualizado
-            self.config_service.save_google_oauth_tokens(creds.to_json())
+            try:
+                creds.refresh(Request())  # type: ignore[no-untyped-call]
+                # Salva o token atualizado
+                self.config_service.save_google_oauth_tokens(creds.to_json())
+            except Exception as e:
+                print(f"AVISO: Falha ao atualizar token (pode estar revogado): {e}")
+                self.config_service.save_google_oauth_tokens(None)
+                return None
 
         return creds  # type: ignore[no-any-return]
 

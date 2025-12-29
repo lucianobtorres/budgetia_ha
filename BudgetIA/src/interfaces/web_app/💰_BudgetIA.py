@@ -49,6 +49,12 @@ def setup_page():
         layout="wide",
         initial_sidebar_state="collapsed",
     )
+    
+    # Adiciona Logo Global na Sidebar (Streamlit 1.35+)
+    try:
+        st.logo("src/assets/logo.png", icon_image="src/assets/logo.png")
+    except Exception:
+        pass # Fallback silencioso se a versão for antiga ou arquivo não carregar
 
 # load_financial_system removido (substituído pela API)
 

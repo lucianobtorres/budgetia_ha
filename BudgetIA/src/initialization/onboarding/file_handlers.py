@@ -292,6 +292,9 @@ class GoogleSheetsHandler(IFileHandler):
             "nuvem",
             "online",
             "seleção de planilha",
+            "reconectar",
+            "trocar conta",
+            "mudar conta"
         ]
         result = any(k in clean_input for k in keywords)
         print(
@@ -303,7 +306,13 @@ class GoogleSheetsHandler(IFileHandler):
         # 1. FIRST: Se a URL foi passada via texto (Chat) ou contexto explícito, finaliza!
         selected_url = context.get("google_file_url")
         user_input = context.get("user_input_text", "")
+        clean_input = user_input.lower().strip()
         
+        # Se o usuário pediu para reconectar, forçamos o logout
+        if any(k in clean_input for k in ["reconectar", "trocar conta", "mudar conta"]):
+            print("[DEBUG GoogleHandler] Usuário solicitou reconexão. Revogando tokens locais.")
+            self.auth_service.revoke_google_oauth_token()
+
         # Se o input do usuário parece uma URL de planilha, usamos ele.
         if "docs.google.com/spreadsheets" in user_input:
             selected_url = user_input.strip()

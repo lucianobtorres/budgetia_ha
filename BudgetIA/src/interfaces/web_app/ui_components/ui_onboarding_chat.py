@@ -13,7 +13,14 @@ def render(api_client: BudgetAPIClient) -> None:
     Renderiza a interface de onboarding conversacional (API-Driven UI).
     Agora o Frontend é 'burro' e pergunta tudo para a API.
     """
-    st.title("Bem-vindo ao BudgetIA! 🚀")
+    try:
+        col1, col2 = st.columns([0.2, 0.8])
+        with col1:
+             st.image("src/assets/logo.png", width=80)
+        with col2:
+             st.title("BudgetIA")
+    except Exception:
+        st.title("Bem-vindo ao BudgetIA! 🚀")
 
     # --- 1. Sincronização de Estado (Polling inicial) ---
     state_data = {}
@@ -184,7 +191,16 @@ def render(api_client: BudgetAPIClient) -> None:
         files_list = st.session_state.get("last_google_files_list", [])
         
         if not files_list:
-            st.warning("Não encontrei a lista de arquivos. Tente clicar em Google Sheets novamente ou aguarde.")
+            st.warning("⚠️ Não encontrei a lista de arquivos. Sua sessão pode ter expirado.")
+            if st.button("🔄 Reconectar Google / Trocar Conta"):
+                st.session_state.onboarding_messages.append({"role": "user", "content": "Trocar conta"})
+                with st.spinner("Reiniciando conexão..."):
+                    try:
+                        resp = api_client.send_onboarding_message("Trocar conta")
+                        st.session_state.onboarding_messages.append({"role": "assistant", "content": resp["message"]})
+                    except BudgetException as e:
+                        st.session_state.onboarding_messages.append({"role": "assistant", "content": f"❌ Erro: {e}"})
+                st.rerun()
         else:
             options = {f["name"]: f["url"] for f in files_list}
             selected_name = st.selectbox("Selecione o arquivo:", list(options.keys()))

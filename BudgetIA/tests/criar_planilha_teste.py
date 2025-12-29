@@ -1,56 +1,85 @@
 import os
 import sys
-
 import pandas as pd
+from datetime import datetime
 
-# Tenta encontrar a pasta 'data' usando o 'config.py'
+# --- CONFIGURAÇÃO ---
+# Tenta importar as configs do projeto para garantir consistência
 try:
-    # Adiciona 'src' ao path para encontrar o 'config'
     src_path = os.path.abspath(os.path.join(os.getcwd(), "src"))
     if src_path not in sys.path:
         sys.path.insert(0, src_path)
-    import config
+    from config import (
+        NomesAbas, 
+        LAYOUT_PLANILHA, 
+        ColunasTransacoes,
+        ColunasOrcamentos,
+        ColunasDividas,
+        ColunasMetas,
+        ColunasInsights,
+        ColunasPerfil
+    )
+except ImportError as e:
+    print(f"ERRO CRÍTICO: Não foi possível importar src/config.py. Certifique-se de rodar na raiz do projeto. ({e})")
+    sys.exit(1)
 
-    DATA_DIR = config.DATA_DIR
-    print(f"Usando pasta de dados do config: {DATA_DIR}")
-except ImportError:
-    print("AVISO: Módulo 'config' não encontrado. Salvando em 'data/'.")
-    DATA_DIR = "data"
-    os.makedirs(DATA_DIR, exist_ok=True)
+OUTPUT_FILE = "planilha_mestra.xlsx"
 
+def create_empty_dataframe(columns):
+    return pd.DataFrame(columns=columns)
 
-# 1. Define o schema customizado e os dados de exemplo
-#    (Note os nomes das colunas e os valores negativos)
-data = {
-    "Data da Operação": [
-        "2025-11-01",
-        "2025-11-03",
-        "2025-11-05",
-        "2025-11-06",
-        "2025-11-07",
-    ],
-    "Detalhes": ["Salário Mensal", "Aluguel", "Supermercado iFood", "Uber", "Cinema"],
-    "Valor (R$)": [5000.00, -1500.00, -450.75, -30.50, -80.00],
-    "Minha Categoria": ["Receita", "Moradia", "Alimentação", "Transporte", "Lazer"],
-}
+def main():
+    print(f"Gerando '{OUTPUT_FILE}' baseado no schema oficial...")
+    
+    with pd.ExcelWriter(OUTPUT_FILE, engine="xlsxwriter") as writer:
+        
+        # 1. Visão Geral e Transações
+        cols_trans = LAYOUT_PLANILHA[NomesAbas.TRANSACOES]
+        df_trans = create_empty_dataframe(cols_trans)
+        # Adicionar uma transação de exemplo para não ficar vazio
+        df_trans.loc[0] = [
+            1, 
+            datetime.now(), 
+            "Receita", 
+            "Salário", 
+            "Salário Inicial", 
+            1000.00, 
+            "Concluído"
+        ]
+        df_trans.to_excel(writer, sheet_name=NomesAbas.TRANSACOES, index=False)
+        print(f"✅ Aba '{NomesAbas.TRANSACOES}' criada.")
 
-# 2. Cria o DataFrame
-df_exemplo = pd.DataFrame(data)
+        # 2. Meus Orçamentos
+        cols_orc = LAYOUT_PLANILHA[NomesAbas.ORCAMENTOS]
+        df_orc = create_empty_dataframe(cols_orc)
+        df_orc.to_excel(writer, sheet_name=NomesAbas.ORCAMENTOS, index=False)
+        print(f"✅ Aba '{NomesAbas.ORCAMENTOS}' criada.")
 
-# 3. Define o nome e o caminho do arquivo
-file_name = "planilha_exemplo_diferente.xlsx"
-file_path = os.path.join(DATA_DIR, file_name)
+        # 3. Minhas Dívidas
+        cols_div = LAYOUT_PLANILHA[NomesAbas.DIVIDAS]
+        df_div = create_empty_dataframe(cols_div)
+        df_div.to_excel(writer, sheet_name=NomesAbas.DIVIDAS, index=False)
+        print(f"✅ Aba '{NomesAbas.DIVIDAS}' criada.")
 
-# 4. Salva o arquivo Excel
-try:
-    with pd.ExcelWriter(file_path, engine="xlsxwriter") as writer:
-        df_exemplo.to_excel(writer, sheet_name="Meu Extrato", index=False)
+        # 4. Metas Financeiras
+        cols_metas = LAYOUT_PLANILHA[NomesAbas.METAS]
+        df_metas = create_empty_dataframe(cols_metas)
+        df_metas.to_excel(writer, sheet_name=NomesAbas.METAS, index=False)
+        print(f"✅ Aba '{NomesAbas.METAS}' criada.")
 
-        # Adiciona uma segunda aba inútil
-        df_dummy = pd.DataFrame({"ID": [101, 102]})
-        df_dummy.to_excel(writer, sheet_name="OutraAba", index=False)
+        # 5. Consultoria da IA
+        cols_ia = LAYOUT_PLANILHA[NomesAbas.CONSULTORIA_IA]
+        df_ia = create_empty_dataframe(cols_ia)
+        df_ia.to_excel(writer, sheet_name=NomesAbas.CONSULTORIA_IA, index=False)
+        print(f"✅ Aba '{NomesAbas.CONSULTORIA_IA}' criada.")
 
-    print(f"SUCESSO: Arquivo de teste criado em: {file_path}")
-    print("Este arquivo tem a aba 'Meu Extrato' e usa valores negativos para despesas.")
-except Exception as e:
-    print(f"ERRO ao criar arquivo de exemplo: {e}")
+        # 6. Perfil Financeiro
+        cols_perfil = LAYOUT_PLANILHA[NomesAbas.PERFIL_FINANCEIRO]
+        df_perfil = create_empty_dataframe(cols_perfil)
+        df_perfil.to_excel(writer, sheet_name=NomesAbas.PERFIL_FINANCEIRO, index=False)
+        print(f"✅ Aba '{NomesAbas.PERFIL_FINANCEIRO}' criada.")
+
+    print(f"\n🎉 Sucesso! '{OUTPUT_FILE}' gerado na raiz.")
+
+if __name__ == "__main__":
+    main()

@@ -160,14 +160,20 @@ def render_danger_zone_api(client: BudgetAPIClient) -> None:
             ):
                 try:
                     if client.reset_account(fast_track=False):
-                        st.cache_resource.clear()
-                        # Limpa session state local
-                        for key in list(st.session_state.keys()):
-                             if key not in ["authentication_status", "name", "username"]:
+                        # Limpa apenas chaves específicas do app
+                        keys_to_reset = [
+                            "onboarding_messages", 
+                            "current_planilha_path", 
+                            "last_google_files_list",
+                            "download_data",
+                            "uploaded_file"
+                        ]
+                        for key in keys_to_reset:
+                             if key in st.session_state:
                                  del st.session_state[key]
                         
                         st.success("Configuração reiniciada (Completa)!")
-                        time.sleep(2)
+                        time.sleep(1)
                         st.switch_page("💰_BudgetIA.py")
                 except Exception as e:
                     st.error(f"Erro ao resetar: {e}")
@@ -182,14 +188,20 @@ def render_danger_zone_api(client: BudgetAPIClient) -> None:
             ):
                 try:
                     if client.reset_account(fast_track=True):
-                        st.cache_resource.clear()
-                        # Limpa session state local
-                        for key in list(st.session_state.keys()):
-                             if key not in ["authentication_status", "name", "username"]:
+                        # Limpa apenas chaves específicas do app
+                        keys_to_reset = [
+                            "onboarding_messages", 
+                            "current_planilha_path", 
+                            "last_google_files_list",
+                            "download_data",
+                            "uploaded_file"
+                        ]
+                        for key in keys_to_reset:
+                             if key in st.session_state:
                                  del st.session_state[key]
                         
                         st.success("Configuração reiniciada (Rápida)!")
-                        time.sleep(2)
+                        time.sleep(1)
                         st.switch_page("💰_BudgetIA.py")
                 except Exception as e:
                     st.error(f"Erro ao resetar: {e}")
