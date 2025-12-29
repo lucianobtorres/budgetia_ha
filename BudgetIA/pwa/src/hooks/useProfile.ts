@@ -113,7 +113,9 @@ export function useProfile() {
             body: JSON.stringify({ fast_track: fastTrack })
         }),
         onSuccess: () => {
-             localStorage.clear();
+             // Limpa apenas chaves de estado de UI, mantendo sessão/token
+             localStorage.removeItem('budgetia_tour_completed');
+             // localStorage.clear(); // REMOVIDO: Evita logout indesejado
              window.location.reload();
         },
         onError: () => toast.error('Erro ao resetar.')

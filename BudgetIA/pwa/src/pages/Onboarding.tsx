@@ -60,7 +60,7 @@ export default function Onboarding() {
             <header className="bg-gray-900/50 backdrop-blur-md border-b border-gray-800 p-4 flex items-center justify-between shadow-sm z-10 shrink-0">
                 <div className="flex items-center gap-3">
                     <div className="relative h-8 w-8 overflow-hidden rounded-lg shadow-sm ring-1 ring-white/10 shrink-0">
-                        <img src="/pwa-192x192.png" alt="Logo" className="h-full w-full object-cover" />
+                        <img src="/pwa-512x512.png" alt="Logo" className="h-full w-full object-cover" />
                     </div>
                     <div>
                         <h1 className="text-lg font-bold tracking-tight text-white leading-none">
