@@ -1,5 +1,5 @@
 name: "BudgetIA (Monorepo)"
-version: "1.0.42"
+version: "1.0.43"
 slug: "budgetia"
 description: "Assistente Financeiro Pessoal com IA Local/Remota, Planilhas e Dashboard Rico."
 url: "https://github.com/lucianobtorres/budgetia_ha"
@@ -29,6 +29,7 @@ options:
   vapid_public_key: ""
   vapid_claim_email: "mailto:admin@example.com"
   secret_key: "change_me_in_production"
+  user_data_encryption_key: ""
   upstash_redis_url: ""
   planilha_path: ""
   ssl: false
@@ -48,6 +49,7 @@ schema:
   vapid_public_key: str?
   vapid_claim_email: str?
   secret_key: str?
+  user_data_encryption_key: str?
   upstash_redis_url: str?
   planilha_path: str?
   ssl: bool?
