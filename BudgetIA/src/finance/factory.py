@@ -5,6 +5,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from config import LAYOUT_PLANILHA
+from core.logger import get_logger
+
+logger = get_logger("FinanceFactory")
 from infrastructure.caching.redis_cache_service import RedisCacheService
 from finance.planilha_manager import PlanilhaManager
 from finance.repositories.budget_repository import BudgetRepository
@@ -46,7 +49,7 @@ def _load_strategy_from_file(
         StrategyClass = getattr(strategy_module, "CustomStrategy")
         return StrategyClass # type: ignore[no-any-return]
     except Exception as e:
-        print(f"ERRO CRÍTICO: Falha ao carregar estratégia de '{strategy_path}': {e}")
+        logger.critical(f"Falha ao carregar estratégia de '{strategy_path}': {e}")
         # Retorna a Padrão como fallback de segurança
         return DefaultStrategy # type: ignore[no-any-return]
 
@@ -64,8 +67,8 @@ class FinancialSystemFactory:
         """
         Cria e configura uma instância completa do PlanilhaManager.
         """
-        print(
-            f"--- DEBUG Factory: Criando sistema para usuário '{config_service.username}' ---"
+        logger.debug(
+            f"Criando sistema para usuário '{config_service.username}'"
         )
 
         # 1. Cache Service
@@ -80,13 +83,15 @@ class FinancialSystemFactory:
         if mapeamento and mapeamento.get("strategy_module"):
             module_name = mapeamento["strategy_module"]
             strategy_path = config_service.strategy_file_path
-            print(
-                f"--- DEBUG Factory: Carregando estratégia customizada '{module_name}' de {strategy_path} ---"
+            module_name = mapeamento["strategy_module"]
+            strategy_path = config_service.strategy_file_path
+            logger.debug(
+                f"Carregando estratégia customizada '{module_name}' de {strategy_path}"
             )
             StrategyClass = _load_strategy_from_file(strategy_path, module_name)
             strategy_instance = StrategyClass(LAYOUT_PLANILHA, mapeamento)
         else:
-            print("--- DEBUG Factory: Usando DefaultStrategy. ---")
+            logger.debug("Usando DefaultStrategy.")
             strategy_instance = DefaultStrategy(LAYOUT_PLANILHA, None)
 
         # 3. Data Context
@@ -118,7 +123,7 @@ class FinancialSystemFactory:
 
         # 5. Setup Inicial (se necessário)
         if context.is_new_file:
-            print("LOG: Detectado arquivo novo ou abas faltando.")
+            logger.info("Detectado arquivo novo ou abas faltando.")
             setup_service = FinancialSetupService(
                 context=context,
                 transaction_repo=transaction_repo,
@@ -128,17 +133,17 @@ class FinancialSystemFactory:
             if mapeamento is None:
                 setup_service.populate_initial_data()
             else:
-                print(
-                    "--- DEBUG Factory: Arquivo mapeado. Salvando abas do sistema... ---"
+                logger.debug(
+                    "Arquivo mapeado. Salvando abas do sistema..."
                 )
                 context.save(add_intelligence=False)
         elif not context.is_cache_hit:
-            print(
-                "LOG: Arquivo existente carregado do Storage. Recalculando orçamentos..."
+            logger.info(
+                "Arquivo existente carregado do Storage. Recalculando orçamentos..."
             )
             budget_repo.recalculate_all_budgets()
         else:
-            print("LOG: Arquivo existente carregado do Cache. Startup rápido.")
+            logger.info("Arquivo existente carregado do Cache. Startup rápido.")
 
         # 6. Cria o Manager (Fachada)
         return PlanilhaManager(

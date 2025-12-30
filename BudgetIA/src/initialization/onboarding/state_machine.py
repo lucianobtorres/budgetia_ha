@@ -1,6 +1,9 @@
 # src/initialization/onboarding/state_machine.py
 from typing import Any
 from enum import Enum, auto
+from core.logger import get_logger
+
+logger = get_logger("OnboardingState")
 
 
 class OnboardingState(Enum):
@@ -99,15 +102,15 @@ class OnboardingStateMachine:
         """
         # Permanecer no mesmo estado é sempre válido
         if self._current_state == new_state:
-            print(
-                f"--- ONBOARDING: Permanecendo no estado {self._current_state.name} ---"
+            logger.debug(
+                f"Permanecendo no estado {self._current_state.name}"
             )
             return True
 
         allowed = self._valid_transitions.get(self._current_state, set())
         if new_state in allowed:
-            print(
-                f"--- ONBOARDING: Transição de {self._current_state.name} para {new_state.name} ---"
+            logger.info(
+                f"Transição de {self._current_state.name} para {new_state.name}"
             )
             self._current_state = new_state
             
@@ -117,8 +120,8 @@ class OnboardingStateMachine:
                 
             return True
 
-        print(
-            f"--- ONBOARDING: Transição INVÁLIDA de {self._current_state.name} para {new_state.name} ---"
+        logger.warning(
+            f"Transição INVÁLIDA de {self._current_state.name} para {new_state.name}"
         )
         return False
 

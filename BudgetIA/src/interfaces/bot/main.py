@@ -35,23 +35,20 @@ if PROJECT_ROOT not in sys.path:
 if SRC_DIR not in sys.path:
     sys.path.insert(0, SRC_DIR)
 
-print(f"--- DEBUG: SYS.PATH ATUALIZADO (para {__file__}) ---")
-print(f"ROOT: {PROJECT_ROOT}")
-print(f"SRC: {SRC_DIR}")
-print("--- INICIANDO IMPORTS DA APLICAÇÃO ---")
+
 
 # Configura o logging
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
-)
-logger = logging.getLogger(__name__)
+from core.logger import get_logger
+
+# Configura o logging
+logger = get_logger("Bot")
 
 BOT_USERNAME = "jsmith"
 
 # --- 4. Inicializa o CLiente da API ---
 from interfaces.web_app.api_client import BudgetAPIClient
 
-print("--- INICIALIZANDO BOT DO TELEGRAM (MODO API CLI) ---")
+logger.info("INICIALIZANDO BOT DO TELEGRAM (MODO API CLI)")
 
 # Carrega o token
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
@@ -63,7 +60,7 @@ API_URL = os.getenv("API_URL", "http://127.0.0.1:8000")
 
 def load_api_client() -> tuple[BudgetAPIClient | None, UserConfigService | None]:
     try:
-        print(f"BOT: Conectando à API em {API_URL} como '{BOT_USERNAME}'...")
+        logger.info(f"Conectando à API em {API_URL} como '{BOT_USERNAME}'...")
         
         # Instancia o cliente da API
         # O Client já cuida dos headers de autenticação simples (X-User-ID)
@@ -73,7 +70,7 @@ def load_api_client() -> tuple[BudgetAPIClient | None, UserConfigService | None]
         if not client.is_healthy():
              logger.warning("AVISO: Não foi possível conectar à API durante a inicialização.")
         else:
-             print("BOT: Conexão com a API estabelecida com sucesso.")
+             logger.info("Conexão com a API estabelecida com sucesso.")
 
         # Carrega config service APENAS para salvar o chat_id localmente (Scheduler)
         config_service = UserConfigService(BOT_USERNAME)
@@ -109,7 +106,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         config_service.save_comunicacao_field("telegram_chat_id", chat_id)
 
     user_text = update.message.text
-    print(f"BOT: Mensagem Recebida ({chat_id}): '{user_text}'")
+    logger.info(f"Mensagem Recebida ({chat_id}): '{user_text}'")
 
     # Mostra "Digitando..." no Telegram
     await context.bot.send_chat_action(chat_id=chat_id, action="typing")

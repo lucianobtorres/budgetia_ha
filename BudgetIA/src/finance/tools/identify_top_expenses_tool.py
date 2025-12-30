@@ -8,6 +8,10 @@ from config import ColunasTransacoes, NomesAbas, ValoresTipo
 from core.base_tool import BaseTool
 from finance.schemas import IdentificarMaioresGastosInput
 
+from core.logger import get_logger
+
+logger = get_logger("Tool_TopExpenses")
+
 
 class IdentificarMaioresGastosTool(BaseTool):  # type: ignore[misc]
     name: str = "identificar_maiores_gastos"
@@ -23,7 +27,7 @@ class IdentificarMaioresGastosTool(BaseTool):  # type: ignore[misc]
     # --- FIM DA MUDANÇA ---
 
     def run(self, top_n: int = 3) -> str:
-        print(f"LOG: Ferramenta '{self.name}' foi chamada com top_n={top_n}.")
+        logger.info(f"Ferramenta '{self.name}' foi chamada com top_n={top_n}.")
 
         # --- DIP: Chama a função injetada ---
         df = self.visualizar_dados(sheet_name=NomesAbas.TRANSACOES)

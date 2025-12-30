@@ -25,6 +25,10 @@ from finance.tool_loader import load_all_financial_tools
 
 load_dotenv()
 
+from core.logger import get_logger
+
+logger = get_logger("Agent")
+
 
 class IADeFinancas(AgentRunner):  # type: ignore[misc]
     """
@@ -59,12 +63,10 @@ class IADeFinancas(AgentRunner):  # type: ignore[misc]
         try:
             with open(config.SYSTEM_PROMPT_PATH, encoding="utf-8") as f:
                 prompt_template_str = f.read()
-                print(
-                    f"--- DEBUG (Agent): Verificando prompt carregado (primeiras 500 chars): {prompt_template_str[:500]} ---"
-                )
+                logger.debug(f"Verificando prompt carregado (primeiras 500 chars): {prompt_template_str[:500]}")
         except FileNotFoundError:
-            print(
-                f"ERRO: Arquivo de prompt do sistema não encontrado em {config.SYSTEM_PROMPT_PATH}"
+            logger.error(
+                f"Arquivo de prompt do sistema não encontrado em {config.SYSTEM_PROMPT_PATH}"
             )
             prompt_template_str = "Você é um assistente prestativo. {contexto_perfil}"
 
@@ -98,7 +100,7 @@ class IADeFinancas(AgentRunner):  # type: ignore[misc]
             input_key="input",  # FIXED: Explicitly set input key
         )
 
-        print("--- DEBUG AGENTE: Carregando ferramentas com injeção de repositório e memória...")
+        logger.debug("Carregando ferramentas com injeção de repositório e memória...")
         tools_custom = load_all_financial_tools(
             # planilha_manager=planilha_manager, # REMOVIDO
             data_context=data_context,
@@ -165,9 +167,7 @@ class IADeFinancas(AgentRunner):  # type: ignore[misc]
             return {"output": output, "intermediate_steps": steps}
 
         except Exception as e:
-            print(f"ERRO CRÍTICO NO AGENTE: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.critical(f"ERRO CRÍTICO NO AGENTE: {e}", exc_info=True)
             return {"output": f"Desculpe, ocorreu um erro interno: {e}", "intermediate_steps": []}
 
     @property

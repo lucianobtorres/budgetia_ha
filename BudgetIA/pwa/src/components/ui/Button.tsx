@@ -21,13 +21,13 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
     ...props 
 }, ref) => {
     const variants = {
-        primary: "bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-900/10",
-        secondary: "bg-gray-800 hover:bg-gray-700 text-white border border-gray-700",
-        neutral: "bg-gray-800/50 hover:bg-gray-800 text-gray-400 hover:text-white border border-gray-800",
-        danger: "bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-900/30",
-        "danger-outline": "border border-red-900/30 text-red-400 hover:bg-red-900/10",
-        ghost: "hover:bg-gray-800 text-gray-400 hover:text-white",
-        outline: "border border-gray-700 text-gray-300 hover:text-white hover:bg-gray-800"
+        primary: "bg-primary hover:bg-primary-hover text-white shadow-lg shadow-primary/20",
+        secondary: "bg-surface-hover hover:bg-border text-text-primary border border-border",
+        neutral: "bg-surface-card/50 hover:bg-surface-hover text-text-secondary hover:text-text-primary border border-border",
+        danger: "bg-danger/10 hover:bg-danger/20 text-danger border border-danger/30",
+        "danger-outline": "border border-danger/30 text-danger hover:bg-danger/10",
+        ghost: "hover:bg-surface-hover text-text-secondary hover:text-text-primary",
+        outline: "border border-border text-text-secondary hover:text-text-primary hover:bg-surface-hover"
     };
 
     const sizes = {
@@ -42,7 +42,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
             ref={ref}
             disabled={disabled || isLoading}
             className={cn(
-                "inline-flex items-center justify-center rounded-xl font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:pointer-events-none disabled:opacity-50",
+                "inline-flex items-center justify-center rounded-xl font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-50",
                 variants[variant],
                 sizes[size],
                 className

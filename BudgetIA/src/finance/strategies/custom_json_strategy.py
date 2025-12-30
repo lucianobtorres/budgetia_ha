@@ -5,12 +5,15 @@ from typing import Any
 import pandas as pd
 
 import config
+from core.logger import get_logger
 from config import (
     ColunasTransacoes,
     ValoresTipo,
 )
 
 from .base_strategy import BaseMappingStrategy
+
+logger = get_logger("CustomJsonStrategy")
 
 
 class CustomJsonStrategy(BaseMappingStrategy):
@@ -23,7 +26,7 @@ class CustomJsonStrategy(BaseMappingStrategy):
         self, layout_config: dict[str, Any], mapeamento: dict[str, Any] | None = None
     ):
         super().__init__(layout_config, mapeamento)
-        print("LOG: Estratégia 'CustomJsonStrategy' selecionada.")
+        logger.info("Estratégia 'CustomJsonStrategy' selecionada.")
 
         # Pre-calcula o mapa reverso para salvar
         mapa_colunas_direto = self.mapeamento.get("colunas", {})
@@ -39,12 +42,12 @@ class CustomJsonStrategy(BaseMappingStrategy):
         # 1. Renomear colunas (SuaColuna -> NossaColuna)
         mapa_colunas = self.mapeamento.get("colunas", {})
         if mapa_colunas:
-            print(f"LOG: Aplicando renomeação de colunas: {mapa_colunas}")
+            logger.info(f"Aplicando renomeação de colunas: {mapa_colunas}")
             df_mapeado.rename(columns=mapa_colunas, inplace=True)
 
         # 2. Aplicar transformações (Ex: Valores Negativos)
         if self.mapeamento.get("transform_valor_negativo", False):
-            print("LOG: Aplicando transformação de valor negativo...")
+            logger.info("Aplicando transformação de valor negativo...")
             if ColunasTransacoes.VALOR in df_mapeado.columns:
                 df_mapeado[ColunasTransacoes.TIPO] = df_mapeado[
                     ColunasTransacoes.VALOR
@@ -59,8 +62,8 @@ class CustomJsonStrategy(BaseMappingStrategy):
                     ColunasTransacoes.VALOR
                 ].abs()
             else:
-                print(
-                    "AVISO: 'transform_valor_negativo' ligado, mas 'Valor' não encontrado."
+                logger.warning(
+                    "'transform_valor_negativo' ligado, mas 'Valor' não encontrado."
                 )
 
         # --- INÍCIO DA CORREÇÃO ---
@@ -69,18 +72,18 @@ class CustomJsonStrategy(BaseMappingStrategy):
 
         if coluna_data_interna in df_mapeado.columns:
             try:
-                print(
-                    f"--- DEBUG (CustomStrategy): Convertendo coluna '{coluna_data_interna}' para datetime... ---"
+                logger.debug(
+                    f"Convertendo coluna '{coluna_data_interna}' para datetime..."
                 )
                 df_mapeado[coluna_data_interna] = pd.to_datetime(
                     df_mapeado[coluna_data_interna], errors="coerce"
                 )
-                print(
-                    f"--- DEBUG (CustomStrategy): Conversão concluída. Valores nulos após conversão: {df_mapeado[coluna_data_interna].isna().sum()} ---"
+                logger.debug(
+                    f"Conversão concluída. Valores nulos após conversão: {df_mapeado[coluna_data_interna].isna().sum()}"
                 )
             except Exception as e:
-                print(
-                    f"AVISO (CustomStrategy): Falha ao converter coluna '{coluna_data_interna}' para datetime: {e}"
+                logger.warning(
+                    f"Falha ao converter coluna '{coluna_data_interna}' para datetime: {e}"
                 )
                 # Se falhar, continua, mas o data_editor pode quebrar
         # --- FIM DA CORREÇÃO ---
@@ -99,7 +102,7 @@ class CustomJsonStrategy(BaseMappingStrategy):
 
         # 1. Aplicar transformação de valor negativo (operação inversa)
         if self.mapeamento.get("transform_valor_negativo", False):
-            print("LOG: Aplicando transformação INVERSA de valor negativo...")
+            logger.info("Aplicando transformação INVERSA de valor negativo...")
             if (
                 ColunasTransacoes.VALOR in df_para_salvar.columns
                 and ColunasTransacoes.TIPO in df_para_salvar.columns
@@ -121,7 +124,7 @@ class CustomJsonStrategy(BaseMappingStrategy):
 
         # 2. Renomear colunas (operação inversa: NossaColuna -> SuaColuna)
         if self.mapa_reverso:
-            print(f"LOG: Aplicando renomeação INVERSA: {self.mapa_reverso}")
+            logger.info(f"Aplicando renomeação INVERSA: {self.mapa_reverso}")
             df_para_salvar.rename(columns=self.mapa_reverso, inplace=True)
 
         # 3. Manter APENAS as colunas originais do usuário
@@ -134,11 +137,11 @@ class CustomJsonStrategy(BaseMappingStrategy):
 
         if not colunas_finais:
             # Segurança: Se o mapa estiver vazio, não quebra
-            print(
-                "AVISO: Mapa de colunas reverso está vazio. Salvando colunas internas."
+            logger.warning(
+                "Mapa de colunas reverso está vazio. Salvando colunas internas."
             )
             return df_interno[self.colunas_transacoes]  # Salva o padrão
 
-        print(f"LOG: Salvando apenas colunas originais do usuário: {colunas_finais}")
+        logger.info(f"Salvando apenas colunas originais do usuário: {colunas_finais}")
         # Retorna o DataFrame apenas com as colunas do usuário, na ordem que ele mapeou
         return df_para_salvar[self.colunas_originais_usuario]

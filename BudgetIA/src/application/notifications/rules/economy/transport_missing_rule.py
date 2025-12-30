@@ -5,7 +5,10 @@ from typing import Any
 import pandas as pd
 
 import config
+from core.logger import get_logger
 from application.notifications.models.notification_message import NotificationPriority
+
+logger = get_logger("TransportMissingRule")
 from application.notifications.models.rule_result import RuleResult
 from application.notifications.rules.base_rule import IFinancialRule
 
@@ -49,15 +52,13 @@ class TransportMissingRule(IFinancialRule): # type: ignore[misc]
         Returns:
             RuleResult com triggered=True se deve notificar.
         """
-        print(
-            f"LOG (TransportMissingRule): Verificando transporte dos últimos {self.days_threshold} dias..."
+        logger.debug(
+            f"Verificando transporte dos últimos {self.days_threshold} dias..."
         )
 
         # Validação: DataFrame vazio significa SEM transações = SEM transporte = DEVE NOTIFICAR
         if transactions_df.empty:
-            print(
-                "LOG (TransportMissingRule): DataFrame vazio. Nenhuma transação registrada. TRIGGERED!"
-            )
+            logger.info("DataFrame vazio. Nenhuma transação registrada. TRIGGERED!")
             return RuleResult(
                 triggered=True,
                 message_template=(
@@ -85,8 +86,8 @@ class TransportMissingRule(IFinancialRule): # type: ignore[misc]
         ]
 
         if transport_recent.empty:
-            print(
-                f"LOG (TransportMissingRule): Nenhum transporte nos últimos {self.days_threshold} dias. TRIGGERED!"
+            logger.info(
+                f"Nenhum transporte nos últimos {self.days_threshold} dias. TRIGGERED!"
             )
             return RuleResult(
                 triggered=True,
@@ -100,7 +101,7 @@ class TransportMissingRule(IFinancialRule): # type: ignore[misc]
                 category="financial_reminder",
             )
         else:
-            print("LOG (TransportMissingRule): Transporte encontrado. Não notificar.")
+            logger.debug("Transporte encontrado. Não notificar.")
             return RuleResult(
                 triggered=False,
                 message_template="",

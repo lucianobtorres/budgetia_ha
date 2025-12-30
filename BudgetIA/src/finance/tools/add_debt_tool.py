@@ -6,6 +6,10 @@ from pydantic import BaseModel
 from core.base_tool import BaseTool
 from finance.schemas import AdicionarDividaInput
 
+from core.logger import get_logger
+
+logger = get_logger("Tool_AddDebt")
+
 
 class AdicionarDividaTool(BaseTool):  # type: ignore[misc]
     name: str = "adicionar_divida"
@@ -37,7 +41,7 @@ class AdicionarDividaTool(BaseTool):  # type: ignore[misc]
         data_proximo_pgto: str | None = None,
         observacoes: str = "",
     ) -> str:
-        print(f"LOG: Ferramenta '{self.name}' chamada para {nome_divida}.")
+        logger.info(f"Ferramenta '{self.name}' chamada para {nome_divida}.")
         try:
             # --- DIP: Chama as funções injetadas ---
             mensagem = self.adicionar_ou_atualizar_divida(

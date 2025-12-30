@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/Button';
 import { GlassCard } from '../ui/GlassCard';
 import { GradientBanner } from '../ui/GradientBanner';
+import { VStack } from '../ui/Layout';
 import { PushNotificationCard } from './PushNotificationCard';
 import type { DriveStatus } from '../../hooks/useProfile';
 import { useTour } from '../../context/TourContext';
@@ -59,8 +60,8 @@ export function SettingsTab({ driveStatus, onShareDrive, onRevokeDrive, onResetP
                         <HelpCircle size={24} />
                     </div>
                     <div>
-                        <h3 className="text-white font-bold">Reiniciar Dicas de Uso</h3>
-                        <p className="text-sm text-gray-400">Ver novamente o tour guiado pelo painel.</p>
+                        <h3 className="text-text-primary font-bold">Reiniciar Dicas de Uso</h3>
+                        <p className="text-sm text-text-muted">Ver novamente o tour guiado pelo painel.</p>
                     </div>
                 </div>
                 <div className="text-emerald-500">
@@ -75,24 +76,24 @@ export function SettingsTab({ driveStatus, onShareDrive, onRevokeDrive, onResetP
                             <FileSpreadsheet size={24} />
                         </div>
                         <div>
-                                <h3 className="text-lg font-bold text-white">Google Drive</h3>
-                                <p className="text-xs text-gray-500">Conexão Backend</p>
+                                <h3 className="text-lg font-bold text-text-primary">Google Drive</h3>
+                                <p className="text-xs text-text-muted">Conexão Backend</p>
                         </div>
                     </div>
                     
-                    <div className="bg-gray-900/50 p-4 rounded-xl border border-gray-800 mb-6 text-sm text-gray-300 leading-relaxed">
+                    <div className="bg-surface-card p-4 rounded-xl border border-border mb-6 text-sm text-text-secondary leading-relaxed">
                         Para que o Agendador de Tarefas e o Bot do Telegram funcionem quando você não está com o app aberto, é necessário autorizar o acesso backend à planilha.
                     </div>
 
-                    <div className="flex items-center justify-between bg-gray-900 p-4 rounded-xl border border-gray-800 mb-6">
-                        <span className="text-sm font-medium text-white">Status</span>
+                    <div className="flex items-center justify-between bg-surface-hover p-4 rounded-xl border border-border mb-6">
+                        <span className="text-sm font-medium text-text-primary">Status</span>
                         {driveStatus.backend_consent ? (
                             <div className="flex items-center space-x-2 text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-lg border border-emerald-500/20">
                                 <CheckCircle size={16} />
                                 <span className="text-xs uppercase font-bold">Ativo</span>
                             </div>
                         ) : (
-                            <div className="flex items-center space-x-2 text-gray-500 bg-gray-800 px-3 py-1 rounded-lg border border-gray-700">
+                            <div className="flex items-center space-x-2 text-text-muted bg-surface-card px-3 py-1 rounded-lg border border-border">
                                 <XCircle size={16} />
                                 <span className="text-xs uppercase font-bold">Inativo</span>
                             </div>
@@ -148,7 +149,7 @@ export function SettingsTab({ driveStatus, onShareDrive, onRevokeDrive, onResetP
                         <div className="px-6 pb-6 pt-0 animate-in slide-in-from-top-2 duration-200">
                             <div className="h-px bg-red-900/30 mb-6" /> {/* Divider */}
                             
-                            <div className="grid grid-cols-1 gap-3">
+                            <VStack gap={3}>
                             <button 
                                 onClick={() => handleReset(false)}
                                 className="w-full text-red-400 hover:text-red-300 text-sm font-medium border border-red-900/50 p-3 rounded-xl hover:bg-red-900/20 transition-colors text-left flex items-center gap-3"
@@ -170,7 +171,7 @@ export function SettingsTab({ driveStatus, onShareDrive, onRevokeDrive, onResetP
                                     <div className="text-xs opacity-70">Reinicia sem tutorial</div>
                                 </div>
                             </button>
-                            </div>
+                            </VStack>
                         </div>
                     )}
             </div>

@@ -63,6 +63,20 @@ api_router.include_router(telemetry.router)
 # Incluir na App Principal
 app.include_router(api_router)
 
+@app.on_event("startup")
+async def startup_event():
+    import logging
+    from core.logger import EndpointFilter, app_logger
+    
+    # Configura filtro para reduzir ruído de logs de acesso
+    access_logger = logging.getLogger("uvicorn.access")
+    # Filtra requisições de arquivos estáticos do PWA
+    access_logger.addFilter(EndpointFilter(path="/pwa-"))
+    access_logger.addFilter(EndpointFilter(path="/assets/"))
+    
+    app_logger.info("Sistema Log de Acessos configurado: Filtros ativos para /pwa e /assets.")
+
+
 if __name__ == "__main__":
     import uvicorn
     # Permite rodar diretamente via 'python src/api/main.py'

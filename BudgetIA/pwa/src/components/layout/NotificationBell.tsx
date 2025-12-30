@@ -125,13 +125,13 @@ export function NotificationBell() {
                 onClick={() => setIsOpen(true)}
                 variant="ghost"
                 size="icon"
-                className="relative border border-gray-800 bg-gray-800/50 hover:bg-gray-800 hover:text-white"
+                className="relative border border-border bg-surface-card/50 hover:bg-surface-card hover:text-text-primary"
             >
                 <Bell size={20} />
                 {unreadCount > 0 && (
                     <span className="absolute top-2 right-2 flex h-2.5 w-2.5">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-danger opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-danger"></span>
                     </span>
                 )}
             </Button>
@@ -142,7 +142,7 @@ export function NotificationBell() {
                          <div className="flex justify-end mb-4 flex-none">
                              <button 
                                 onClick={markAllRead} 
-                                className="text-sm text-emerald-400 hover:text-emerald-300 flex items-center gap-1 bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-500/20"
+                                className="text-sm text-primary-light hover:text-primary flex items-center gap-1 bg-primary/10 px-3 py-1.5 rounded-full border border-primary/20"
                             >
                                 <Check size={14} />
                                 Marcar todas como lidas
@@ -152,14 +152,14 @@ export function NotificationBell() {
 
                     <div className="flex-1 overflow-y-auto space-y-3 pb-safe">
                         {loading ? (
-                            <div className="p-8 text-center text-gray-500">
+                            <div className="p-8 text-center text-text-muted">
                                 <span className="animate-pulse">Carregando...</span>
                             </div>
                         ) : notifications.length === 0 ? (
                             <div className="p-8 text-center flex flex-col items-center justify-center opacity-50">
-                                <Bell className="h-12 w-12 text-gray-600 mb-4" />
-                                <p className="text-gray-400 text-lg">Tudo limpo por aqui.</p>
-                                <p className="text-sm text-gray-600">Nenhuma notificação nova.</p>
+                                <Bell className="h-12 w-12 text-text-secondary mb-4" />
+                                <p className="text-text-secondary text-lg">Tudo limpo por aqui.</p>
+                                <p className="text-sm text-text-muted">Nenhuma notificação nova.</p>
                             </div>
                         ) : (
                              notifications.map((notif) => {
@@ -182,8 +182,8 @@ export function NotificationBell() {
                                     className={cn(
                                         "p-4 rounded-xl border transition-all flex gap-3 relative overflow-hidden",
                                         isRead 
-                                            ? "bg-gray-900/30 border-gray-800 opacity-75" 
-                                            : "bg-gray-800/40 border-gray-700 shadow-sm"
+                                            ? "bg-surface-card/30 border-border opacity-75" 
+                                            : "bg-surface-card/40 border-border shadow-sm"
                                     )}
                                 >
                                     {/* Indicator */}
@@ -194,25 +194,25 @@ export function NotificationBell() {
                                     
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-start justify-between gap-2">
-                                            <h4 className={cn("text-base font-semibold truncate pr-8", isRead ? "text-gray-400" : "text-white")}>
+                                            <h4 className={cn("text-base font-semibold truncate pr-8", isRead ? "text-text-muted" : "text-text-primary")}>
                                                 {title}
                                             </h4>
                                         </div>
                                         {/* Allow whitespace-pre-wrap to handle newlines in message if any */}
-                                        <p className="text-sm text-gray-400 mt-1 leading-relaxed whitespace-pre-wrap line-clamp-3">
+                                        <p className="text-sm text-text-secondary mt-1 leading-relaxed whitespace-pre-wrap line-clamp-3">
                                             {message.replace(/\*\*/g, '')} {/* Simple strip markdown bold */}
                                         </p>
-                                        <p className="text-xs text-gray-600 mt-2 font-medium">
+                                        <p className="text-xs text-text-muted mt-2 font-medium">
                                             {dateDisplay}
                                         </p>
                                     </div>
                                     
                                     {/* Quick Actions */}
-                                    <div className="flex flex-col gap-2 pl-2 border-l border-gray-800/50">
+                                    <div className="flex flex-col gap-2 pl-2 border-l border-border/50">
                                         {!isRead && (
                                             <button 
                                                 onClick={(e) => markAsRead(notif.id, e)}
-                                                className="p-2 text-gray-500 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors"
+                                                className="p-2 text-text-secondary hover:text-primary-light hover:bg-primary/10 rounded-lg transition-colors"
                                                 title="Marcar lida"
                                             >
                                                 <Check size={18} />
@@ -220,7 +220,7 @@ export function NotificationBell() {
                                         )}
                                             <button 
                                             onClick={(e) => deleteNotification(notif.id, e)}
-                                            className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                                            className="p-2 text-text-secondary hover:text-danger hover:bg-danger/10 rounded-lg transition-colors"
                                             title="Excluir"
                                         >
                                             <Trash2 size={18} />

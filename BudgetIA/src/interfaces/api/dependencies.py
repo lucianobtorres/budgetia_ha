@@ -9,6 +9,9 @@ from core.user_config_service import UserConfigService
 from finance.factory import FinancialSystemFactory
 from finance.planilha_manager import PlanilhaManager
 from finance.storage.excel_storage_handler import ExcelStorageHandler
+from core.logger import get_logger
+
+logger = get_logger("API_Deps")
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
@@ -24,7 +27,11 @@ def get_user_config_service(
 ) -> UserConfigService:
     """Dependency que valida o JWT e retorna o Config Service."""
     payload = decode_access_token(token)
+    
     if payload is None:
+         logger.warning("Payload é None (Token inválido ou expirado)")
+         # Tenta debug da string do token se possível
+ 
          raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Credenciais inválidas ou expiradas",
@@ -33,6 +40,7 @@ def get_user_config_service(
     
     username: str = payload.get("sub")
     if username is None:
+        logger.warning("Claim 'sub' ausente no payload")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token inválido: sub ausente",
@@ -40,7 +48,7 @@ def get_user_config_service(
         )
 
     # Debug para confirmar quem está chamando
-    print(f"--- API Dependency: Acesso AUTENTICADO para user='{username}' ---")
+    logger.debug(f"Acesso AUTENTICADO para user='{username}'")
     return UserConfigService(username=username)
 
 
@@ -66,7 +74,7 @@ def get_planilha_manager(
 
     if cache_key in _managers_cache:
         # Debug:
-        # print(f"--- API: Usando Manager em Cache para {cache_key} ---")
+
         return _managers_cache[cache_key]
 
     # 3. Obtém credenciais de usuário (se houver) para acesso ao GSheets
@@ -75,16 +83,16 @@ def get_planilha_manager(
     user_credentials = auth_service.get_user_credentials()
 
     if user_credentials:
-        print(f"--- API: Injetando credenciais de usuário para acesso à planilha ---")
+        logger.info("Injetando credenciais de usuário para acesso à planilha")
 
     # 4. Cria o Handler de Storage (Local, Google Sheets ou Google Drive Excel)
     from finance.storage.storage_factory import StorageHandlerFactory
 
     try:
         storage_handler = StorageHandlerFactory.create_handler(path_str, credentials=user_credentials)
-        print(f"--- API: Handler de Storage criado: {type(storage_handler).__name__} para {path_str} ---")
+        logger.info(f"Handler de Storage criado: {type(storage_handler).__name__} para {path_str}")
     except ValueError as e:
-        print(f"--- API ERRO: Falha ao criar handler de storage: {e} ---")
+        logger.error(f"Falha ao criar handler de storage: {e}")
         raise HTTPException(
             status_code=500, detail=f"Erro de configuração de storage: {str(e)}"
         )
@@ -95,7 +103,7 @@ def get_planilha_manager(
     )
 
     # Debug:
-    print(f"--- API: Novo Manager Criado para {cache_key} ---")
+    logger.debug(f"Novo Manager Criado para {cache_key}")
     _managers_cache[cache_key] = manager
 
     return manager
@@ -116,45 +124,70 @@ def get_llm_orchestrator(
     global _global_llm_orchestrator
     if _global_llm_orchestrator is None:
         # Inicializa se não existir
-        print(
-            "--- API Dependency: Inicializando LLMOrchestrator com Supor a Groq & Gemini ---"
+        provider_name = config.LLM_PROVIDER
+        logger.info(
+            f"Inicializando LLMOrchestrator com Provider='{provider_name}'"
         )
         try:
-            # Estratégia: Tenta criar provedores disponíveis
-            # primary_provider = LLMProviderFactory.create_provider(
-            #     LLMProviderType.GEMINI, default_model=config.DEFAULT_GEMINI_MODEL
-            # )
+            primary_provider = None
+            fallback_providers = []
 
-            # fallback_provider = LLMProviderFactory.create_provider(
-            #     LLMProviderType.GROQ, default_model="llama-3.3-70b-Versatile"
-            # )
+            # 1. Configura Provedor Primário baseado na ENV
+            if provider_name == config.LLMProviders.GROQ:
+                primary_provider = LLMProviderFactory.create_provider(
+                    LLMProviderType.GROQ,
+                    default_model=config.LLMModels.DEFAULT_GROQ,
+                )
+                # Fallback: Gemini
+                fallback_providers.append(
+                    LLMProviderFactory.create_provider(
+                        LLMProviderType.GEMINI,
+                        default_model=config.LLMModels.DEFAULT_GEMINI,
+                    )
+                )
 
-            primary_provider = LLMProviderFactory.create_provider(
-                LLMProviderType.GROQ,
-                default_model=config.LLMModels.DEFAULT_GROQ,
-                # default_model=config.LLMModels.GROQ_LLAMA_3_1_8B
-            )
-            fallback_provider = LLMProviderFactory.create_provider(
-                LLMProviderType.GEMINI, default_model=config.LLMModels.DEFAULT_GEMINI
-            )
+            elif provider_name == config.LLMProviders.GEMINI:
+                primary_provider = LLMProviderFactory.create_provider(
+                    LLMProviderType.GEMINI,
+                    default_model=config.LLMModels.DEFAULT_GEMINI,
+                )
+                # Fallback: Groq (se tiver chave)
+                try:
+                    fallback_providers.append(
+                         LLMProviderFactory.create_provider(
+                            LLMProviderType.GROQ,
+                            default_model=config.LLMModels.DEFAULT_GROQ,
+                        )
+                    )
+                except Exception:
+                    logger.warning("Falha ao configurar Groq como fallback (possivelmente sem chave).")
 
-            # Se o usuário pediu explicitamente Groq (ou se Gemini falhar muito),
-            # poderíamos inverter. Por enquanto, adicionamos como Fallback.
-            # Mas como o usuário está com erro de Cota no Gemini, talvez ele queira Groq como primário?
-            # Vamos assumir que o LLMManager vai tentar o primário, falhar (sem crashar app) e ir pro fallback.
-            # O LLMManager.get_configured_llm faz exatamente isso.
+            elif provider_name == config.LLMProviders.OPENAI:
+                 # TODO: Implementar OpenAI Provider na Factory se usarmos
+                 # Por enquanto, fallback para Gemini
+                 logger.warning("OpenAI Provider selecionado mas init pendente. Usando Gemini.")
+                 primary_provider = LLMProviderFactory.create_provider(
+                    LLMProviderType.GEMINI,
+                    default_model=config.LLMModels.DEFAULT_GEMINI,
+                )
+            else:
+                # Default safety net
+                logger.warning(f"Provider '{provider_name}' desconhecido. Usando Gemini Default.")
+                primary_provider = LLMProviderFactory.create_provider(
+                    LLMProviderType.GEMINI,
+                    default_model=config.LLMModels.DEFAULT_GEMINI,
+                )
 
             _global_llm_orchestrator = LLMOrchestrator(
                 primary_provider=primary_provider,
-                fallback_providers=[fallback_provider],
+                fallback_providers=fallback_providers,
             )
 
-            # Força carregamento (vai tentar Gemini -> Se der erro de cota -> Vai pro Groq)
+            # Força carregamento e checagem de saúde
             _global_llm_orchestrator.get_configured_llm()
 
         except Exception as e:
-            print(f"ERRO CRÍTICO ao iniciar LLM: {e}")
-            # Em último caso, tenta só o Groq se o Gemini falhou na criação (o que não deve ocorrer se for só API Key missing)
+            logger.critical(f"ERRO CRÍTICO ao iniciar LLM: {e}")
             raise HTTPException(status_code=500, detail=f"Erro ao iniciar IA: {e}")
 
     return _global_llm_orchestrator
@@ -179,7 +212,7 @@ def get_agent_runner(
     if user_id in _agents_cache:
         return _agents_cache[user_id]
 
-    print(f"--- API: Criando Novo Agente para user='{user_id}' ---")
+    logger.info(f"Criando Novo Agente para user='{user_id}'")
     try:
         # Cria o agente usando a Factory, injetando o Manager COMPARTILHADO
         agent = AgentFactory.create_agent(
@@ -196,7 +229,7 @@ def get_agent_runner(
         _agents_cache[user_id] = agent
         return agent
     except Exception as e:
-        print(f"Erro ao inicializar agente na API: {e}")
+        logger.error(f"Erro ao inicializar agente na API: {e}")
         raise HTTPException(status_code=500, detail=f"Erro interno: {e}")
 
 
@@ -262,8 +295,8 @@ def get_onboarding_orchestrator(
     user_id = config_service.username
 
     if user_id not in _onboarding_cache:
-        print(
-            f"--- API: Criando Novo Onboarding Orchestrator para user='{user_id}' ---"
+        logger.info(
+            f"Criando Novo Onboarding Orchestrator para user='{user_id}'"
         )
         orchestrator = OnboardingOrchestrator(config_service, llm_orchestrator)
         _onboarding_cache[user_id] = orchestrator

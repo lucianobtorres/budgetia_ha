@@ -8,6 +8,10 @@ import redis
 import config
 
 
+from core.logger import get_logger
+
+logger = get_logger("CacheService")
+
 class CacheService:
     """
     Gerencia a conexão e as operações de cache com o Redis (Upstash).
@@ -21,15 +25,15 @@ class CacheService:
                 # 'decode_responses=True' faz o redis-py retornar strings (utf-8)
                 self.client = redis.from_url(redis_url, decode_responses=True)  # type: ignore[no-untyped-call]
                 self.client.ping()
-                print("LOG: Conexão com o Cache Service (Redis/Upstash) bem-sucedida.")
+                logger.info("Conexão com o Cache Service (Redis/Upstash) bem-sucedida.")
             except redis.exceptions.ConnectionError as e:
-                print(
-                    f"AVISO (Cache): Falha ao conectar ao Redis ({redis_url}). O cache será desabilitado. "
+                logger.warning(
+                    f"Falha ao conectar ao Redis ({redis_url}). O cache será desabilitado. "
                     f"Verifique sua internet ou remova UPSTASH_REDIS_URL do .env se não quiser usar cache. (Detalhe: {e})"
                 )
                 self.client = None
         else:
-            print("AVISO: URL do Redis não configurada. O cache ficará desabilitado.")
+            logger.warning("URL do Redis não configurada. O cache ficará desabilitado.")
 
     def _is_connected(self) -> bool:
         """Verifica se o cliente Redis está inicializado e conectado."""
@@ -59,10 +63,10 @@ class CacheService:
 
             # 3. Salva no Redis
             self.client.set(key, json_string)
-            print(f"LOG: Cache SET para a chave '{key}' (Timestamp: {timestamp}).")
+            logger.debug(f"Cache SET para a chave '{key}' (Timestamp: {timestamp}).")
 
         except Exception as e:
-            print(f"ERRO ao serializar ou salvar DFs no cache: {e}")
+            logger.error(f"ERRO ao serializar ou salvar DFs no cache: {e}")
 
     def get_dfs(self, key: str) -> tuple[dict[str, pd.DataFrame] | None, str | None]:
         """
@@ -74,7 +78,7 @@ class CacheService:
         try:
             json_string = self.client.get(key)
             if json_string is None:
-                print(f"LOG: Cache MISS para a chave '{key}'.")
+                logger.debug(f"Cache MISS para a chave '{key}'.")
                 return None, None
 
             json_str: str = str(json_string)
@@ -96,11 +100,11 @@ class CacheService:
 
             dfs_dict = self._ensure_dtypes(dfs_dict)
 
-            print(f"LOG: Cache HIT para a chave '{key}'.")
+            logger.debug(f"Cache HIT para a chave '{key}'.")
             return dfs_dict, cached_timestamp
 
         except Exception as e:
-            print(f"ERRO ao ler ou desserializar DFs do cache: {e}")
+            logger.error(f"ERRO ao ler ou desserializar DFs do cache: {e}")
             return None, None
 
     def delete(self, key: str) -> None:
@@ -110,9 +114,9 @@ class CacheService:
 
         try:
             self.client.delete(key)
-            print(f"LOG: Cache DELETED para a chave '{key}'.")
+            logger.debug(f"Cache DELETED para a chave '{key}'.")
         except Exception as e:
-            print(f"ERRO ao deletar chave do cache: {e}")
+            logger.error(f"ERRO ao deletar chave do cache: {e}")
 
     def _ensure_dtypes(
         self, dfs_dict: dict[str, pd.DataFrame]
@@ -138,8 +142,8 @@ class CacheService:
 
                     dfs_dict[aba_nome] = df
                 except Exception as e:
-                    print(
-                        f"AVISO: Não foi possível aplicar dtypes para a aba '{aba_nome}'. Erro: {e}"
+                    logger.warning(
+                        f"Não foi possível aplicar dtypes para a aba '{aba_nome}'. Erro: {e}"
                     )
         return dfs_dict
 
@@ -173,8 +177,8 @@ class CacheService:
 
             if count_int >= limit:
                 # Limite atingido
-                print(
-                    f"AVISO: Rate Limit atingido para a chave '{action_key}' (Limite: {limit})"
+                logger.warning(
+                    f"Rate Limit atingido para a chave '{action_key}' (Limite: {limit})"
                 )
                 return True  # Bloquear
 
@@ -183,5 +187,5 @@ class CacheService:
             return False  # Permitido
 
         except Exception as e:
-            print(f"ERRO ao verificar Rate Limit: {e}")
+            logger.error(f"ERRO ao verificar Rate Limit: {e}")
             return False  # Falha aberta (permite a ação)

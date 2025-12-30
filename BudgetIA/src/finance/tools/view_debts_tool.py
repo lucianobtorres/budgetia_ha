@@ -8,6 +8,10 @@ from config import NomesAbas
 from core.base_tool import BaseTool
 from finance.schemas import VisualizarDividasInput
 
+from core.logger import get_logger
+
+logger = get_logger("Tool_ViewDebts")
+
 
 class VisualizarDividasTool(BaseTool):  # type: ignore[misc]
     name: str = "visualizar_dividas"
@@ -24,7 +28,7 @@ class VisualizarDividasTool(BaseTool):  # type: ignore[misc]
     # --- FIM DA MUDANÇA ---
 
     def run(self) -> str:
-        print(f"LOG: Ferramenta '{self.name}' foi chamada.")
+        logger.info(f"Ferramenta '{self.name}' foi chamada.")
 
         # --- DIP: Chama a função injetada ---
         df = self.visualizar_dados(aba_nome=NomesAbas.DIVIDAS)

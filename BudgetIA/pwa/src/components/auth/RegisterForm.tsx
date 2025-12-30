@@ -54,9 +54,9 @@ export function RegisterForm({ onLogin }: RegisterFormProps) {
     return (
          <form className="mt-8 space-y-4" onSubmit={handleRegister}>
             {error && (
-                <div className="bg-red-500/10 border border-red-500/50 text-red-500 text-sm p-3 rounded-lg text-center">
+                <h2 className="mt-6 text-center text-3xl font-extrabold text-text-primary">
                     {error}
-                </div>
+                </h2>
             )}
             
             <Input
@@ -64,6 +64,7 @@ export function RegisterForm({ onLogin }: RegisterFormProps) {
                 required
                 className="py-3 px-4"
                 placeholder="Nome Completo"
+                variant="glass"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
             />
@@ -73,6 +74,7 @@ export function RegisterForm({ onLogin }: RegisterFormProps) {
                 required
                 className="py-3 px-4"
                 placeholder="E-mail"
+                variant="glass"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
             />
@@ -82,6 +84,7 @@ export function RegisterForm({ onLogin }: RegisterFormProps) {
                 required
                 className="py-3 px-4"
                 placeholder="Usuário (Login)"
+                variant="glass"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
             />
@@ -91,6 +94,7 @@ export function RegisterForm({ onLogin }: RegisterFormProps) {
                 required
                 className="py-3 px-4"
                 placeholder="Senha (mín. 6)"
+                variant="glass"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
             />
@@ -100,6 +104,7 @@ export function RegisterForm({ onLogin }: RegisterFormProps) {
                 required
                 className="py-3 px-4"
                 placeholder="Confirmar Senha"
+                variant="glass"
                 value={confirmPass}
                 onChange={(e) => setConfirmPass(e.target.value)}
             />

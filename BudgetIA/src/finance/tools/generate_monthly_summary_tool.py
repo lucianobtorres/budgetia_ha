@@ -9,6 +9,10 @@ from config import ColunasTransacoes, NomesAbas, SummaryKeys, ValoresTipo
 from core.base_tool import BaseTool
 from finance.schemas import GerarResumoMensalInput
 
+from core.logger import get_logger
+
+logger = get_logger("Tool_GenMthlySummary")
+
 
 class GerarResumoMensalTool(BaseTool):  # type: ignore[misc]
     name: str = "gerar_resumo_mensal"
@@ -25,7 +29,7 @@ class GerarResumoMensalTool(BaseTool):  # type: ignore[misc]
     # --- FIM DA MUDANÇA ---
 
     def run(self, ano: int | None = None, mes: int | None = None) -> str:
-        print(f"LOG: Ferramenta '{self.name}' chamada para Ano={ano}, Mês={mes}.")
+        logger.info(f"Ferramenta '{self.name}' chamada para Ano={ano}, Mês={mes}.")
 
         # --- DIP: Chama a função injetada ---
         df = self.visualizar_dados(sheet_name=NomesAbas.TRANSACOES)

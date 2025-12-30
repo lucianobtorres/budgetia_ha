@@ -4,6 +4,9 @@ from typing import Any
 
 import config
 from core.cache_service import CacheService
+from core.logger import get_logger
+
+logger = get_logger("PresenceService")
 
 class PresenceService:
     """
@@ -32,7 +35,7 @@ class PresenceService:
                 self.redis.set(key, datetime.now().isoformat(), ex=ttl)
                 return
             except Exception as e:
-                print(f"ERRO (Presence/Redis): Falha ao setar heartbeat: {e}")
+                logger.error(f"Falha ao setar heartbeat: {e}")
 
         # 2. Fallback Memória
         self._memory_last_seen[user_id] = datetime.now()
@@ -48,7 +51,7 @@ class PresenceService:
                 # Simplesmente verifica se a chave existe (TTL cuida da expiração)
                 return bool(self.redis.exists(key))
             except Exception as e:
-                print(f"ERRO (Presence/Redis): Falha ao checar online: {e}")
+                logger.error(f"Falha ao checar online: {e}")
 
         # 2. Fallback Memória
         last = self._memory_last_seen.get(user_id)
@@ -75,7 +78,7 @@ class PresenceService:
                 self.redis.expire(key, 86400) # Expira fila em 24h se não lida
                 return
             except Exception as e:
-                print(f"ERRO (Presence/Redis): Falha ao pushar toast: {e}")
+                logger.error(f"Falha ao pushar toast: {e}")
 
         # 2. Fallback Memória
         if user_id not in self._memory_toast_queue:
@@ -102,7 +105,7 @@ class PresenceService:
                 toasts = [json.loads(item) for item in raw_list]
                 return toasts
             except Exception as e:
-                print(f"ERRO (Presence/Redis): Falha ao popar toasts: {e}")
+                logger.error(f"Falha ao popar toasts: {e}")
                 # Se falhar o Redis, tenta entregar o que tem na memória? 
                 # Sim, pode ter algo lá se o redis caiu no meio.
 

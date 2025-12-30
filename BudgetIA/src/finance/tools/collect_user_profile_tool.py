@@ -5,6 +5,10 @@ from typing import Any
 from core.base_tool import BaseTool
 from finance.schemas import ColetarPerfilUsuarioInput
 
+from core.logger import get_logger
+
+logger = get_logger("Tool_CollectProfile")
+
 
 class ColetarPerfilUsuarioTool(BaseTool):  # type: ignore[misc]
     """
@@ -29,8 +33,8 @@ class ColetarPerfilUsuarioTool(BaseTool):  # type: ignore[misc]
         """
         Executa a ferramenta para salvar o dado do perfil.
         """
-        print(
-            f"LOG: Ferramenta '{self.name}' chamada para salvar Campo='{campo}', Valor='{valor}'"
+        logger.info(
+            f"Ferramenta '{self.name}' chamada para salvar Campo='{campo}', Valor='{valor}'"
         )
 
         try:
@@ -39,5 +43,5 @@ class ColetarPerfilUsuarioTool(BaseTool):  # type: ignore[misc]
             mensagem = self.salvar_dado_perfil(campo=campo, valor=valor)
             return str(mensagem)
         except Exception as e:
-            print(f"ERRO DE EXECUÇÃO NA TOOL DE PERFIL: {e}")
+            logger.error(f"ERRO DE EXECUÇÃO NA TOOL DE PERFIL: {e}")
             return f"Erro ao salvar dado do perfil: {e}"

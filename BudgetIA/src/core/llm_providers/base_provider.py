@@ -3,6 +3,9 @@ import os
 from abc import ABC, abstractmethod
 from typing import Any
 
+from core.logger import get_logger
+
+logger = get_logger("LLM_Provider")
 
 class LLMProvider(ABC):
     """
@@ -15,12 +18,12 @@ class LLMProvider(ABC):
     ):
         self.api_key = os.getenv(api_key_env_var)
         if not self.api_key:
-            print(
-                f"AVISO: Chave da API para '{api_key_env_var}' não encontrada. Este provedor pode não funcionar."
+            logger.warning(
+                f"Chave da API para '{api_key_env_var}' não encontrada. Este provedor pode não funcionar."
             )
         else:
-            print(
-                f"LOG: Chave da API para {self.__class__.__name__} carregada com sucesso!"
+            logger.info(
+                f"Chave da API para {self.__class__.__name__} carregada com sucesso!"
             )
 
         self.api_key_env_var = api_key_env_var

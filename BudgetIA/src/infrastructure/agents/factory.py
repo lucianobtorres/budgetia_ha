@@ -9,6 +9,9 @@ from finance.planilha_manager import PlanilhaManager
 
 from core.user_config_service import UserConfigService # NEW
 from core.memory.memory_service import MemoryService # NEW
+from core.logger import get_logger
+
+logger = get_logger("AgentFactory")
 
 class AgentFactory:
     """
@@ -34,7 +37,7 @@ class AgentFactory:
         framework = os.getenv("AGENT_TYPE", "langchain").lower()
 
         if framework == "agno":
-            print("--- AGENT FACTORY: Instanciando Agno Agent ---")
+            logger.info("Instanciando Agno Agent")
             return AgnoAgent(
                 llm_orchestrator=llm_orchestrator,
                 contexto_perfil=contexto_perfil,

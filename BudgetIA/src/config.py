@@ -4,8 +4,15 @@ import os
 
 from dotenv import load_dotenv
 
+from core.logger import get_logger
+
+# Configuração do Logger para este módulo
+logger = get_logger("Config")
+
 # Carrega as variáveis de ambiente do arquivo .env
-load_dotenv()
+# MUDANÇA: Aponta explicitamente para o .env na raiz para evitar erros de CWD
+DOTENV_PATH = os.path.join(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")), ".env")
+load_dotenv(DOTENV_PATH)
 
 # --- 1. Configurações de Caminhos (Paths) ---
 # Define o diretório raiz do projeto de forma robusta
@@ -39,7 +46,7 @@ try:
     os.makedirs(DATA_DIR, exist_ok=True)
     os.makedirs(PROMPTS_DIR, exist_ok=True)
 except Exception as e:
-    print(f"AVISO CONFIG: Erro ao criar diretórios: {e}")
+    logger.warning(f"Erro ao criar diretórios: {e}")
 
 # Nomes dos arquivos centralizados aqui
 PLANILHA_FILENAME = "planilha_mestra.xlsx"
@@ -71,9 +78,21 @@ class LLMModels:
     # OPENAI_GPT_4 = "gpt-4" # Exemplo futuro
 
     # Defaults do Sistema
-    DEFAULT_GROQ = GROQ_GPT_OSS_120B
-    DEFAULT_GEMINI = GEMINI_2_0_FLASH_LITE 
+    # Defaults do Sistema (Podem ser sobrescritos por ENV)
+    DEFAULT_GROQ = os.getenv("GROQ_MODEL", GROQ_LLAMA_3_3_70B)
+    DEFAULT_GEMINI = os.getenv("GEMINI_MODEL", GEMINI_2_0_FLASH_LITE)
     # DEFAULT_GEMINI = GEMINI_2_5_FLASH # Alternativa
+    
+class LLMProviders:
+    """Constantes para os provedores de LLM."""
+    GROQ = "GROQ"
+    GEMINI = "GEMINI"
+    OPENAI = "OPENAI"
+
+# --- CONFIGURAÇÃO DE PROVEDOR ATIVO (VIA ENV) ---
+# Define qual provedor será o PRIMÁRIO do sistema.
+# Opções: GROQ, GEMINI, OPENAI
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", LLMProviders.GEMINI).upper()
     
 # Mantendo compatibilidade com código antigo que importava essas variáveis, 
 # mas agora apontando para a classe central.
@@ -109,21 +128,21 @@ else:
     # 2. Fallback para o padrão
     CHOSEN_CRED_PATH = SERVICE_ACCOUNT_CREDENTIALS_PATH
 
-# Debug prints
-print(f"DEBUG: Project Root: {PROJECT_ROOT}")
-print(f"DEBUG: Data Dir: {DATA_DIR}")
-print(f"DEBUG: Env Var Path: {GSPREAD_CREDENTIALS_PATH}")
-print(f"DEBUG: Chosen Path: {CHOSEN_CRED_PATH}")
+# Debug prints convertidos para Logger (DEBUG level para não poluir)
+logger.debug(f"Project Root: {PROJECT_ROOT}")
+logger.debug(f"Data Dir: {DATA_DIR}")
+logger.debug(f"Env Var Path: {GSPREAD_CREDENTIALS_PATH}")
+logger.debug(f"Chosen Path: {CHOSEN_CRED_PATH}")
 if CHOSEN_CRED_PATH:
-    print(f"DEBUG: Exists? {os.path.exists(CHOSEN_CRED_PATH)}")
+    logger.debug(f"Exists? {os.path.exists(CHOSEN_CRED_PATH)}")
     try:
         if not os.path.exists(CHOSEN_CRED_PATH) and not os.path.isabs(CHOSEN_CRED_PATH):
-            print(f"DEBUG: CWD: {os.getcwd()}")
-            print(f"DEBUG: Abs Path via CWD: {os.path.abspath(CHOSEN_CRED_PATH)}")
+            logger.debug(f"CWD: {os.getcwd()}")
+            logger.debug(f"Abs Path via CWD: {os.path.abspath(CHOSEN_CRED_PATH)}")
             try:
-                print(f"DEBUG: Contents of {DATA_DIR}: {os.listdir(DATA_DIR)}")
+                logger.debug(f"Contents of {DATA_DIR}: {os.listdir(DATA_DIR)}")
             except Exception as e:
-                print(f"DEBUG: Could not list data dir: {e}")
+                logger.debug(f"Could not list data dir: {e}")
     except OSError:
         pass
 
@@ -135,9 +154,9 @@ if CHOSEN_CRED_PATH:
             creds_json = json.load(f)
             SERVICE_ACCOUNT_EMAIL = creds_json.get("client_email")
     except FileNotFoundError:
-        print(f"AVISO CRÍTICO: Arquivo de credenciais não encontrado em: {CHOSEN_CRED_PATH}")
+        logger.warning(f"CRÍTICO: Arquivo de credenciais não encontrado em: {CHOSEN_CRED_PATH}")
     except Exception as e:
-        print(f"AVISO CRÍTICO: Erro ao ler credenciais: {e}")
+        logger.warning(f"CRÍTICO: Erro ao ler credenciais: {e}")
 
 # Atualiza a variável que o resto do sistema usa
 GSPREAD_CREDENTIALS_PATH = CHOSEN_CRED_PATH

@@ -11,6 +11,9 @@ from core.llm_manager import LLMOrchestrator
 from core.user_config_service import UserConfigService
 from finance.factory import FinancialSystemFactory
 from finance.storage.excel_storage_handler import ExcelStorageHandler
+from core.logger import get_logger
+
+logger = get_logger("MainCLI")
 
 
 # Esta função ainda é útil para quando a IA precisar VER os dados
@@ -28,7 +31,7 @@ def main() -> None:
     """
     Função principal que orquestra a leitura da planilha e a geração de insights pela IA.
     """
-    print("Iniciando o Sistema de Gestão Financeira Inteligente...")
+    logger.info("Iniciando o Sistema de Gestão Financeira Inteligente...")
 
     # Definindo o caminho da planilha de forma robusta
     script_dir = os.path.dirname(__file__)

@@ -11,7 +11,9 @@ if TYPE_CHECKING:
     from finance.repositories.insight_repository import InsightRepository
     from finance.repositories.profile_repository import ProfileRepository
     from finance.repositories.transaction_repository import TransactionRepository
-    from finance.services.insight_service import InsightService
+from core.logger import get_logger
+
+logger = get_logger("PlanilhaManager")
 
 
 class PlanilhaManager:
@@ -62,7 +64,7 @@ class PlanilhaManager:
         que estamos trabalhando com a versão mais recente antes de salvar.
         Útil para transações atômicas (Lock -> Refresh -> Update -> Save).
         """
-        print("LOG (PM): Recarregando dados do disco (Atomic Refresh)...")
+        logger.debug("Recarregando dados do disco (Atomic Refresh)...")
         dfs, _ = self._context.storage.load_sheets(
             self._context.layout_config, self._context.strategy
         )
@@ -189,15 +191,15 @@ class PlanilhaManager:
         return self.profile_repo.ensure_fields(fields) # type: ignore[no-any-return]
 
     def analisar_para_insights_proativos(self) -> list[dict[str, Any]]:
-        print("LOG (PM): Delegando análise proativa para o InsightService.")
+        logger.info("Delegando análise proativa para o InsightService.")
         return self.insight_service.run_proactive_analysis_orchestration() # type: ignore[no-any-return]
 
     def check_connection(self) -> tuple[bool, str]:
-        print("--- DEBUG PM: Verificando saúde da conexão com o armazenamento... ---")
+        logger.debug("Verificando saúde da conexão com o armazenamento...")
         return self._context.storage.ping() # type: ignore[no-any-return]
 
     def clear_cache(self) -> None:
-        print(
-            f"--- DEBUG PM: Forçando invalidação de cache para '{self.cache_key}' ---"
+        logger.debug(
+            f"Forçando invalidação de cache para '{self.cache_key}'"
         )
         self._context.cache.delete(self.cache_key)

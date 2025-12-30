@@ -1,6 +1,9 @@
 # Em: src/finance/services/debt_service.py
 
 import numpy_financial as npf
+from core.logger import get_logger
+
+logger = get_logger("DebtService")
 
 
 class DebtService:
@@ -39,5 +42,5 @@ class DebtService:
             return float(saldo_devedor)
         except Exception as e:
             # Fallback em caso de erro no cálculo (ex: npf não disponível)
-            print(f"Erro ao calcular PV: {e}")
+            logger.error(f"Erro ao calcular PV: {e}")
             return float(valor_parcela * parcelas_restantes)

@@ -54,7 +54,7 @@ export function ChatInput({
                     onChange={(e) => onChange(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && onSend()}
                     placeholder={placeholder}
-                    className="w-full bg-transparent border-none text-white pl-4 pr-12 py-3 focus:ring-0 text-sm placeholder-gray-500 min-h-[48px]"
+                    className="w-full bg-transparent border-none text-white pl-4 pr-12 py-3 focus:ring-0 outline-none focus:outline-none text-sm placeholder-gray-500 min-h-[48px]"
                     disabled={loading}
                     autoFocus={autoFocus}
                 />

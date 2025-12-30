@@ -41,6 +41,7 @@ def mock_storage_handler() -> MagicMock:
     # (Usamos 'autospec=True' para garantir que ele só tenha
     # métodos que a interface real tem)
     handler = MagicMock(spec=BaseStorageHandler)
+    handler.resource_id = "test_resource_id"
 
     # --- CORREÇÃO: Retornar DFs vazios, mas inicializados ---
     import pandas as pd
@@ -69,7 +70,15 @@ def plan_manager_para_ferramentas(
     mock_config_service.get_mapeamento.return_value = None
 
     # Pula o 'recalculate_budgets'
-    with patch.object(PlanilhaManager, "recalculate_budgets", return_value=None):
+    # Pula o 'recalculate_budgets' e evita Redis real
+    with patch.object(PlanilhaManager, "recalculate_budgets", return_value=None), \
+         patch("finance.factory.RedisCacheService") as mock_redis_service:
+        
+        # Configura o mock do Redis para evitar erros
+        mock_instance = mock_redis_service.return_value
+        mock_instance.get_entry.return_value = (None, None)
+        mock_instance.set_entry.return_value = True
+
         plan_manager = FinancialSystemFactory.create_manager(
             storage_handler=mock_storage_handler,
             config_service=mock_config_service,

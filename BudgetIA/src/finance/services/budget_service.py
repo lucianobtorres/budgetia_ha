@@ -5,6 +5,9 @@ import datetime
 import pandas as pd
 
 from config import ColunasOrcamentos, ColunasTransacoes, ValoresTipo
+from core.logger import get_logger
+
+logger = get_logger("BudgetService")
 
 
 class BudgetService:
@@ -69,8 +72,8 @@ class BudgetService:
                 & (df_despesas[ColunasTransacoes.DATA].dt.month == hoje.month)
             ]
         else:
-            print(
-                "AVISO (Calculator): Transações sem coluna 'Data'. Calculando orçamento com todas as transações."
+            logger.warning(
+                "Transações sem coluna 'Data'. Calculando orçamento com todas as transações."
             )
         # --- Fim da lógica de data ---
 

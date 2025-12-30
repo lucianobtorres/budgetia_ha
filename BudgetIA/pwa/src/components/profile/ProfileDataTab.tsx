@@ -36,24 +36,24 @@ export function ProfileDataTab({ data, onSave, isSaving }: Props) {
                 variant="emerald"
             />
 
-            <GlassCard variant="emerald" className="divide-y divide-gray-800 overflow-hidden" hoverEffect={false}>
+            <GlassCard variant="emerald" className="divide-y divide-border overflow-hidden" hoverEffect={false}>
                 {formData.map((item, idx) => (
-                    <div key={idx} className="p-4 hover:bg-gray-900/80 transition-colors flex flex-col md:flex-row md:items-center gap-2">
+                    <div key={idx} className="p-4 hover:bg-surface-hover/80 transition-colors flex flex-col md:flex-row md:items-center gap-2">
                         <div className="md:w-1/3">
-                            <span className="text-sm font-medium text-gray-400">{item.Campo}</span>
+                            <span className="text-sm font-medium text-text-muted">{item.Campo}</span>
                         </div>
                         <div className="md:w-2/3">
                             <Input 
                                 value={item.Valor}
                                 onChange={(e) => handleEdit(idx, e.target.value)}
-                                className="bg-transparent focus:bg-gray-900/50 border-b border-transparent border-t-0 border-l-0 border-r-0 focus:border-b-emerald-500 rounded-none w-full text-white px-2 py-1 focus:outline-none transition-all focus:ring-0"
+                                className="bg-transparent focus:bg-surface-input border-b border-transparent border-t-0 border-l-0 border-r-0 focus:border-b-primary rounded-none w-full text-text-primary px-2 py-1 focus:outline-none transition-all focus:ring-0"
                                 placeholder="Valor..."
                             />
                         </div>
                     </div>
                 ))}
                 {formData.length === 0 && (
-                        <div className="p-8 text-center text-gray-500">Nenhum dado de perfil encontrado.</div>
+                        <div className="p-8 text-center text-text-muted">Nenhum dado de perfil encontrado.</div>
                 )}
             </GlassCard>
 

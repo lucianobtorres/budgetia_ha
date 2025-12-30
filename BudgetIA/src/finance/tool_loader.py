@@ -6,6 +6,9 @@ from collections.abc import Callable  # Importa o que precisamos
 from typing import Any
 
 from core.base_tool import BaseTool
+from core.logger import get_logger
+
+logger = get_logger("ToolLoader")
 
 # Importa todos os repositórios
 from finance.repositories.budget_repository import BudgetRepository
@@ -88,7 +91,7 @@ def load_all_financial_tools(
     }
 
     if not os.path.exists(tools_dir):
-        print(f"ERRO: Diretório de ferramentas '{tools_dir}' não encontrado.")
+        logger.error(f"Diretório de ferramentas '{tools_dir}' não encontrado.")
         return tools_list
 
     for filename in os.listdir(tools_dir):
@@ -126,26 +129,26 @@ def load_all_financial_tools(
                                         param_name
                                     ]
                                 else:
-                                    print(
-                                        f"AVISO (ToolLoader): Dependência '{param_name}' da ferramenta '{tool_class.__name__}' não encontrada no 'dependency_map'."
+                                    logger.warning(
+                                        f"Dependência '{param_name}' da ferramenta '{tool_class.__name__}' não encontrada no 'dependency_map'."
                                     )
 
                             tool_instance = tool_class(**kwargs_for_tool)
                             tools_list.append(tool_instance)
 
                         except TypeError as e:
-                            print(
-                                f"AVISO (ToolLoader): Não foi possível instanciar '{attribute_name}' do {full_module_name}. "
+                            logger.warning(
+                                f"Não foi possível instanciar '{attribute_name}' do {full_module_name}. "
                                 f"Verifique o __init__ e o 'dependency_map'. Erro: {e}"
                             )
                         except Exception as e:
-                            print(
-                                f"ERRO (ToolLoader): Erro inesperado ao carregar '{attribute_name}'. Erro: {e}"
+                            logger.error(
+                                f"Erro inesperado ao carregar '{attribute_name}'. Erro: {e}"
                             )
             except Exception as e:
-                print(
-                    f"ERRO (ToolLoader): Erro ao importar módulo '{full_module_name}'. Erro: {e}"
+                logger.error(
+                    f"Erro ao importar módulo '{full_module_name}'. Erro: {e}"
                 )
 
-    print(f"LOG (ToolLoader): {len(tools_list)} ferramentas carregadas com sucesso. (Essential Only: {essential_only})")
+    logger.info(f"{len(tools_list)} ferramentas carregadas com sucesso. (Essential Only: {essential_only})")
     return tools_list

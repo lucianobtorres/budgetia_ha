@@ -3,6 +3,9 @@ import json
 import os
 
 import streamlit as st
+from core.logger import get_logger
+
+logger = get_logger("ChatHistoryManager")
 
 
 class BaseHistoryManager:
@@ -63,8 +66,8 @@ class JsonHistoryManager(BaseHistoryManager):
             with open(self.file_path, "w", encoding="utf-8") as f:
                 json.dump(history, f, ensure_ascii=False, indent=2)
         except OSError as e:
-            print(
-                f"ERRO (JsonHistoryManager): Falha ao escrever no histórico {self.file_path}: {e}"
+            logger.error(
+                f"Falha ao escrever no histórico {self.file_path}: {e}"
             )
 
     def get_history(self) -> list[dict[str, str]]:

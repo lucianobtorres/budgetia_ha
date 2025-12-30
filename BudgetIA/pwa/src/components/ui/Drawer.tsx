@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { Typography } from "./Typography";
 
 interface DrawerProps {
   isOpen: boolean;
@@ -49,16 +50,16 @@ export function Drawer({ isOpen, onClose, children, title, action }: DrawerProps
                 animate={{ y: 0 }}
                 exit={{ y: "100%" }}
                 transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                className="fixed bottom-0 left-0 right-0 z-[100] mt-24 flex h-[85dvh] flex-col rounded-t-[20px] bg-gray-900 border-t border-gray-800 shadow-2xl"
+                className="fixed bottom-0 left-0 right-0 z-[100] mt-24 flex h-[85dvh] flex-col rounded-t-[20px] bg-surface-card border-t border-border shadow-2xl"
             >
                 {/* Handle/Header */}
                 <div className="flex-none p-4 pb-2">
-                    <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-gray-700/50" />
+                    <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-border-hover/50" />
                     <div className="flex items-center justify-between">
-                        <h2 className="text-xl font-bold text-white">{title || "Detalhes"}</h2>
+                        <Typography variant="h4" className="text-text-primary">{title || "Detalhes"}</Typography>
                         <div className="flex items-center gap-2">
                             {action}
-                            <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-800 text-gray-400">
+                            <button onClick={onClose} className="p-2 rounded-full hover:bg-surface-hover text-text-secondary">
                                 <X className="w-5 h-5" />
                             </button>
                         </div>

@@ -8,6 +8,10 @@ from config import NomesAbas
 from core.base_tool import BaseTool
 from finance.schemas import RecomendarRegraIdealInput
 
+from core.logger import get_logger
+
+logger = get_logger("Tool_RecRule")
+
 
 class RecomendarRegraIdealTool(BaseTool):  # type: ignore[misc]
     name: str = "recomendar_regra_ideal"
@@ -25,7 +29,7 @@ class RecomendarRegraIdealTool(BaseTool):  # type: ignore[misc]
     # --- FIM DA MUDANÇA ---
 
     def run(self) -> str:
-        print(f"LOG: Ferramenta '{self.name}' chamada: Sugerindo Regra de Ouro.")
+        logger.info(f"Ferramenta '{self.name}' chamada: Sugerindo Regra de Ouro.")
 
         # --- DIP: Chama a função injetada ---
         df_perfil = self.visualizar_dados(aba_nome=self.aba_perfil)

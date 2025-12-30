@@ -4,6 +4,9 @@ from agno.tools import Function
 from dotenv import load_dotenv
 
 import config
+from core.logger import get_logger
+
+logger = get_logger("AgnoAgent")
 from core.agent_runner_interface import AgentRunner
 from core.base_tool import BaseTool
 from core.llm_manager import LLMOrchestrator
@@ -52,7 +55,7 @@ class AgnoAgent(AgentRunner):
         self.llm_orchestrator.get_configured_llm()
         active_provider = self.llm_orchestrator.active_provider_name
 
-        print(f"--- AGNO AGENT: Configurando para provedor '{active_provider}' ---")
+        logger.info(f"Configurando para provedor '{active_provider}'")
 
         # 3. Carrega as ferramentas customizadas (Com filtro Essential se for Groq)
         is_groq = active_provider == "groq"
@@ -83,14 +86,19 @@ class AgnoAgent(AgentRunner):
                 )
                 self.model = Groq(id=model_id)
             except ImportError:
-                print(
-                    "ERRO: 'agno.models.groq' não encontrado. Verifique se 'agno' está atualizado."
+                logger.error(
+                    "'agno.models.groq' não encontrado. Verifique se 'agno' está atualizado."
                 )
-                # Fallback para Gemini se der erro de import, mas provavelmente falhará se cota for o problema
-                self.model = Gemini(id=config.LLMModels.GEMINI_2_5_FLASH)
+                # Fallback para Gemini se der erro de import
+                self.model = Gemini(id=config.LLMModels.DEFAULT_GEMINI)
+        elif active_provider == "gemini":
+            # Gemini Nativo
+            model_id = self.llm_orchestrator.active_model_name or config.LLMModels.DEFAULT_GEMINI
+            self.model = Gemini(id=model_id)
         else:
-            # Default: Gemini
-            model_id = config.LLMModels.GEMINI_2_5_FLASH
+            # Default fallback for unknown -> Gemini
+            logger.warning(f"Provider '{active_provider}' não específico. Usando Gemini.")
+            model_id = config.LLMModels.DEFAULT_GEMINI
             self.model = Gemini(id=model_id)
 
         # 5. Inicializa o Agente
@@ -126,7 +134,7 @@ class AgnoAgent(AgentRunner):
             response = self.agent.run(input_usuario)
             return response.content
         except Exception as e:
-            print(f"ERRO AGNO: {e}")
+            logger.error(f"ERRO AGNO: {e}")
             return f"Erro ao processar com Agno: {e}"
 
     def interact_with_details(self, input_usuario: str) -> dict:

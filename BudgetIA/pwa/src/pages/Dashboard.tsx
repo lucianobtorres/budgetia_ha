@@ -14,13 +14,14 @@ import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { telemetry } from '../services/telemetry';
 import { useTour } from '../context/TourContext';
+import { PageHeader } from '../components/ui/PageHeader';
 
 export default function Dashboard() {
   const { openDrawer } = useDrawer();
   const location = useLocation();
   const queryClient = useQueryClient();
   const { data: summary, isLoading: loadingSummary } = useSummary();
-  const { data: expenses, isLoading: loadingExpenses } = useExpenses();
+  const { data: expenses, isLoading: loadingExpenses } = useExpenses(50);
   const { startTour } = useTour(); // Hook do Tour
 
   const loading = loadingSummary || loadingExpenses;
@@ -87,14 +88,12 @@ export default function Dashboard() {
   if (!loading && !hasData) {
       return (
         <div className="h-full flex flex-col gap-4 pb-0 md:pb-6 overflow-hidden">
-             <div id="welcome-header" className="flex-none pt-safe pt-4 flex items-start justify-between">
-                <div>
-                   <h2 className="text-xl md:text-3xl font-bold tracking-tight text-white mb-1 md:mb-2">Bem-vindo(a)!</h2>
-                   <p className="text-sm md:text-base text-gray-400">Vamos começar sua jornada financeira.</p>
-                </div>
-                <div id="notification-bell">
-                     <NotificationBell />
-                </div>
+             <div id="welcome-header" className="flex-none">
+                <PageHeader 
+                   title="Bem-vindo(a)!" 
+                   description="Vamos começar sua jornada financeira."
+                   action={<NotificationBell />}
+                />
              </div>
              
              <div className="flex-1 flex flex-col items-center justify-between min-h-0">
@@ -118,14 +117,13 @@ export default function Dashboard() {
   return (
     <div className="h-full flex flex-col gap-4 pb-0 md:pb-6 overflow-hidden">
       {/* Header - Visible on all screens, adaptable size */}
-      <div id="welcome-header" className="flex-none pt-safe flex items-start justify-between">
-        <div>
-           <h2 className="text-xl md:text-3xl font-bold tracking-tight text-white mb-1 md:mb-2">Visão Geral</h2>
-           <p className="text-sm md:text-base text-gray-400">Acompanhe seu desempenho financeiro.</p>
-        </div>
-        <div id="notification-bell">
-            <NotificationBell />
-        </div>
+      {/* Header - Visible on all screens, adaptable size */}
+      <div id="welcome-header" className="flex-none">
+        <PageHeader 
+            title="Visão Geral" 
+            description="Acompanhe seu desempenho financeiro."
+            action={<NotificationBell />}
+        />
       </div>
       
       {/* Top Section: KPIs & Charts - Scrollable internally, capped height to ensure Chat space */}
@@ -137,7 +135,7 @@ export default function Dashboard() {
                 title="Saldo" 
                 value={(summary?.total_receitas || 0) - (summary?.total_despesas || 0)} 
                 icon={Wallet} 
-                color="text-emerald-400"
+                color="text-primary"
                 compact
             />
             <KpiCard 
@@ -151,7 +149,7 @@ export default function Dashboard() {
                 title="Despesas" 
                 value={summary?.total_despesas || 0} 
                 icon={ArrowDownCircle} 
-                color="text-red-400"
+                color="text-danger"
                 compact
             />
          </div>
@@ -174,7 +172,7 @@ export default function Dashboard() {
                         <Wallet className="w-4 h-4 text-blue-400" />
                      </div>
                      <div>
-                         <h3 className="text-sm font-medium text-white">Despesas por Categoria</h3>
+                         <h3 className="text-sm font-medium text-text-primary">Despesas por Categoria</h3>
                          <p className="text-xs text-gray-400">
                             {expenses?.length || 0} categorias ativas
                          </p>
@@ -187,7 +185,7 @@ export default function Dashboard() {
 
             <div className="w-full">
                 <CategoryStackedBar 
-                    data={expenses || []} 
+                    data={expenses?.slice(0, 5) || []} 
                 />
             </div>
          </div>

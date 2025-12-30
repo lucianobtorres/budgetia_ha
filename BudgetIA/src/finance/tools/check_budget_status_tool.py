@@ -8,6 +8,10 @@ from config import ColunasOrcamentos, NomesAbas
 from core.base_tool import BaseTool
 from finance.schemas import VerificarStatusOrcamentoInput
 
+from core.logger import get_logger
+
+logger = get_logger("Tool_CheckBudget")
+
 
 class VerificarStatusOrcamentoTool(BaseTool):  # type: ignore[misc]
     name: str = "verificar_status_orcamento"
@@ -29,7 +33,7 @@ class VerificarStatusOrcamentoTool(BaseTool):  # type: ignore[misc]
     # --- FIM DA MUDANÇA ---
 
     def run(self, categoria: str | None = None) -> str:
-        print(f"LOG: Ferramenta '{self.name}' chamada para Categoria={categoria}.")
+        logger.info(f"Ferramenta '{self.name}' chamada para Categoria={categoria}.")
 
         try:
             # --- DIP: Chama as funções injetadas ---

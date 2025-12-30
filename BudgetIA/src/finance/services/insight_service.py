@@ -5,6 +5,9 @@ from typing import Any
 import pandas as pd
 
 from config import ColunasOrcamentos, NomesAbas
+from core.logger import get_logger
+
+logger = get_logger("InsightService")
 
 from ..repositories.budget_repository import BudgetRepository
 from ..repositories.insight_repository import InsightRepository
@@ -95,7 +98,7 @@ class InsightService:
         Orquestra todo o processo de análise proativa.
         (Lógica movida de PlanilhaManager.analisar_para_insights_proativos)
         """
-        print("LOG (InsightService): Orquestrando análise proativa...")
+        logger.info("Orquestrando análise proativa...")
 
         # 1. Recalcular orçamentos (garante que os dados estão frescos)
         self._budget_repo.recalculate_all_budgets()
@@ -112,8 +115,8 @@ class InsightService:
 
         # 5. Salvar os insights no repositório
         if insights_gerados:
-            print(
-                f"LOG (InsightService): {len(insights_gerados)} insights gerados. Registrando..."
+            logger.info(
+                f"{len(insights_gerados)} insights gerados. Registrando..."
             )
             for insight in insights_gerados:
                 self._insight_repo.add_insight(
@@ -123,8 +126,8 @@ class InsightService:
                     detalhes_recomendacao=insight["detalhes_recomendacao"],
                 )
         else:
-            print(
-                "LOG (InsightService): Análise proativa concluída. Nenhum insight novo gerado."
+            logger.info(
+                "Análise proativa concluída. Nenhum insight novo gerado."
             )
 
         return insights_gerados

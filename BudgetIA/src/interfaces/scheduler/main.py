@@ -8,6 +8,9 @@ from pathlib import Path
 import schedule
 
 import config
+from core.logger import get_logger
+
+logger = get_logger("Scheduler")
 
 
 # 1. Encontra o diretório onde este arquivo está (src/scheduler)
@@ -29,12 +32,9 @@ if PROJECT_ROOT not in sys.path:
 if SRC_DIR not in sys.path:
     sys.path.insert(0, SRC_DIR)
 
-print(f"--- DEBUG: SYS.PATH ATUALIZADO (para {__file__}) ---")
-print(f"ROOT: {PROJECT_ROOT}")
-print(f"SRC: {SRC_DIR}")
-print("--- INICIANDO IMPORTS DA APLICAÇÃO ---")
 
-print("--- SERVIÇO DE AGENDAMENTO (Scheduler - API Client) ---")
+
+logger.info("SERVIÇO DE AGENDAMENTO (Scheduler - API Client)")
 
 # Importa o cliente da API
 from interfaces.web_app.api_client import BudgetAPIClient
@@ -45,11 +45,11 @@ def run_proactive_jobs_for_all_users() -> None:
     """
     Varre a pasta de usuários e dispara os jobs via API para cada um.
     """
-    print(f"\n--- SCHEDULER: Verificando jobs para {datetime.now()} ---")
+    logger.info(f"Verificando jobs para {datetime.now()}")
 
     users_dir = Path(os.path.join(config.DATA_DIR, "users"))
     if not users_dir.exists():
-        print("SCHEDULER: Pasta 'data/users' não encontrada. Pulando.")
+        logger.warning("Pasta 'data/users' não encontrada. Pulando.")
         return
 
     # Itera sobre cada pasta de usuário (ex: 'jsmith', 'mjane')
@@ -64,28 +64,28 @@ def run_proactive_jobs_for_all_users() -> None:
             # Verifica se tem config básico
             config_file = user_dir / "user_config.json"
             if not config_file.exists():
-                print(f"SCHEDULER: Usuário '{username}' sem config. Pulando.")
+                logger.info(f"Usuário '{username}' sem config. Pulando.")
                 continue
 
             try:
-                print(f"--- Disparando job via API para: {username} ---")
+                logger.info(f"Disparando job via API para: {username}")
                 
                 # Instancia cliente personificado
                 client = BudgetAPIClient(base_url=API_URL, user_id=username)
                 
                 # Dispara job
                 result = client.trigger_proactive_job()
-                print(f"SCHEDULER Result ({username}): {result}")
+                logger.info(f"Result ({username}): {result}")
 
             except Exception as e:
-                print(f"ERRO SCHEDULER: Falha ao processar jobs para {username}: {e}")
+                logger.error(f"Falha ao processar jobs para {username}: {e}")
 
 
 # Para testar, vamos rodar a cada 1 minuto
-print("Agendando jobs para rodar a cada 1 minuto.")
+logger.info("Agendando jobs para rodar a cada 1 minuto.")
 schedule.every(1).minutes.do(run_proactive_jobs_for_all_users)
 
-print("Jobs agendados. Aguardando para executar...")
+logger.info("Jobs agendados. Aguardando para executar...")
 
 
 # --- Loop Principal ---
@@ -94,4 +94,4 @@ try:
         schedule.run_pending()
         time.sleep(1)  # Dorme por 1 segundo para não fritar a CPU
 except KeyboardInterrupt:
-    print("\nEncerrando o agendador...")
+    logger.info("Encerrando o agendador...")

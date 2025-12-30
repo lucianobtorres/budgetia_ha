@@ -6,23 +6,23 @@ export function PushNotificationCard() {
   const { isSubscribed, loading, enablePush, disablePush, permission } = usePushNotifications();
 
   return (
-    <div className="bg-gray-800/40 backdrop-blur border border-gray-700/50 rounded-2xl p-5 hover:border-emerald-500/20 transition-all group">
+    <div className="bg-surface-card/40 backdrop-blur border border-border/50 rounded-2xl p-5 hover:border-primary/20 transition-all group">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <div className={`h-12 w-12 rounded-xl flex items-center justify-center transition-colors ${isSubscribed ? 'bg-emerald-500/20 text-emerald-400' : 'bg-gray-700/50 text-gray-400'}`}>
+          <div className={`h-12 w-12 rounded-xl flex items-center justify-center transition-colors ${isSubscribed ? 'bg-primary/20 text-primary-light' : 'bg-surface-hover/50 text-text-secondary'}`}>
             {loading ? <Loader2 className="animate-spin" size={24} /> : (
                 isSubscribed ? <Bell size={24} /> : <BellOff size={24} />
             )}
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-white">Notificações Push</h3>
-            <p className="text-sm text-gray-400">
+            <h3 className="text-lg font-semibold text-text-primary">Notificações Push</h3>
+            <p className="text-sm text-text-muted">
               {isSubscribed 
                 ? "Ativo neste dispositivo" 
                 : "Receba alertas mesmo com o app fechado"}
             </p>
             {permission === 'denied' && (
-                <p className="text-xs text-red-400 mt-1">⚠️ Permissão bloqueada no navegador.</p>
+                <p className="text-xs text-danger mt-1">⚠️ Permissão bloqueada no navegador.</p>
             )}
           </div>
         </div>

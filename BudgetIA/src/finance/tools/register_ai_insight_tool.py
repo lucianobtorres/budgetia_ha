@@ -7,6 +7,10 @@ from pydantic import BaseModel
 from core.base_tool import BaseTool
 from finance.schemas import RegistrarInsightIAInput
 
+from core.logger import get_logger
+
+logger = get_logger("Tool_RegInsight")
+
 
 class RegistrarInsightIATool(BaseTool):  # type: ignore[misc]
     name: str = "registrar_insight_ia"
@@ -29,8 +33,8 @@ class RegistrarInsightIATool(BaseTool):  # type: ignore[misc]
         detalhes_recomendacao: str,
         status: str = "Novo",
     ) -> str:
-        print(
-            f"LOG: Ferramenta '{self.name}' chamada: Tipo='{tipo_insight}', Título='{titulo_insight}'"
+        logger.info(
+            f"Ferramenta '{self.name}' chamada: Tipo='{tipo_insight}', Título='{titulo_insight}'"
         )
         data_insight = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         try:

@@ -5,7 +5,10 @@ from datetime import datetime
 
 from core.llm_manager import LLMOrchestrator
 from core.memory.memory_service import MemoryService
+from core.logger import get_logger
 from langchain.schema import SystemMessage, HumanMessage
+
+logger = get_logger("BehaviorAnalyst")
 
 
 class BehaviorAnalyst:
@@ -91,5 +94,5 @@ class BehaviorAnalyst:
             return learned_facts
 
         except Exception as e:
-            print(f"ERRO (BehaviorAnalyst): Falha na análise LLM: {e}")
+            logger.error(f"Falha na análise LLM: {e}")
             return []

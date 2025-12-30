@@ -5,6 +5,9 @@ from finance.planilha_manager import PlanilhaManager
 from core.user_config_service import UserConfigService
 from core.llm_manager import LLMOrchestrator
 from application.proactive_jobs import run_proactive_notifications
+from core.logger import get_logger
+
+logger = get_logger("API_Jobs")
 
 router = APIRouter(prefix="/jobs", tags=["Jobs"])
 
@@ -22,7 +25,7 @@ async def run_proactive_job(
         if not manager:
             raise HTTPException(status_code=500, detail="PlanilhaManager não disponível.")
             
-        print(f"API: Executando job proativo para {config_service.username}...")
+        logger.info(f"Executando job proativo para {config_service.username}...")
         
         result = await run_proactive_notifications(
             config_service=config_service,
@@ -33,5 +36,5 @@ async def run_proactive_job(
         return {"status": "success", "result": result}
         
     except Exception as e:
-        print(f"ERRO API JOB: {e}")
+        logger.error(f"ERRO API JOB: {e}")
         raise HTTPException(status_code=500, detail=str(e))

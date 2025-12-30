@@ -8,6 +8,10 @@ from config import ColunasTransacoes, NomesAbas, ValoresTipo
 from core.base_tool import BaseTool
 from finance.schemas import AnalisarTendenciasGastosInput
 
+from core.logger import get_logger
+
+logger = get_logger("Tool_AnlzTrends")
+
 
 class AnalisarTendenciasGastosTool(BaseTool):  # type: ignore[misc]
     name: str = "analisar_tendencias_gastos"
@@ -24,7 +28,7 @@ class AnalisarTendenciasGastosTool(BaseTool):  # type: ignore[misc]
     # --- FIM DA MUDANÇA ---
 
     def run(self, categoria: str | None = None) -> str:
-        print(f"LOG: Ferramenta '{self.name}' chamada para Categoria={categoria}.")
+        logger.info(f"Ferramenta '{self.name}' chamada para Categoria={categoria}.")
 
         # --- DIP: Chama a função injetada ---
         df = self.visualizar_dados(sheet_name=NomesAbas.TRANSACOES)

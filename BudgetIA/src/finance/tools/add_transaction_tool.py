@@ -5,6 +5,10 @@ from typing import Callable, Any  # Importar Callable
 from core.base_tool import BaseTool
 from finance.schemas import AddTransactionInput
 
+from core.logger import get_logger
+
+logger = get_logger("Tool_AddTransaction")
+
 
 class AddTransactionTool(BaseTool):  # type: ignore[misc]
     name: str = "adicionar_transacao"
@@ -62,9 +66,7 @@ class AddTransactionTool(BaseTool):  # type: ignore[misc]
             )
             self.save()  # Salva a transação
 
-            print(
-                "LOG (Tool): Transação adicionada. Acionando recálculo de orçamentos..."
-            )
+            logger.info("Transação adicionada. Acionando recálculo de orçamentos...")
             self.recalculate_budgets_func()
 
             resumo_atual = self.get_summary()

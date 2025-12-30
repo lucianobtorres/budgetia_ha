@@ -13,9 +13,9 @@ interface GradientBannerProps {
 
 const VARIANTS = {
     emerald: {
-        container: "from-emerald-500/10 border-emerald-500/20",
-        iconBg: "bg-emerald-500/20 text-emerald-400",
-        desc: "text-emerald-200/60"
+        container: "from-primary/10 border-primary/20",
+        iconBg: "bg-primary/20 text-primary-light",
+        desc: "text-primary-light/60"
     },
     violet: {
         container: "from-violet-500/10 border-violet-500/20",

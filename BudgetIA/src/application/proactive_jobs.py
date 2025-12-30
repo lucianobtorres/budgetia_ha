@@ -17,6 +17,9 @@ from application.notifications.rules.audit.subscription_auditor_rule import Subs
 from core.llm_manager import LLMOrchestrator
 from core.user_config_service import UserConfigService
 from application.notifications.rule_repository import RuleRepository
+from core.logger import get_logger
+
+logger = get_logger("ProactiveJobs")
 
 
 from application.services.push_notification_service import PushNotificationService
@@ -30,16 +33,16 @@ async def run_proactive_notifications(
     Executa o sistema de notificações proativas para um usuário.
     Agora espera o PlanilhaManager já inicializado (via API).
     """
-    print(f"\n--- JOB PROATIVO: Iniciando para '{config_service.username}' ---")
+    logger.info(f"JOB PROATIVO: Iniciando para '{config_service.username}'")
 
     try:
         # Verifica caminho apenas para logging/debug, mas o manager já deve ter resolvido
         if not plan_manager:
-             print("ERRO JOB: PlanilhaManager nulo recebido.")
+             logger.error("JOB: PlanilhaManager nulo recebido.")
              return {"notifications_sent": 0, "rules_checked": 0, "failures": ["Manager is None"], "rules_triggered": 0}
 
         planilha_path = config_service.get_planilha_path()
-        print(f"JOB: Usando PlanilhaManager injetado (Arquivo: {planilha_path})...")
+        logger.debug(f"JOB: Usando PlanilhaManager injetado (Arquivo: {planilha_path})...")
 
         # 3. Registrar regras de negócio
         # Regras "Hardcoded" do sistema
@@ -53,7 +56,7 @@ async def run_proactive_notifications(
         repo = RuleRepository(config_service.get_user_dir())
         dynamic_rules = repo.get_all_rules()
         if dynamic_rules:
-            print(f"JOB: Carregando {len(dynamic_rules)} regras dinâmicas do repositório.")
+            logger.info(f"JOB: Carregando {len(dynamic_rules)} regras dinâmicas do repositório.")
             rules.extend(dynamic_rules)
 
         # 4. Registrar canais de notificação (Omnichannel)
@@ -77,15 +80,16 @@ async def run_proactive_notifications(
 
         result = await orchestrator.run(plan_manager)
 
-        print(f"\n--- JOB FINALIZADO para '{config_service.username}' ---")
-        print(f"Notificações enviadas: {result['notifications_sent']}")
-        print(f"Regras verificadas: {result['rules_checked']}")
-        print(f"Falhas: {len(result['failures'])}")
+        logger.info(f"JOB FINALIZADO para '{config_service.username}'")
+        logger.info(f"Notificações enviadas: {result['notifications_sent']}")
+        logger.debug(f"Regras verificadas: {result['rules_checked']}")
+        if result['failures']:
+            logger.warning(f"Falhas: {len(result['failures'])}")
 
         return result
 
     except Exception as e:
-        print(f"ERRO JOB: Falha ao executar notificações proativas: {e}")
+        logger.error(f"JOB: Falha ao executar notificações proativas: {e}")
         return {"notifications_sent": 0, "failures": [str(e)], "rules_checked": 0, "rules_triggered": 0}
 
 
@@ -102,8 +106,8 @@ def check_missing_daily_transport(
         config_service: Serviço de configuração do usuário.
         llm_orchestrator: Orquestrador de LLM.
     """
-    print(
-        "AVISO: check_missing_daily_transport() é uma função legada. "
+    logger.warning(
+        "check_missing_daily_transport() é uma função legada. "
         "Use run_proactive_notifications() diretamente."
     )
 

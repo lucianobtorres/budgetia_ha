@@ -39,7 +39,9 @@ from initialization.onboarding.state_machine import (
 )
 from initialization.strategy_generator import StrategyGenerator
 
-logger = logging.getLogger(__name__)
+from core.logger import get_logger
+
+logger = get_logger("OnboardingOrchestrator")
 
 
 class OnboardingOrchestrator:
@@ -62,14 +64,14 @@ class OnboardingOrchestrator:
         if saved_status:
             try:
                 initial_state = OnboardingState[saved_status]
-                print(f"[ONBOARDING] Restoring state: {initial_state.name}")
+                logger.info(f"Restoring state: {initial_state.name}")
             except KeyError:
-                print(
+                logger.warning(
                     f"[ONBOARDING] Invalid saved status '{saved_status}'. Starting fresh."
                 )
         else:
-            print(
-                f"[ONBOARDING] Starting new onboarding with state: {initial_state.name}"
+            logger.info(
+                f"Starting new onboarding with state: {initial_state.name}"
             )
 
         self.state_machine = OnboardingStateMachine(
@@ -110,12 +112,12 @@ class OnboardingOrchestrator:
              # Só salvamos o state name.
              # Se for COMPLETE, _finalize_onboarding cuida dos detalhes extras (limpar flags).
              # Mas salvar o status 'COMPLETE' aqui também não faz mal.
-             print(f"[ONBOARDING] Persistindo estado intermediário: {new_state.name}")
+             logger.debug(f"Persistindo estado intermediário: {new_state.name}")
              config_data = self.config_service.load_config()
              config_data["onboarding_status"] = new_state.name
              self.config_service.save_config(config_data)
         except Exception as e:
-             print(f"[ONBOARDING] ERRO AO PERSISTIR ESTADO: {e}")
+             logger.error(f"ERRO AO PERSISTIR ESTADO: {e}")
 
     # ---------------------------------------------------------------------
     # Public helpers
@@ -140,7 +142,7 @@ class OnboardingOrchestrator:
 
         # WELCOME: Auto-greet when not yet engaged
         if current_state == OnboardingState.WELCOME and not self._welcome_engaged:
-            print("[ONBOARDING] Generating initial WELCOME greeting...")
+            logger.info("Generating initial WELCOME greeting...")
             message = self.agent.chat(
                 "[INÍCIO]",  # Placeholder - agent will initiate based on system prompt
                 OnboardingState.WELCOME,
@@ -154,12 +156,12 @@ class OnboardingOrchestrator:
 
 Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
             )
-            print(f"[ONBOARDING] Initial greeting: {message[:100]}...")
+            logger.debug(f"Initial greeting: {message[:100]}...")
             return message
 
         # OPTIONAL_PROFILE: Auto-prompt if arriving here directly (e.g. reload or default sheet skip)
         if current_state == OnboardingState.OPTIONAL_PROFILE and not self._profile_interview_started:
-             print("[ONBOARDING] Generating initial PROFILE prompt...")
+             logger.info("Generating initial PROFILE prompt...")
              return self.agent.chat(
                  "[INÍCIO_PERFIL]",
                  OnboardingState.OPTIONAL_PROFILE,
@@ -212,15 +214,7 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
         )
 
         # Safe logging – avoid UnicodeEncodeError on Windows consoles.
-        try:
-            print(
-                f"\n[ONBOARDING] State={current_state.name} | User Input: '{text}' | Clean: '{clean_text}'"
-            )
-        except UnicodeEncodeError:
-            print(
-                f"\n[ONBOARDING] State={current_state.name} | User Input: (unicode) | Clean: '{clean_text}'"
-            )
-        logger.info(f"[ONBOARDING] State={current_state.name} | User Input: '{text}'")
+        # logger.info(f"State={current_state.name} | User Input: '{text}'")
 
         # Classify Intent
         try:
@@ -228,11 +222,11 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
                 clean_text, current_state.name, self._last_agent_response
             )
         except Exception as e:
-            print(f"[ONBOARDING] AVISO: Falha na classificação de intenção (Rate Limit?): {e}")
+            logger.warning(f"AVISO: Falha na classificação de intenção (Rate Limit?): {e}")
             logger.warning(f"[ONBOARDING] Intent classification failed: {e}")
             intent = UserIntent.NEUTRAL_INFO
         
-        print(f"[ONBOARDING] Intent Detected: {intent.name}")
+        logger.info(f"Intent Detected: {intent.name}")
 
         # -----------------------------------------------------------------
         # Auto‑transition after the agent offers a strategy suggestion.
@@ -243,8 +237,8 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
         ):
             # The next user answer decides whether to accept or skip.
             if intent in [UserIntent.NEGATIVE_REFUSAL, UserIntent.SKIP]:
-                print(
-                    "[ONBOARDING] User declined strategy after profile interview (Intent). Finalising onboarding."
+                logger.info(
+                    "User declined strategy after profile interview (Intent). Finalising onboarding."
                 )
                 self.state_machine.transition_to(OnboardingState.COMPLETE)
                 self._finalize_onboarding()
@@ -257,8 +251,8 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
                 return response
 
             if intent == UserIntent.POSITIVE_CONFIRMATION:
-                print(
-                    "[ONBOARDING] User accepted strategy after profile interview (Intent). Finalising onboarding."
+                logger.info(
+                    "User accepted strategy after profile interview (Intent). Finalising onboarding."
                 )
                 self.state_machine.transition_to(OnboardingState.COMPLETE)
                 self._finalize_onboarding()
@@ -323,8 +317,8 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
                 intent == UserIntent.NEGATIVE_REFUSAL
                 and not self._profile_interview_started
             ):
-                print(
-                    "[ONBOARDING] User chose to skip profile and finish onboarding (Intent)."
+                logger.info(
+                    "User chose to skip profile and finish onboarding (Intent)."
                 )
                 self.state_machine.transition_to(OnboardingState.COMPLETE)
                 self._finalize_onboarding()
@@ -341,8 +335,8 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
                 self._profile_interview_started
                 and intent == UserIntent.INTERVIEW_COMPLETE
             ):
-                print(
-                    "[ONBOARDING] User signaled interview completion (Intent). Generating strategy and FINALIZING..."
+                logger.info(
+                    "User signaled interview completion (Intent). Generating strategy and FINALIZING..."
                 )
                 
                 # Generate strategy but DON'T transition to OPTIONAL_STRATEGY
@@ -378,7 +372,7 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
                 "aceitar",
                 "usar esta",
             ]:
-                print("[ONBOARDING] User accepted suggested strategy (Intent).")
+                logger.info("User accepted suggested strategy (Intent).")
                 self.state_machine.transition_to(OnboardingState.COMPLETE)
                 self._finalize_onboarding()
                 response = self.agent.chat(
@@ -399,7 +393,7 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
 
             # Skip / finalize.
             if intent in [UserIntent.SKIP, UserIntent.NEGATIVE_REFUSAL]:
-                print("[ONBOARDING] User skipped strategy (Intent).")
+                logger.info("User skipped strategy (Intent).")
                 self.state_machine.transition_to(OnboardingState.COMPLETE)
                 self._finalize_onboarding()
                 response = self.agent.chat(
@@ -420,8 +414,9 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
             self._last_agent_response = response
             return response
 
-        print(f"[ONBOARDING] Unhandled state: {current_state.name}")
-        logger.warning(f"[ONBOARDING] Unhandled state: {current_state.name}")
+            return response
+        
+        logger.warning(f"Unhandled state: {current_state.name}")
         return "Estado não reconhecido."
 
     # ---------------------------------------------------------------------
@@ -440,7 +435,7 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
         if self._welcome_engaged:
             # User confirms readiness
             if intent == UserIntent.POSITIVE_CONFIRMATION:
-                print("[ONBOARDING] User ready to proceed from WELCOME")
+                logger.debug("User ready to proceed from WELCOME")
                 self.state_machine.transition_to(
                     OnboardingState.SPREADSHEET_ACQUISITION
                 )
@@ -467,7 +462,7 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
 
         if intent in engaging_intents:
             self._welcome_engaged = True
-            print(f"[ONBOARDING] User engaged in WELCOME (intent: {intent.name})")
+            logger.debug(f"User engaged in WELCOME (intent: {intent.name})")
 
             # Context-aware based on user's answer
             if intent == UserIntent.POSITIVE_CONFIRMATION:
@@ -491,11 +486,8 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
         )
 
     def _handle_acquisition(self, text: str) -> str:
-        print(
-            f"[ONBOARDING] Processing acquisition with {len(self.file_handlers)} handlers"
-        )
         logger.info(
-            f"[ONBOARDING] Processing acquisition with {len(self.file_handlers)} handlers"
+            f"Processing acquisition with {len(self.file_handlers)} handlers"
         )
         for handler in self.file_handlers:
             if handler.can_handle(text):
@@ -503,7 +495,7 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
                     self._context["username"] = self.config_service.username
                 if "save_dir" not in self._context:
                     self._context["save_dir"] = str(Path.cwd() / "data")
-                print(f"[ONBOARDING] Invoking handler {handler.__class__.__name__}")
+                logger.debug(f"Invoking handler {handler.__class__.__name__}")
                 result = handler.acquire(self._context)
                 if result.success:
                     self._finalize_acquisition(result)
@@ -531,7 +523,7 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
                         OnboardingState.SPREADSHEET_ACQUISITION,
                         extra_context=f"Handler FAILED. Error: {error_msg}. Prompt retry.",
                     )
-        print("[ONBOARDING] No handler matched; delegating to agent.")
+        logger.info("No handler matched; delegating to agent.")
         return self.agent.chat(text, OnboardingState.SPREADSHEET_ACQUISITION)
 
     def _handle_translation_review(
@@ -555,8 +547,8 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
                 )
                 return "Erro: Planilha não encontrada. Voltando para aquisição."
             if file_path.startswith("http"):
-                print(
-                    "[ONBOARDING] Detectado Google Sheets URL. Iniciando download temporário."
+                logger.info(
+                    "Detectado Google Sheets URL. Iniciando download temporário."
                 )
                 try:
                     file_id = self.google_auth_service._extract_file_id_from_url(
@@ -573,11 +565,11 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
                         raise Exception(
                             "Falha ao baixar arquivo temporário do Google Sheets."
                         )
-                    print(
-                        f"[ONBOARDING] Download temporário concluído em: {local_file_path}"
+                    logger.info(
+                        f"Download temporário concluído em: {local_file_path}"
                     )
                 except Exception as e:
-                    print(f"[ONBOARDING] ERRO DOWNLOAD GOOGLE: {e}")
+                    logger.error(f"[ONBOARDING] ERRO DOWNLOAD GOOGLE: {e}")
                     message = (
                         f"Erro ao baixar a planilha do Google Sheets. Detalhe: {e}"
                     )
@@ -593,7 +585,7 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
                 success = True
                 message = "Planilha padrão lida e validada com sucesso."
             else:
-                print("[ONBOARDING] Iniciando geração/validação da estratégia...")
+                logger.info("Iniciando geração/validação da estratégia...")
                 try:
                     success, message, schema_summary = (
                         self.strategy_generator.generate_and_validate_strategy(
@@ -601,7 +593,7 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
                         )
                     )
                 except Exception as e:
-                    print(f"[ONBOARDING] AVISO: Falha na geração da estratégia (Rate Limit?): {e}")
+                    logger.warning(f"AVISO: Falha na geração da estratégia (Rate Limit?): {e}")
                     success = True # Assume sucesso para não travar o user
                     message = "Devido à alta demanda do servidor, ignoramos a análise detalhada e usaremos a Estratégia Padrão."
                     schema_summary = "Análise ignorada (Fallback)."
@@ -613,11 +605,11 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
             ):
                 try:
                     os.remove(local_file_path)
-                    print(
-                        f"[ONBOARDING] Cleanup: Arquivo temporário removido: {local_file_path}"
+                    logger.debug(
+                        f"Cleanup: Arquivo temporário removido: {local_file_path}"
                     )
                 except Exception as e:
-                    print(
+                    logger.warning(
                         f"[ONBOARDING] AVISO: Falha ao remover arquivo temporário {local_file_path}: {e}"
                     )
             self._translation_result = TranslationResult(
@@ -628,7 +620,7 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
             )
 
             # ALWAYS show analysis result on first call (don't transition immediately)
-            print(f"[ONBOARDING] Translation analysis complete: success={success}")
+            logger.info(f"Translation analysis complete: success={success}")
             context_for_agent = f"\n[CONTEXTO DE ANÁLISE DE PLANILHA]\nSUCESSO: {success}\nMENSAGEM: {message}\nESQUEMA LIDO:\n{schema_summary[:2000]}"
             return self.agent.chat(
                 f"Analisar o seguinte resultado da planilha: {message}",
@@ -649,8 +641,8 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
                 )
 
             # Analysis succeeded → Transition
-            print(
-                "[ONBOARDING] User confirmed translation review, proceeding to profile"
+            logger.info(
+                "User confirmed translation review, proceeding to profile"
             )
             self.state_machine.transition_to(OnboardingState.OPTIONAL_PROFILE)
             return self.agent.chat(
@@ -661,7 +653,7 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
 
         # CASO 2: User has questions → Discussion mode
         if intent == UserIntent.QUESTION:
-            print("[ONBOARDING] User has questions about translation")
+            logger.info("User has questions about translation")
             return self.agent.chat(
                 clean_text,
                 OnboardingState.TRANSLATION_REVIEW,
@@ -670,7 +662,7 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
 
         # CASO 3: User refused/rejected → Offer alternatives
         if intent == UserIntent.NEGATIVE_REFUSAL:
-            print("[ONBOARDING] User refused translation result")
+            logger.info("User refused translation result")
             if self._translation_result.success:
                 # Succeeded but user doesn't like it
                 return self.agent.chat(
@@ -688,7 +680,7 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
 
         # CASO 4: Skip → Create default spreadsheet
         if intent == UserIntent.SKIP:
-            print("[ONBOARDING] User wants to skip translation review")
+            logger.info("User wants to skip translation review")
             return self.agent.chat(
                 clean_text,
                 OnboardingState.TRANSLATION_REVIEW,
@@ -712,19 +704,16 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
         )
 
     def _finalize_acquisition(self, result: AcquisitionResult) -> None:
-        print(
-            f"[ONBOARDING] Finalizing acquisition: file_path={result.file_path}, handler_type={result.handler_type}"
-        )
         logger.info(
-            f"[ONBOARDING] Finalizing acquisition: file_path={result.file_path}, handler_type={result.handler_type}"
+            f"Finalizing acquisition: file_path={result.file_path}, handler_type={result.handler_type}"
         )
         if result.file_path:
             self.config_service.save_pending_planilha_path(result.file_path)
 
         # If default spreadsheet, skip translation review (schema is known)
         if result.handler_type == "default":
-            print(
-                "[ONBOARDING] Default spreadsheet created. Skipping TRANSLATION_REVIEW."
+            logger.info(
+                "Default spreadsheet created. Skipping TRANSLATION_REVIEW."
             )
             self.state_machine.transition_to(OnboardingState.OPTIONAL_PROFILE)
         else:
@@ -765,23 +754,19 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
 
     def _finalize_onboarding(self) -> None:
         """Persist onboarding completion and clean up temporary config entries."""
-        print("[ONBOARDING] Finalizando onboarding...")
-        logger.info("[ONBOARDING] Finalizando onboarding...")
+        logger.info("Finalizando onboarding...")
         config_data = self.config_service.load_config()
         pending_path = config_data.get("pending_planilha_path")
         if pending_path:
             self.config_service.save_planilha_path(pending_path)
         else:
-            print("[ONBOARDING] AVISO: Nenhum pending_planilha_path encontrado!")
-            logger.warning(
-                "[ONBOARDING] Nenhum pending_planilha_path encontrado durante finalização"
-            )
+            logger.warning("Nenhum pending_planilha_path encontrado!")
         # Persist complete status.
         config_data = self.config_service.load_config()
         config_data["onboarding_status"] = OnboardingState.COMPLETE.name
         self.config_service.save_config(config_data)
-        print(
-            f"[ONBOARDING] Estado persistido: onboarding_status={OnboardingState.COMPLETE.name}"
+        logger.info(
+            f"Estado persistido: onboarding_status={OnboardingState.COMPLETE.name}"
         )
 
     def reset_config(self) -> None:

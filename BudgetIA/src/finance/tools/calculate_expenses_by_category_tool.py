@@ -8,6 +8,10 @@ from config import ColunasTransacoes, NomesAbas, ValoresTipo
 from core.base_tool import BaseTool
 from finance.schemas import CalcularDespesasPorCategoriaInput
 
+from core.logger import get_logger
+
+logger = get_logger("Tool_CalcExpByCat")
+
 
 class CalcularDespesasPorCategoriaTool(BaseTool):  # type: ignore[misc]
     name: str = "calcular_despesas_por_categoria"
@@ -25,7 +29,7 @@ class CalcularDespesasPorCategoriaTool(BaseTool):  # type: ignore[misc]
     # --- FIM DA MUDANÇA ---
 
     def run(self) -> str:
-        print(f"LOG: Ferramenta '{self.name}' foi chamada.")
+        logger.info(f"Ferramenta '{self.name}' foi chamada.")
 
         # --- DIP: Chama a função injetada ---
         df = self.visualizar_dados(sheet_name=NomesAbas.TRANSACOES)

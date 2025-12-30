@@ -4,6 +4,9 @@ import pickle
 import pandas as pd
 from typing import Any, Optional
 from config import UPSTASH_REDIS_URL
+from core.logger import get_logger
+
+logger = get_logger("RedisCache")
 
 class RedisCacheService:
     def __init__(self):
@@ -21,9 +24,9 @@ class RedisCacheService:
                 self.redis_client = redis.from_url(url, ssl_cert_reqs=None)
                 self.redis_client.ping() # Test connection
                 self.enabled = True
-                print("LOG: Redis Cache Service Connected Successfully. 🚀")
+                logger.info("Redis Cache Service Connected Successfully. 🚀")
             except Exception as e:
-                print(f"AVISO: Falha ao conectar Redis Cache: {e}")
+                logger.warning(f"Falha ao conectar Redis Cache: {e}")
                 self.enabled = False
 
     def get_entry(self, key: str) -> tuple[Any, Optional[str]]:
@@ -37,7 +40,7 @@ class RedisCacheService:
                 # Expects a tuple (data_object, timestamp_str)
                 return pickle.loads(data)
         except Exception as e:
-            print(f"ERRO Cache Read ({key}): {e}")
+            logger.error(f"ERRO Cache Read ({key}): {e}")
         return None, None
 
     def set_entry(self, key: str, data: Any, timestamp: str, ttl_seconds: int = 3600) -> bool:
@@ -51,7 +54,7 @@ class RedisCacheService:
             self.redis_client.setex(key, ttl_seconds, serialized_data)
             return True
         except Exception as e:
-            print(f"ERRO Cache Write ({key}): {e}")
+            logger.error(f"ERRO Cache Write ({key}): {e}")
             return False
 
     def invalidate(self, key: str) -> bool:
@@ -63,5 +66,5 @@ class RedisCacheService:
             self.redis_client.delete(key)
             return True
         except Exception as e:
-            print(f"ERRO Cache Invalidate ({key}): {e}")
+            logger.error(f"ERRO Cache Invalidate ({key}): {e}")
             return False

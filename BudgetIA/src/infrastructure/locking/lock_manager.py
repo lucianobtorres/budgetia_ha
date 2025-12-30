@@ -2,6 +2,9 @@ import redis
 import hashlib
 from contextlib import contextmanager
 from config import UPSTASH_REDIS_URL
+from core.logger import get_logger
+
+logger = get_logger("LockManager")
 
 class RedisLockManager:
     """
@@ -26,10 +29,10 @@ class RedisLockManager:
                  try:
                     cls._client = redis.from_url(url, decode_responses=False)
                  except Exception as e:
-                    print(f"AVISO: Falha ao conectar Redis Cache: {e}")
+                    logger.warning(f"Falha ao conectar Redis Cache: {e}")
                     cls._client = None
              else:
-                 print("AVISO: UPSTASH_REDIS_URL inválida ou não configurada. Locks distribuídos DESATIVADOS.")
+                 logger.warning("UPSTASH_REDIS_URL inválida ou não configurada. Locks distribuídos DESATIVADOS.")
          return cls._client
 
     def __init__(self, resource_id: str):

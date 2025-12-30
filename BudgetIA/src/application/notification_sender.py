@@ -1,5 +1,8 @@
 # src/app/notification_sender.py
 from telegram import Bot
+from core.logger import get_logger
+
+logger = get_logger("TelegramSender")
 
 
 class TelegramSender:
@@ -18,16 +21,16 @@ class TelegramSender:
         Envia uma mensagem de texto para um chat_id específico.
         """
         if not chat_id:
-            print("ERRO (TelegramSender): chat_id está vazio. Não é possível enviar.")
+            logger.error("chat_id está vazio. Não é possível enviar.")
             return False
 
         try:
-            print(
-                f"--- (TelegramSender) Enviando: '{message_text}' para o chat_id: {chat_id} ---"
+            logger.info(
+                f"Enviando: '{message_text}' para o chat_id: {chat_id}"
             )
             await self.bot.send_message(chat_id=chat_id, text=message_text)
-            print("--- (TelegramSender) Mensagem enviada com sucesso. ---")
+            logger.info("Mensagem enviada com sucesso.")
             return True
         except Exception as e:
-            print(f"ERRO CRÍTICO (TelegramSender) ao enviar mensagem: {e}")
+            logger.critical(f"Erro CRÍTICO ao enviar mensagem: {e}")
             return False

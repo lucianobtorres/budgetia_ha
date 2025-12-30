@@ -50,15 +50,15 @@ export function ProgressListItem({
         : "opacity-100 md:opacity-0 group-hover:opacity-100";
 
     return (
-        <div className="group relative rounded-xl border border-gray-800 bg-gray-900/40 p-4 transition-all hover:bg-gray-900/60 hover:border-gray-700">
+        <div className="group relative rounded-xl border border-border bg-surface-card/40 p-4 transition-all hover:bg-surface-card/60 hover:border-border-hover">
             {/* Actions (Absolute) - Only if handlers provided */}
             {(onEdit || onDelete || action) && (
-                <div className={`absolute top-3 right-3 flex items-center space-x-1 ${actionOpacityClass} transition-opacity bg-gray-900/80 rounded-lg p-1 z-10`}>
+                <div className={`absolute top-3 right-3 flex items-center space-x-1 ${actionOpacityClass} transition-opacity bg-surface-card/80 rounded-lg p-1 z-10`}>
                     {action}
                     {onEdit && (
                         <button 
                             onClick={(e) => { e.stopPropagation(); onEdit(); }}
-                            className="p-1.5 text-gray-400 hover:text-emerald-400 rounded-md hover:bg-gray-800"
+                            className="p-1.5 text-text-secondary hover:text-primary-light rounded-md hover:bg-surface-hover"
                             title="Editar"
                         >
                             <Edit2 size={14} />
@@ -67,7 +67,7 @@ export function ProgressListItem({
                     {onDelete && (
                         <button 
                             onClick={(e) => { e.stopPropagation(); onDelete(); }}
-                            className="p-1.5 text-gray-400 hover:text-red-400 rounded-md hover:bg-gray-800"
+                            className="p-1.5 text-text-secondary hover:text-danger rounded-md hover:bg-surface-hover"
                             title="Excluir"
                         >
                             <Trash2 size={14} />
@@ -85,48 +85,48 @@ export function ProgressListItem({
                             className="w-2 h-2 rounded-full" 
                             style={{ backgroundColor: color }}
                         />
-                        <span className="font-semibold text-white truncate text-base">{title}</span>
+                        <span className="font-semibold text-text-primary truncate text-base">{title}</span>
                     </div>
                     {subtitle && (
-                        <span className="text-[10px] text-gray-500 uppercase tracking-wider pl-4">{subtitle}</span>
+                        <span className="text-[10px] text-text-muted uppercase tracking-wider pl-4">{subtitle}</span>
                     )}
                 </div>
             </div>
 
             {/* Content */}
             <div className="space-y-2 mt-3 pl-4">
-                <div className="flex justify-between text-xs text-gray-400">
-                    <span>Gasto: <span className="text-white font-medium">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)}</span></span>
+                <div className="flex justify-between text-xs text-text-secondary">
+                    <span>Gasto: <span className="text-text-primary font-medium">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)}</span></span>
                     
                     {/* Show Meta only in Budget Mode */}
                     {isBudgetMode && (
-                        <span>Meta: <span className="text-white font-medium">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(limit || 0)}</span></span>
+                        <span>Meta: <span className="text-text-primary font-medium">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(limit || 0)}</span></span>
                     )}
                 </div>
                 
                 {/* Progress Bar */}
-                <div className="relative h-2.5 w-full bg-gray-800 rounded-full overflow-hidden">
+                <div className="relative h-2.5 w-full bg-surface-hover rounded-full overflow-hidden">
                     <div 
-                        className={cn("h-full rounded-full transition-all duration-500 relative", isOver ? "bg-red-500" : "")}
+                        className={cn("h-full rounded-full transition-all duration-500 relative", isOver ? "bg-danger" : "")}
                         style={{ 
                             width: `${percentage}%`,
                             backgroundColor: isOver ? undefined : color
                         }}
                     >
                         {/* Shine effect */}
-                        <div className="absolute inset-0 bg-white/10" />
+                        <div className="absolute inset-0 bg-text-primary/10" />
                     </div>
                 </div>
 
                 {/* Footer Text */}
                 <div className="flex justify-between items-center text-[10px]">
-                    <div className={cn("font-medium", isOver ? "text-red-400" : "text-emerald-400")}>
+                    <div className={cn("font-medium", isOver ? "text-danger" : "text-primary-light")}>
                        <span style={isBudgetMode && !isOver ? { color } : {}}>
                             {percentage.toFixed(isBudgetMode ? 0 : 1)}% {isBudgetMode ? "utilizado" : "do total"}
                        </span>
                     </div>
                     {isOver && (
-                        <span className="text-red-400 flex items-center font-bold bg-red-950/30 px-2 py-0.5 rounded-full">
+                        <span className="text-danger flex items-center font-bold bg-danger/10 px-2 py-0.5 rounded-full">
                             <AlertTriangle size={10} className="mr-1" /> EXCEDIDO
                         </span>
                     )}

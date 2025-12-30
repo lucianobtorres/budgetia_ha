@@ -10,6 +10,9 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 import config
 from core.llm_manager import LLMOrchestrator
+from core.logger import get_logger
+
+logger = get_logger("StrategyGen")
 
 TEMPLATE_STRATEGY_PATH = Path("src/finance/strategies")
 GENERATED_CLASS_NAME = "CustomStrategy"
@@ -29,8 +32,9 @@ try:
     ) as f:
         RETRY_PROMPT_TEMPLATE = f.read()
 except FileNotFoundError:
-    print(
-        "ERRO CRÍTICO: Arquivos de prompt de estratégia não encontrados na pasta 'src/prompts/'."
+
+    logger.critical(
+        "Arquivos de prompt de estratégia não encontrados na pasta 'src/core/prompts/'."
     )
     raise
 
@@ -70,7 +74,7 @@ class StrategyGenerator:
 
                 return schema_str
         except Exception as e:
-            print(f"Erro ao ler schema da planilha: {e}")
+            logger.error(f"Erro ao ler schema da planilha: {e}")
             raise OSError(f"Não foi possível ler os metadados do arquivo: {e}")
 
     def _get_base_templates(self) -> str:
@@ -95,7 +99,7 @@ class StrategyGenerator:
                 f"--- FIM: Exemplo ---\n"
             )
         except FileNotFoundError as e:
-            print(f"ERRO: Não encontrou os arquivos de template de estratégia: {e}")
+            logger.error(f"Não encontrou os arquivos de template de estratégia: {e}")
             raise e
 
     def _get_system_prompt(self) -> str:
@@ -110,7 +114,7 @@ class StrategyGenerator:
         Tenta carregar e executar o `temp_strategy_module.py` em um sandbox.
         Retorna (Sucesso, MensagemDeErro)
         """
-        print(f"--- DEBUG SANDBOX: Testando estratégia em {strategy_file_path}...")
+        logger.info(f"Testando estratégia em {strategy_file_path}...")
         falhou = False
 
         # O 'strategy_file_path' é o caminho completo (ex: data/users/jsmith/user_strategy.py)
@@ -133,7 +137,7 @@ class StrategyGenerator:
             for proibido in imports_proibidos:
                 if re.search(proibido, codigo_gerado):
                     erro = f"Import/Função perigosa detectada: '{proibido}'"
-                    print(f"--- DEBUG SANDBOX: FALHA! {erro} ---")
+                    logger.warning(f"SANDBOX FALHA! {erro}")
                     falhou = True  # Garante a limpeza do arquivo
                     return False, erro
 
@@ -168,11 +172,11 @@ class StrategyGenerator:
             except Exception as e:
                 raise OSError(f"Sandbox falhou ao ler o arquivo Excel: {e}")
 
-            print("--- DEBUG SANDBOX: Executando .map_transactions()... ---")
+            logger.debug("Executando .map_transactions()...")
             # 3. Testa o map_transactions
             df_mapeado = strategy_instance.map_transactions(df_bruto)
 
-            print("--- DEBUG SANDBOX: Validando schema... ---")
+            logger.debug("Validando schema...")
             colunas_requeridas = layout_config[config.NomesAbas.TRANSACOES]
             for col in colunas_requeridas:
                 if col not in df_mapeado.columns:
@@ -187,11 +191,11 @@ class StrategyGenerator:
                     "Estratégia falhou. A coluna 'Valor' traduzida não é numérica."
                 )
 
-            print("--- DEBUG SANDBOX: Sucesso! ---")
+            logger.debug("Sucesso!")
             return True, "Validado com sucesso"
 
         except Exception as e:
-            print(f"--- DEBUG SANDBOX: FALHA! Erro: {e} ---")
+            logger.error(f"SANDBOX FALHA! Erro: {e}")
             falhou = True
             return False, str(e)
         finally:
@@ -215,8 +219,8 @@ class StrategyGenerator:
         if not strategy_file_path.exists():
             return False, "Arquivo de estratégia não encontrado."
 
-        print(
-            f"--- DEBUG GENERATOR: Validando estratégia existente em {strategy_file_path}... ---"
+        logger.info(
+            f"Validando estratégia existente em {strategy_file_path}..."
         )
         layout_config = config.LAYOUT_PLANILHA
 
@@ -252,7 +256,7 @@ class StrategyGenerator:
 
             erro_log = ""
             for i in range(self.max_retries):
-                print(f"--- DEBUG GENERATOR: Tentativa {i + 1}/{self.max_retries} ---")
+                logger.debug(f"Tentativa {i + 1}/{self.max_retries}")
 
                 if erro_log:
                     prompt_com_erro = RETRY_PROMPT_TEMPLATE.format(
@@ -271,8 +275,8 @@ class StrategyGenerator:
                         HumanMessage(content=human_prompt),
                     ]
 
-                print(
-                    f"--- DEBUG GENERATOR [PROMPT (Tentativa {i + 1})]:\n{messages[1].content[:500]}...\n"
+                logger.debug(
+                    f"PROMPT (Tentativa {i + 1}):\n{messages[1].content[:500]}..."
                 )
 
                 try:
@@ -280,13 +284,13 @@ class StrategyGenerator:
                 except Exception as e:
                     error_msg = str(e)
                     if "429" in error_msg or "Rate limit" in error_msg:
-                        print(f"--- DEBUG GENERATOR: RATE LIMIT DETECTADO NA TENTATIVA {i+1} ---")
+                        logger.warning(f"RATE LIMIT DETECTADO NA TENTATIVA {i+1}")
                         # Em caso de rate limit, não adianta tentar de novo imediatamente.
                         # Retornamos falha controlada para o orchestrator lidar.
                         return False, f"Rate Limit Exceeded: {error_msg}", schema_usuario
                     # Outros erros, loga e continua o loop de retry
                     erro_log = f"Erro na chamada LLM: {error_msg}"
-                    print(f"--- DEBUG GENERATOR [ERRO LLM]: {erro_log} ---")
+                    logger.error(f"ERRO LLM: {erro_log}")
                     continue
 
                 codigo_gerado = (
@@ -296,8 +300,8 @@ class StrategyGenerator:
                     .replace("```", "")
                     .strip()
                 )
-                print(
-                    f"--- DEBUG GENERATOR [RESPOSTA IA (Código)]:\n{codigo_gerado[:500]}...\n"
+                logger.debug(
+                    f"RESPOSTA IA (Código):\n{codigo_gerado[:500]}..."
                 )
 
                 try:
@@ -314,8 +318,8 @@ class StrategyGenerator:
                 )
                 if success:
                     module_name = strategy_save_path.stem
-                    print(
-                        f"--- DEBUG GENERATOR: Estratégia validada e salva como '{module_name}' ---"
+                    logger.info(
+                        f"Estratégia validada e salva como '{module_name}'"
                     )
                     mapa_para_salvar = {"strategy_module": module_name}
                     return True, json.dumps(mapa_para_salvar), schema_usuario
@@ -329,7 +333,7 @@ class StrategyGenerator:
             )
 
         except Exception as e:
-            print(f"--- DEBUG GENERATOR [ERRO FATAL]: {e} ---")
+            logger.critical(f"ERRO FATAL: {e}")
             import traceback
 
             traceback.print_exc()

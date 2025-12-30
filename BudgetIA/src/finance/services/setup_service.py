@@ -8,7 +8,10 @@ from config import (
     ColunasTransacoes,
     NomesAbas,
 )
+from core.logger import get_logger
 from finance.utils import _carregar_dados_exemplo
+
+logger = get_logger("SetupService")
 
 if TYPE_CHECKING:
     from finance.repositories.budget_repository import BudgetRepository
@@ -37,7 +40,7 @@ class FinancialSetupService:
 
     def populate_initial_data(self) -> None:
         """Popula a planilha com dados de exemplo se estiver vazia."""
-        print("--- DEBUG SetupService: Populando com dados de exemplo... ---")
+        logger.debug("Populando com dados de exemplo...")
 
         # 1. Orçamentos Iniciais
         if self._context.get_dataframe(NomesAbas.ORCAMENTOS).empty:
@@ -50,7 +53,7 @@ class FinancialSetupService:
             self._budget_repo.recalculate_all_budgets()
 
         # 3. Campos de Perfil
-        print("--- DEBUG SetupService: Garantindo campos de perfil... ---")
+        logger.debug("Garantindo campos de perfil...")
         self._profile_repo.ensure_fields(PROFILE_ESSENTIAL_FIELDS)
 
         # Salva tudo no final

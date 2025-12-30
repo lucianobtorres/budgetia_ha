@@ -5,6 +5,9 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import config
+from core.logger import get_logger
+
+logger = get_logger("UserBehavior")
 
 class UserBehaviorService:
     """
@@ -34,7 +37,7 @@ class UserBehaviorService:
             with open(self.behavior_file, "r", encoding="utf-8") as f:
                 return json.load(f)
         except (json.JSONDecodeError, OSError):
-            print(f"AVISO: behavior.json corrompido para {self.username}. Reiniciando.")
+            logger.warning(f"behavior.json corrompido para {self.username}. Reiniciando.")
             return {}
 
     def _save_data(self, data: Dict[str, Any]) -> None:
@@ -42,7 +45,7 @@ class UserBehaviorService:
             with open(self.behavior_file, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=4, ensure_ascii=False)
         except OSError as e:
-            print(f"ERRO ao salvar behavior.json: {e}")
+            logger.error(f"ERRO ao salvar behavior.json: {e}")
 
     # --- Telemetria de Ações ---
 
@@ -121,7 +124,7 @@ class UserBehaviorService:
         consecutive_ignores = feedback.get("consecutive_ignores", 0)
         
         if consecutive_ignores >= threshold:
-            print(f"SMART RULE: Silenciando '{rule_name}' (Ignorada {consecutive_ignores}x seguidas).")
+            logger.info(f"SMART RULE: Silenciando '{rule_name}' (Ignorada {consecutive_ignores}x seguidas).")
             return True
             
         return False

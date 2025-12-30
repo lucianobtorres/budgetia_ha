@@ -9,6 +9,10 @@ from config import ColunasDividas, NomesAbas
 from core.base_tool import BaseTool
 from finance.schemas import AnalisarDividaInput
 
+from core.logger import get_logger
+
+logger = get_logger("Tool_AnlzDebt")
+
 
 class AnalisarDividaTool(BaseTool):  # type: ignore[misc]
     name: str = "analisar_divida"
@@ -25,8 +29,8 @@ class AnalisarDividaTool(BaseTool):  # type: ignore[misc]
     # --- FIM DA MUDANÇA ---
 
     def run(self, nome_divida: str) -> str:
-        print(
-            f"LOG: Ferramenta '{self.name}' chamada para analisar dívida: {nome_divida}."
+        logger.info(
+            f"Ferramenta '{self.name}' chamada para analisar dívida: {nome_divida}."
         )
 
         # --- DIP: Chama a função injetada ---

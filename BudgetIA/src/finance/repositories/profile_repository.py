@@ -9,6 +9,9 @@ from config import (
 )
 
 from .data_context import FinancialDataContext
+from core.logger import get_logger
+
+logger = get_logger("ProfileRepo")
 
 
 class ProfileRepository:
@@ -40,7 +43,7 @@ class ProfileRepository:
 
         if ColunasPerfil.CAMPO not in df_perfil.columns:
             df_perfil = pd.DataFrame(columns=config.LAYOUT_PLANILHA[self._aba_nome])
-            print(f"AVISO (Repo): Aba '{self._aba_nome}' recriada em memória.")
+            logger.warning(f"Aba '{self._aba_nome}' recriada em memória.")
 
         campo_limpo = str(campo).strip().lower()
         idx_existente = df_perfil[
@@ -68,7 +71,7 @@ class ProfileRepository:
 
         self._context.update_dataframe(self._aba_nome, df_perfil)
         self._context.save()  # Perfil é crítico, salva imediatamente
-        print(f"LOG (Repo): {mensagem}")
+        logger.info(mensagem)
         return mensagem
 
     def get_profile_as_text(self) -> str:
@@ -108,7 +111,7 @@ class ProfileRepository:
             return contexto_str.strip()
 
         except Exception as e:
-            print(f"ERRO (Repo) ao ler perfil como texto: {e}")
+            logger.error(f"Erro ao ler perfil como texto: {e}")
             return "Não foi possível carregar o perfil do usuário."
 
     def ensure_fields(self, fields: list[str]) -> bool:
@@ -150,8 +153,8 @@ class ProfileRepository:
 
             self._context.update_dataframe(self._aba_nome, df_perfil)
             self._context.save()
-            print(
-                f"LOG (Repo): Campos de perfil adicionados: {[d['Campo'] for d in dados_para_adicionar]}"
+            logger.info(
+                f"Campos de perfil adicionados: {[d['Campo'] for d in dados_para_adicionar]}"
             )
             return True
 

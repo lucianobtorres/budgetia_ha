@@ -3,7 +3,10 @@ from langchain_openai import ChatOpenAI
 from pydantic.types import SecretStr
 
 import config
+from core.logger import get_logger
 from .base_provider import LLMProvider
+
+logger = get_logger("OpenAIProvider")
 
 
 class OpenAIProvider(LLMProvider):
@@ -23,7 +26,7 @@ class OpenAIProvider(LLMProvider):
         model = model_name if model_name else self.default_model
         temp = temperature if temperature is not None else self.default_temperature
 
-        print(f"LOG: Instanciando OpenAI LLM: Modelo='{model}', Temp={temp}")
+        logger.info(f"Instanciando OpenAI LLM: Modelo='{model}', Temp={temp}")
 
         return ChatOpenAI(
             model=model, temperature=temp, api_key=SecretStr(self.api_key)

@@ -4,7 +4,10 @@ from typing import Any
 import pandas as pd
 
 import config
+from core.logger import get_logger
 from application.notifications.models.notification_message import NotificationPriority
+
+logger = get_logger("SubscriptionAuditor")
 from application.notifications.models.rule_result import RuleResult
 from application.notifications.rules.base_rule import IFinancialRule
 
@@ -37,7 +40,7 @@ class SubscriptionAuditorRule(IFinancialRule): # type: ignore[misc]
         user_profile: dict[str, Any],
     ) -> RuleResult:
         
-        print(f"LOG (SubscriptionAuditor): Auditando assinaturas nos últimos {self.days_lookback} dias...")
+        logger.debug(f"Auditando assinaturas nos últimos {self.days_lookback} dias...")
 
         if transactions_df.empty:
             return RuleResult(triggered=False)

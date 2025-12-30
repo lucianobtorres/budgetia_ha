@@ -5,6 +5,9 @@ import pandas as pd
 from config import LAYOUT_PLANILHA, ColunasInsights, NomesAbas
 
 from .data_context import FinancialDataContext
+from core.logger import get_logger
+
+logger = get_logger("InsightRepo")
 
 
 class InsightRepository:
@@ -58,4 +61,4 @@ class InsightRepository:
 
         df_atualizado = pd.concat([df_insight, novo_insight], ignore_index=True)
         self._context.update_dataframe(self._aba_nome, df_atualizado)
-        print(f"LOG (Repo): Insight de IA '{titulo_insight}' adicionado.")
+        logger.info(f"Insight de IA '{titulo_insight}' adicionado.")

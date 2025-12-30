@@ -51,6 +51,7 @@ export function LoginForm({ onLogin }: LoginFormProps) {
                         type="text"
                         required
                         icon={User}
+                        variant="glass"
                         placeholder="Usuário"
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
@@ -64,6 +65,7 @@ export function LoginForm({ onLogin }: LoginFormProps) {
                         type="password"
                         required
                         icon={Lock}
+                        variant="glass"
                         placeholder="Senha"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}

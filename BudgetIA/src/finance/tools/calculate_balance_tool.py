@@ -6,6 +6,10 @@ from pydantic import BaseModel
 from core.base_tool import BaseTool
 from finance.schemas import CalcularSaldoTotalInput
 
+from core.logger import get_logger
+
+logger = get_logger("Tool_CalcBalance")
+
 
 class CalcularSaldoTotalTool(BaseTool):  # type: ignore[misc]
     name: str = "calcular_saldo_total"
@@ -25,7 +29,7 @@ class CalcularSaldoTotalTool(BaseTool):  # type: ignore[misc]
         """
         Calcula o saldo chamando a função injetada e formata a saída.
         """
-        print(f"LOG: Ferramenta '{self.name}' foi chamada.")
+        logger.info(f"Ferramenta '{self.name}' foi chamada.")
         try:
             # --- DIP: Chama a função injetada ---
             resumo = self.get_summary()

@@ -12,6 +12,9 @@ from googleapiclient.http import (
 )
 
 import config
+from core.logger import get_logger
+
+logger = get_logger("GDriveHandler")
 from finance.storage.base_storage_handler import BaseStorageHandler
 from finance.strategies.base_strategy import BaseMappingStrategy
 
@@ -31,12 +34,12 @@ class GoogleDriveFileHandler(BaseStorageHandler): # type: ignore[misc]
     """
 
     def __init__(self, file_url: str):
-        print(f"--- DEBUG (GDriveHandler): __init__ chamado para: '{file_url}' ---")
+        logger.debug(f"__init__ chamado para: '{file_url}'")
         self.file_url = file_url
         self.file_id = self._extract_file_id(file_url)
         if not self.file_id:
             msg = f"URL do Google Drive inválida. Não foi possível extrair o File ID: {file_url}"
-            print(msg)
+            logger.error(msg)
             raise ValueError(msg)
 
         try:
@@ -51,23 +54,23 @@ class GoogleDriveFileHandler(BaseStorageHandler): # type: ignore[misc]
             # Verifica se o arquivo existe (apenas para definir self._is_new_file)
             self.drive_service.files().get(fileId=self.file_id, fields="id").execute()
             self._is_new_file = False
-            print(
-                f"--- DEBUG (GDriveHandler): Serviço do Drive v3 construído. File ID: {self.file_id} ---"
+            logger.debug(
+                f"Serviço do Drive v3 construído. File ID: {self.file_id}"
             )
 
         except HttpError as e:
             if e.resp.status == 404:
-                print(
-                    f"ERRO (GDriveHandler): Arquivo NÃO encontrado no Drive: {self.file_id}"
+                logger.error(
+                    f"Arquivo NÃO encontrado no Drive: {self.file_id}"
                 )
                 raise ValueError(
                     f"Arquivo não encontrado ou sem permissão no Google Drive: {self.file_id}"
                 )
             else:
-                print(f"ERRO (GDriveHandler): Erro Http: {e}")
+                logger.error(f"Erro Http: {e}")
                 raise
         except Exception as e:
-            print(f"ERRO (GDriveHandler): Falha ao construir serviço do Drive: {e}")
+            logger.error(f"Falha ao construir serviço do Drive: {e}")
             raise
 
     def _extract_file_id(self, url: str) -> str | None:
@@ -106,7 +109,7 @@ class GoogleDriveFileHandler(BaseStorageHandler): # type: ignore[misc]
         Baixa o arquivo .xlsx do Google Drive em memória, carrega todas
         as abas, e aplica a Estratégia de Mapeamento.
         """
-        print(f"--- [LOG GDriveHandler] Baixando arquivo: {self.file_id} ---")
+        logger.debug(f"Baixando arquivo: {self.file_id}")
         dataframes: dict[str, pd.DataFrame] = {}
 
         try:
@@ -119,10 +122,10 @@ class GoogleDriveFileHandler(BaseStorageHandler): # type: ignore[misc]
             done = False
             while not done:
                 status, done = downloader.next_chunk()
-                print(f"Download: {int(status.progress() * 100)}%.")
+                logger.debug(f"Download: {int(status.progress() * 100)}%.")
 
-            print(
-                "--- [LOG GDriveHandler] Download concluído. Lendo Excel em memória... ---"
+            logger.debug(
+                "Download concluído. Lendo Excel em memória..."
             )
             file_buffer.seek(0)
 
@@ -144,8 +147,8 @@ class GoogleDriveFileHandler(BaseStorageHandler): # type: ignore[misc]
                 if nome_aba_para_ler in raw_sheets_data:
                     df_bruto = raw_sheets_data[nome_aba_para_ler]
                 else:
-                    print(
-                        f"AVISO: Aba '{nome_aba_para_ler}' (padrão: '{sheet_name_padrao}') não encontrada no Excel."
+                    logger.warning(
+                        f"Aba '{nome_aba_para_ler}' (padrão: '{sheet_name_padrao}') não encontrada no Excel."
                     )
                     df_bruto = pd.DataFrame()
                     self._is_new_file = True  # Marca que abas estão faltando
@@ -162,7 +165,7 @@ class GoogleDriveFileHandler(BaseStorageHandler): # type: ignore[misc]
             return dataframes, self._is_new_file
 
         except Exception as e:
-            print(
+            logger.critical(
                 f"ERRO CRÍTICO ao ler o arquivo do GDrive: {e}. Retornando estrutura vazia."
             )
             # Fallback: cria estrutura vazia em memória
@@ -180,8 +183,8 @@ class GoogleDriveFileHandler(BaseStorageHandler): # type: ignore[misc]
         """
         Salva os DataFrames de volta no arquivo .xlsx no Google Drive.
         """
-        print(
-            f"--- [LOG GDriveHandler] Preparando para salvar (upload) arquivo: {self.file_id} ---"
+        logger.debug(
+            f"Preparando para salvar (upload) arquivo: {self.file_id}"
         )
 
         try:
@@ -231,12 +234,12 @@ class GoogleDriveFileHandler(BaseStorageHandler): # type: ignore[misc]
                 .execute()
             )
 
-            print(
-                f"--- [LOG GDriveHandler] Arquivo '{updated_file.get('name')}' atualizado no Drive! ---"
+            logger.info(
+                f"Arquivo '{updated_file.get('name')}' atualizado no Drive!"
             )
 
         except Exception as e:
-            print(f"Erro ao salvar (upload) o arquivo para o Google Drive: {e}")
+            logger.error(f"Erro ao salvar (upload) o arquivo para o Google Drive: {e}")
             raise
 
     def ping(self) -> tuple[bool, str]:
@@ -273,5 +276,5 @@ class GoogleDriveFileHandler(BaseStorageHandler): # type: ignore[misc]
             # Retorna a string ISO 8601 (ex: "2025-11-17T18:00:00.000Z")
             return file_metadata.get("modifiedTime") # type: ignore[no-any-return]
         except Exception as e:
-            print(f"AVISO: Não foi possível obter modifiedTime do GDrive: {e}")
+            logger.warning(f"Não foi possível obter modifiedTime do GDrive: {e}")
             return None

@@ -2,6 +2,9 @@
 import os
 import streamlit as st
 from typing import Any
+from core.logger import get_logger
+
+logger = get_logger("StreamlitApp")
 
 # --- Environment Setup ---
 os.environ["TRANSFORMERS_NO_ADVISORY_WARNINGS"] = "true"
@@ -36,9 +39,9 @@ try:
         # decode_responses=False pois o cache usa pickle
         redis_client = redis.from_url(real_url, decode_responses=False)
         set_llm_cache(RedisCache(redis_client))
-        print("LOG: LangChain Redis Cache (Global) ENABLED. 🚀")
+        logger.info("LangChain Redis Cache (Global) ENABLED. 🚀")
 except Exception as e:
-    print(f"AVISO: Falha ao ativar Cache de LLM: {e}")
+    logger.warning(f"Falha ao ativar Cache de LLM: {e}")
 
 # --- Functions ---
 

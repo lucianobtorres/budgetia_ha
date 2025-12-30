@@ -5,6 +5,9 @@ from dotenv import load_dotenv
 
 # Importa a interface e as implementações concretas
 from .llm_providers.base_provider import LLMProvider
+from core.logger import get_logger
+
+logger = get_logger("LLMOrchestrator")
 
 load_dotenv()
 
@@ -53,8 +56,8 @@ class LLMOrchestrator:
         for provider in providers_to_try:
             try:
                 if not provider.api_key:
-                    print(
-                        f"AVISO: Pulando provedor '{provider.name}' pois a API Key não foi encontrada."
+                    logger.warning(
+                        f"Pulando provedor '{provider.name}' pois a API Key não foi encontrada."
                     )
                     continue
 
@@ -69,12 +72,12 @@ class LLMOrchestrator:
                 else:
                     self._active_model_name = provider.default_model
 
-                print(
-                    f"LOG: LLM ativo: Provedor='{self._active_provider_name}', Modelo='{self._active_model_name}'."
+                logger.info(
+                    f"LLM ativo: Provedor='{self._active_provider_name}', Modelo='{self._active_model_name}'."
                 )
                 return llm
             except Exception as e:
-                print(f"ERRO: Falha ao carregar LLM do provedor '{provider.name}': {e}")
+                logger.error(f"Falha ao carregar LLM do provedor '{provider.name}': {e}")
 
         raise RuntimeError("Nenhum provedor de LLM pôde ser carregado.")
 

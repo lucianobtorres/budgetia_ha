@@ -7,6 +7,9 @@ from tabulate import tabulate
 
 from config import ColunasTransacoes, NomesAbas
 from core.base_tool import BaseTool
+from core.logger import get_logger
+
+logger = get_logger("Tool_ViewLastTrans")
 
 
 class VisualizarUltimasTransacoesInput(BaseModel):
@@ -33,6 +36,7 @@ class VisualizarUltimasTransacoesTool(BaseTool):  # type: ignore[misc]
     # --- FIM DA MUDANÇA ---
 
     def run(self, n: int = 5, tipo: str | None = None) -> str:
+        logger.info(f"Ferramenta '{self.name}' chamada com n={n}, tipo={tipo}")
         try:
             # --- DIP: Chama a função injetada ---
             df = self.visualizar_dados(NomesAbas.TRANSACOES).copy()

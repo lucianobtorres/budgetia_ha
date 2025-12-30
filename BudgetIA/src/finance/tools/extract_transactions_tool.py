@@ -4,6 +4,10 @@ from pydantic import BaseModel
 from core.base_tool import BaseTool
 from finance.schemas import ExtrairTransacoesDoTextoInput
 
+from core.logger import get_logger
+
+logger = get_logger("Tool_ExtractTrans")
+
 
 class ExtrairTransacoesDoTextoTool(BaseTool):  # type: ignore[misc]
     name: str = "extrair_transacoes_do_texto"
@@ -21,7 +25,7 @@ class ExtrairTransacoesDoTextoTool(BaseTool):  # type: ignore[misc]
     # --- FIM DA MUDANÇA ---
 
     def run(self, texto_usuario: str) -> str:
-        print(f"LOG: Ferramenta '{self.name}' chamada com texto: '{texto_usuario}'")
+        logger.info(f"Ferramenta '{self.name}' chamada com texto: '{texto_usuario}'")
         # Esta ferramenta é um "placeholder" para o LLM.
         # Ela apenas confirma que o LLM deve focar neste texto.
         # A lógica de extração real é feita pelo LLM em seguida.

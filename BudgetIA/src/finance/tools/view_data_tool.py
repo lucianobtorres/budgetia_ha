@@ -9,6 +9,10 @@ import config
 from core.base_tool import BaseTool
 from finance.schemas import VisualizarDadosPlanilhaInput
 
+from core.logger import get_logger
+
+logger = get_logger("Tool_ViewData")
+
 
 class VisualizarDadosPlanilhaTool(BaseTool):  # type: ignore[misc]
     name: str = "visualizar_dados_planilha"
@@ -28,7 +32,7 @@ class VisualizarDadosPlanilhaTool(BaseTool):  # type: ignore[misc]
         if aba_nome is None:
             aba_nome = config.NomesAbas.TRANSACOES
 
-        print(f"LOG: Ferramenta '{self.name}' foi chamada para a aba '{aba_nome}'.")
+        logger.info(f"Ferramenta '{self.name}' foi chamada para a aba '{aba_nome}'.")
 
         try:
             # --- DIP: Chama a função injetada ---

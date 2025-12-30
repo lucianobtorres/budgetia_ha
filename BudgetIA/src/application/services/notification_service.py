@@ -8,6 +8,9 @@ from core.user_config_service import UserConfigService
 
 
 from application.services.push_notification_service import PushNotificationService
+from core.logger import get_logger
+
+logger = get_logger("NotificationService")
 
 class NotificationService:
     """
@@ -35,7 +38,7 @@ class NotificationService:
             with open(self.file_path, "w", encoding="utf-8") as f:
                 json.dump(notifications, f, ensure_ascii=False, indent=2)
         except OSError as e:
-            print(f"ERRO: Falha ao salvar notificações: {e}")
+            logger.error(f"Falha ao salvar notificações: {e}")
 
     def add_notification(self, message: str, category: str, priority: str) -> dict[str, Any]:
         """Cria e salva uma nova notificação."""

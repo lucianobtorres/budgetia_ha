@@ -3,6 +3,9 @@ from typing import Any
 from application.notifications.channels.base_channel import INotificationChannel
 from application.notifications.models.notification_message import NotificationMessage
 from application.services.presence_service import PresenceService
+from core.logger import get_logger
+
+logger = get_logger("InAppChannel")
 
 
 class InAppChannel(INotificationChannel): # type: ignore[misc]
@@ -50,12 +53,12 @@ class InAppChannel(INotificationChannel): # type: ignore[misc]
         """
         if not recipient_id or recipient_id == "user_ref":
             # Fallback se a lógica acima falhar
-            print("ERRO (InAppChannel): Username não fornecido corretamente.")
+            logger.error("Username não fornecido corretamente.")
             return False
             
         try:
             self.presence_service.push_toast(user_id=recipient_id, message=message.text)
             return True
         except Exception as e:
-            print(f"ERRO (InAppChannel): Falha ao enviar toast: {e}")
+            logger.error(f"Falha ao enviar toast: {e}")
             return False

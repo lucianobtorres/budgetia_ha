@@ -25,18 +25,9 @@ class OnboardingAgent:
     def _load_prompt(self) -> str:
         """Carrega o prompt do arquivo."""
         try:
-            current_file = Path(__file__)
-            # src/initialization/onboarding/agent.py -> src/prompts/onboarding_prompt.txt
-            # parent = onboarding
-            # parent.parent = initialization
-            # parent.parent.parent = src
-            project_src = current_file.parent.parent.parent
-            prompt_path = project_src / "prompts" / "onboarding_prompt.txt"
-
-            if not prompt_path.exists():
-                # Fallback relativo
-                prompt_path = Path("src/prompts/onboarding_prompt.txt")
-
+            import config # Ensure availability
+            prompt_path = Path(config.PROMPTS_DIR) / "onboarding_prompt.txt"
+            
             if prompt_path.exists():
                 return prompt_path.read_text(encoding="utf-8")
 

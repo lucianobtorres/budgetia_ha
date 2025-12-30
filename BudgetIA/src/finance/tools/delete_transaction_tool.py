@@ -2,6 +2,9 @@ from typing import Type, Callable, Any
 from pydantic import BaseModel, Field
 from core.base_tool import BaseTool
 from finance.repositories.transaction_repository import TransactionRepository
+from core.logger import get_logger
+
+logger = get_logger("Tool_DelTrans")
 
 class DeleteTransactionSchema(BaseModel):
     transaction_id: int = Field(..., description="ID numérico da transação a ser excluída.")
@@ -23,6 +26,7 @@ class DeleteTransactionTool(BaseTool):
         self.recalculate_budgets = recalculate_budgets_func
 
     def run(self, transaction_id: int) -> str:
+        logger.info(f"Ferramenta '{self.name}' chamada para ID={transaction_id}")
         try:
             success = self.transaction_repo.delete_transaction(transaction_id)
             if success:

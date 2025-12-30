@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import { Button } from "./Button";
 import { cn } from "../../utils/cn";
+import { Typography } from "./Typography";
 
 interface EmptyStateProps {
     title: string;
@@ -22,14 +23,14 @@ export function EmptyState({
     return (
         <div className={cn("flex flex-col items-center justify-center p-8 text-center h-full min-h-[300px]", className)}>
             {Icon && (
-                <div className="p-4 bg-gray-800/50 rounded-full mb-4">
-                    <Icon className="w-8 h-8 text-gray-400" />
+                <div className="p-4 bg-surface-hover rounded-full mb-4">
+                    <Icon className="w-8 h-8 text-text-muted" />
                 </div>
             )}
-            <h3 className="text-lg font-medium text-white mb-2">{title}</h3>
-            <p className="text-gray-400 max-w-sm mb-6 text-sm leading-relaxed">
+            <Typography variant="large" className="text-text-primary mb-2">{title}</Typography>
+            <Typography variant="muted" className="max-w-sm mb-6 leading-relaxed">
                 {description}
-            </p>
+            </Typography>
             {actionLabel && onAction && (
                 <Button 
                     onClick={onAction}

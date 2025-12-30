@@ -12,6 +12,10 @@ from config import (
     ColunasTransacoes,
 )
 
+from core.logger import get_logger
+
+logger = get_logger("ExcelStorage")
+
 # --- 1. IMPORTAR A INTERFACE CORRIGIDA ---
 from finance.storage.base_storage_handler import BaseStorageHandler
 from finance.strategies.base_strategy import BaseMappingStrategy
@@ -23,8 +27,8 @@ class ExcelStorageHandler(BaseStorageHandler): # type: ignore[misc]
 
     def __init__(self, file_path: str) -> None:
         # --- LOG ADICIONADO ---
-        print(
-            f"--- DEBUG (ExcelHandler): __init__ chamado com file_path: '{file_path}' ---"
+        logger.debug(
+            f"__init__ chamado com file_path: '{file_path}'"
         )
         # --- FIM DO LOG ---
 
@@ -32,8 +36,8 @@ class ExcelStorageHandler(BaseStorageHandler): # type: ignore[misc]
 
         # --- LOG ADICIONADO ---
         file_exists = os.path.exists(self.file_path)
-        print(
-            f"--- DEBUG (ExcelHandler): 'os.path.exists' para '{self.file_path}' retornou: {file_exists} ---"
+        logger.debug(
+            f"'os.path.exists' para '{self.file_path}' retornou: {file_exists}"
         )
         # --- FIM DO LOG ---
 
@@ -57,27 +61,26 @@ class ExcelStorageHandler(BaseStorageHandler): # type: ignore[misc]
         """
 
         # --- LOG INICIAL ---
-        print("\n--- [LOG ExcelHandler] Iniciando load_sheets ---")
-        print(f"--- [LOG ExcelHandler] Verificando arquivo: {self.file_path} ---")
+        logger.debug(f"Verificando arquivo: {self.file_path}")
 
         dataframes: dict[str, pd.DataFrame] = {}
         is_new_file = self.is_new_file  # Pega o estado inicial
 
         # --- LOG ADICIONADO ---
-        print(
-            f"--- DEBUG (ExcelHandler): 'load_sheets' iniciando. 'is_new_file' (do self) é: {is_new_file} ---"
+        logger.debug(
+            f"'load_sheets' iniciando. 'is_new_file' (do self) é: {is_new_file}"
         )
         # --- FIM DO LOG ---
 
         if is_new_file:
-            print(
-                f"AVISO: Arquivo '{self.file_path}' não encontrado. Estrutura criada em memória."
+            logger.warning(
+                f"Arquivo '{self.file_path}' não encontrado. Estrutura criada em memória."
             )
             # Cria DataFrames vazios para todas as abas do layout
             for sheet_name, columns in layout_config.items():
                 dataframes[sheet_name] = pd.DataFrame(columns=columns)
         else:
-            print(f"LOG: Carregando planilha existente de '{self.file_path}'.")
+            logger.info(f"Carregando planilha existente de '{self.file_path}'.")
             try:
                 xls = pd.ExcelFile(self.file_path)
                 abas_existentes = xls.sheet_names
@@ -95,8 +98,8 @@ class ExcelStorageHandler(BaseStorageHandler): # type: ignore[misc]
                     )
                 else:
                     # Se a aba principal falta, trata como arquivo incompleto
-                    print(
-                        f"AVISO: Aba de transações '{nome_aba_transacoes}' não encontrada."
+                    logger.warning(
+                        f"Aba de transações '{nome_aba_transacoes}' não encontrada."
                     )
                     df_bruto_transacoes = pd.DataFrame(
                         columns=strategy.colunas_transacoes
@@ -124,8 +127,8 @@ class ExcelStorageHandler(BaseStorageHandler): # type: ignore[misc]
                             xls, sheet_name=nome_aba_para_ler
                         )
                     else:
-                        print(
-                            f"AVISO: Aba do sistema '{sheet_name_padrao}' não encontrada. Criando vazia."
+                        logger.warning(
+                            f"Aba do sistema '{sheet_name_padrao}' não encontrada. Criando vazia."
                         )
                         df_bruto_outra = pd.DataFrame(columns=columns)
                         is_new_file = True  # Marca para salvar
@@ -136,7 +139,7 @@ class ExcelStorageHandler(BaseStorageHandler): # type: ignore[misc]
                     )
 
             except Exception as e:
-                print(
+                logger.critical(
                     f"ERRO CRÍTICO ao ler o arquivo Excel: {e}. Criando estrutura do zero em memória."
                 )
                 is_new_file = True
@@ -196,10 +199,10 @@ class ExcelStorageHandler(BaseStorageHandler): # type: ignore[misc]
                             writer, sheet_name_to_save, df_para_salvar
                         )
 
-            print(f"Planilha salva com sucesso em {self.file_path}")
+            logger.info(f"Planilha salva com sucesso em {self.file_path}")
 
         except Exception as e:
-            print(f"ERRO CRÍTICO ao salvar a planilha: {e}")
+            logger.critical(f"ERRO CRÍTICO ao salvar a planilha: {e}")
 
     def _apply_formatting(
         self, writer: pd.ExcelWriter, sheet_name: str, df: pd.DataFrame

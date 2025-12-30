@@ -2,6 +2,9 @@ from typing import Type, Optional, Any
 from pydantic import BaseModel, Field
 from core.base_tool import BaseTool
 from finance.repositories.transaction_repository import TransactionRepository
+from core.logger import get_logger
+
+logger = get_logger("Tool_UpdTrans")
 from collections.abc import Callable
 
 class UpdateTransactionSchema(BaseModel):
@@ -30,6 +33,7 @@ class UpdateTransactionTool(BaseTool):
         self.recalculate_budgets = recalculate_budgets_func
 
     def run(self, transaction_id: int, **kwargs) -> str:
+        logger.info(f"Ferramenta '{self.name}' chamada para ID={transaction_id}")
         try:
             # Filtra argumentos nulos
             dados_atualizados = {k: v for k, v in kwargs.items() if v is not None}

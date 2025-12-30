@@ -3,6 +3,9 @@
 import pandas as pd
 
 from config import ColunasTransacoes, SummaryKeys, ValoresTipo
+from core.logger import get_logger
+
+logger = get_logger("TransactionService")
 
 
 class TransactionService:
@@ -36,7 +39,7 @@ class TransactionService:
         ).fillna(0)
 
         if ColunasTransacoes.TIPO not in df.columns:
-            print("AVISO (Trans. Service): DataFrame de transações sem coluna 'Tipo'.")
+            logger.warning("DataFrame de transações sem coluna 'Tipo'.")
             return {
                 SummaryKeys.RECEITAS: 0.0,
                 SummaryKeys.DESPESAS: 0.0,

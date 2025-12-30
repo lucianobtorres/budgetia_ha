@@ -10,6 +10,10 @@ from core.base_tool import BaseTool
 from finance.financial_rules import FinancialRules
 from finance.schemas import AnalisarAdesaoInput
 
+from core.logger import get_logger
+
+logger = get_logger("Tool_AnlzAdherence")
+
 
 class AnalisarAdesaoFinanceiraTool(BaseTool):  # type: ignore[misc]
     name: str = "analisar_adesao_financeira"
@@ -27,8 +31,8 @@ class AnalisarAdesaoFinanceiraTool(BaseTool):  # type: ignore[misc]
     # --- FIM DA MUDANÇA ---
 
     def run(self, rule_name: str) -> str:
-        print(
-            f"LOG: Ferramenta '{self.name}' chamada: Analisando a regra '{rule_name}'."
+        logger.info(
+            f"Ferramenta '{self.name}' chamada: Analisando a regra '{rule_name}'."
         )
 
         regras_alvo = FinancialRules.get_target_percentages(rule_name)

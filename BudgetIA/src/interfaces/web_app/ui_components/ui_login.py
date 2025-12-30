@@ -1,5 +1,7 @@
 
 import yaml
+import os
+import config # Importa as configurações do sistema
 import streamlit as st
 import streamlit_authenticator as stauth
 
@@ -94,7 +96,8 @@ class LoginUI:
         auth_config["credentials"]["usernames"][username] = new_user_data
 
         # Persiste no disco
-        with open("data/users.yaml", "w") as file:
+        users_path = os.path.join(config.DATA_DIR, "users.yaml")
+        with open(users_path, "w") as file:
             yaml.dump(auth_config, file, default_flow_style=False)
 
         # 3. Auto-Login

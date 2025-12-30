@@ -5,6 +5,9 @@ from typing import Any
 import pandas as pd
 
 import config
+from core.logger import get_logger
+
+logger = get_logger("DefaultStrategy")
 
 from .base_strategy import BaseMappingStrategy
 
@@ -19,7 +22,7 @@ class DefaultStrategy(BaseMappingStrategy):
         self, layout_config: dict[str, Any], mapeamento: dict[str, Any] | None = None
     ):
         super().__init__(layout_config, mapeamento)
-        print("LOG: Estratégia 'DefaultStrategy' selecionada.")
+        logger.info("Estratégia 'DefaultStrategy' selecionada.")
 
     def map_transactions(self, df_bruto: pd.DataFrame) -> pd.DataFrame:
         """
@@ -32,18 +35,18 @@ class DefaultStrategy(BaseMappingStrategy):
 
         if coluna_data_padrao in df_bruto.columns:
             try:
-                print(
-                    f"--- DEBUG (DefaultStrategy): Convertendo coluna '{coluna_data_padrao}' para datetime... ---"
+                logger.debug(
+                    f"Convertendo coluna '{coluna_data_padrao}' para datetime..."
                 )
                 df_bruto[coluna_data_padrao] = pd.to_datetime(
                     df_bruto[coluna_data_padrao], errors="coerce"
                 )
-                print(
-                    f"--- DEBUG (DefaultStrategy): Conversão concluída. Valores nulos após conversão: {df_bruto[coluna_data_padrao].isna().sum()} ---"
+                logger.debug(
+                    f"Conversão concluída. Valores nulos após conversão: {df_bruto[coluna_data_padrao].isna().sum()}"
                 )
             except Exception as e:
-                print(
-                    f"AVISO (DefaultStrategy): Falha ao converter coluna '{coluna_data_padrao}' para datetime: {e}"
+                logger.warning(
+                    f"Falha ao converter coluna '{coluna_data_padrao}' para datetime: {e}"
                 )
                 # Se falhar, continua, mas o data_editor pode quebrar
         # --- FIM DA CORREÇÃO ---

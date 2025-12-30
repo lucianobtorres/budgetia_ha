@@ -8,7 +8,7 @@ import pytest
 from openpyxl import load_workbook
 
 # Importa as classes que vamos testar
-from BudgetIA.src import config
+import config
 from finance.storage.excel_storage_handler import ExcelStorageHandler
 from finance.strategies.custom_json_strategy import CustomJsonStrategy
 

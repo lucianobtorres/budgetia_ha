@@ -3,13 +3,16 @@
 import streamlit as st
 import config
 from core.exceptions import BudgetException, APIConnectionError
+from core.logger import get_logger
+
+logger = get_logger("UI_HomeHub")
 
 # --- NOVOS IMPORTS ---
 from interfaces.web_app.api_client import BudgetAPIClient
 from application.chat_history_manager import StreamlitHistoryManager
 # --- FIM NOVOS IMPORTS ---
 
-print("--- RELOADED UI_HOME_HUB (V2) ---")
+logger.info("RELOADED UI_HOME_HUB (V2)")
 
 def _render_dashboard_metrics(api_client: BudgetAPIClient) -> None:
     """Renderiza os KPIs e gráficos do dashboard buscando da API."""

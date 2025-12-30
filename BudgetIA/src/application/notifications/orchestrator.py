@@ -14,6 +14,9 @@ from finance.planilha_manager import PlanilhaManager
 
 from core.behavior.user_behavior_service import UserBehaviorService
 from application.services.push_notification_service import PushNotificationService
+from core.logger import get_logger
+
+logger = get_logger("NotificationOrchestrator")
 
 class ProactiveNotificationOrchestrator:
     """
@@ -66,7 +69,7 @@ class ProactiveNotificationOrchestrator:
                 recipient = channel.get_recipient_id(user_config)
                 if recipient:
                     targets.append((channel, recipient))
-                    print(f"LOG (Orchestrator): Canal '{ch_name}' selecionado para '{recipient}'.")
+                    logger.debug(f"Canal '{ch_name}' selecionado para '{recipient}'.")
 
         return targets
 
@@ -86,7 +89,7 @@ class ProactiveNotificationOrchestrator:
             user_profile: dict[str, Any] = {} # Todo: carregar profile
 
         except Exception as e:
-            print(f"ERRO (Orchestrator): Falha ao carregar dados: {e}")
+            logger.error(f"Falha ao carregar dados: {e}")
             stats["failures"].append(f"data_load_error: {e}")
             return stats
 
@@ -95,7 +98,7 @@ class ProactiveNotificationOrchestrator:
         targets = self._select_channels(user_config)
         
         if not targets:
-            print("AVISO (Orchestrator): Nenhum canal (nem In-App?) disponível.")
+            logger.warning("Nenhum canal (nem In-App?) disponível.")
         
         # 3. Executar Regras
         for rule in self.rules:
@@ -103,11 +106,11 @@ class ProactiveNotificationOrchestrator:
 
             # --- JARVIS CHECK: A regra deve ser silenciada? ---
             if self.behavior_service.should_silence_rule(rule.rule_name, threshold=3):
-                print(f"LOG (Orchestrator): Regra '{rule.rule_name}' SILENCIADA pelo Jarvis (ignorada frequentemente).")
+                logger.info(f"Regra '{rule.rule_name}' SILENCIADA pelo Jarvis (ignorada frequentemente).")
                 stats["rules_silenced"] += 1
                 continue # Pula esta regra
 
-            print(f"\nLOG (Orchestrator): Executando regra '{rule.rule_name}'...")
+            logger.info(f"Executando regra '{rule.rule_name}'...")
 
             try:
                 result = rule.should_notify(transactions_df, budgets_df, user_profile)
@@ -132,18 +135,18 @@ class ProactiveNotificationOrchestrator:
                             success = await channel.send(recipient, message)
                             if success:
                                 stats["notifications_sent"] += 1
-                                print(f"LOG (Orchestrator): Enviado para {recipient} via {channel.channel_name}.")
+                                logger.info(f"Enviado para {recipient} via {channel.channel_name}.")
                             else:
                                 stats["failures"].append(f"{rule.rule_name}:{channel.channel_name}:failed")
                         except Exception as ex:
                             stats["failures"].append(f"{rule.rule_name}:{channel.channel_name}:error")
-                            print(f"ERRO Envio {channel.channel_name}: {ex}")
+                            logger.error(f"Erro Envio {channel.channel_name}: {ex}")
 
                 else:
-                    print(f"LOG (Orchestrator): Regra '{rule.rule_name}' ok (não acionada).")
+                    logger.debug(f"Regra '{rule.rule_name}' ok (não acionada).")
 
             except Exception as e:
-                print(f"ERRO (Orchestrator): Falha na regra '{rule.rule_name}': {e}")
+                logger.error(f"Falha na regra '{rule.rule_name}': {e}")
                 stats["failures"].append(f"{rule.rule_name}: {e}")
 
         return stats

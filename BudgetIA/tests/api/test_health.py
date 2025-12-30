@@ -3,24 +3,36 @@ from interfaces.api.main import app
 
 client = TestClient(app)
 
+from unittest.mock import MagicMock
+from interfaces.api.dependencies import get_planilha_manager
+from finance.planilha_manager import PlanilhaManager
+
 def test_health_check_returns_200():
     """Testa se o endpoint /health retorna status 200 e json correto."""
-    response = client.get("/health")
+    response = client.get("/api/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok", "app": "BudgetIA API"}
 
 def test_readiness_check_structure():
-    """Testa se o endpoint /readiness retorna a estrutura esperada (mesmo que haja erro de conexão)."""
-    response = client.get("/readiness")
-    # O status code pode ser 200 (OK) ou 503 (Service Unavailable - se não configurado)
-    assert response.status_code in [200, 503]
-    data = response.json()
+    """Testa se o endpoint /readiness retorna a estrutura esperada."""
     
-    if response.status_code == 503:
-        # Se for erro de serviço indisponível (HTTPException), o FastAPI retorna 'detail'
-        assert "detail" in data
-    else:
-        # Se for sucesso (ou erro tratado dentro da função), retorna o nosso schema
-        assert "status" in data
+    # Mock do PlanilhaManager
+    mock_manager = MagicMock(spec=PlanilhaManager)
+    mock_manager.check_connection.return_value = (True, "Conectado")
+    
+    # Override da dependência
+    app.dependency_overrides[get_planilha_manager] = lambda: mock_manager
+    
+    try:
+        response = client.get("/api/readiness")
+        
+        # O status code esperado é 200 (OK)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "ready"
         assert "details" in data
-        assert data["status"] in ["ready", "error"]
+        
+    finally:
+        # Limpa o override
+        app.dependency_overrides = {}
+

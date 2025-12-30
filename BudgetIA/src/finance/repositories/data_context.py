@@ -7,6 +7,9 @@ from infrastructure.caching.redis_cache_service import RedisCacheService
 
 from ..storage.base_storage_handler import BaseStorageHandler
 from ..strategies.base_strategy import BaseMappingStrategy
+from core.logger import get_logger
+
+logger = get_logger("DataContext")
 
 
 class FinancialDataContext:
@@ -38,8 +41,8 @@ class FinancialDataContext:
         self.strategy = strategy
         self.cache = cache_service
         self.cache_key = cache_key
-        print(
-            f"--- [LOG DataContext] Usando estratégia injetada: '{type(self.strategy).__name__}'."
+        logger.debug(
+            f"Usando estratégia injetada: '{type(self.strategy).__name__}'."
         )
 
         self.is_cache_hit = False
@@ -60,26 +63,26 @@ class FinancialDataContext:
             if config.NomesAbas.TRANSACOES in cached_data:
                 is_valid_cache = True
             else:
-                print(
-                    f"--- [LOG DataContext] Cache INVALIDADO (Dados corrompidos/incompletos no Redis). ---"
+                logger.warning(
+                    "Cache INVALIDADO (Dados corrompidos/incompletos no Redis)."
                 )
 
         if is_valid_cache and cached_timestamp == source_timestamp:
-            print(
-                "--- [LOG DataContext] Cache HIT (Timestamps correspondem). Carregando dados do Redis. ---"
+            logger.info(
+                "Cache HIT (Timestamps correspondem). Carregando dados do Redis."
             )
             self.data = cached_data
             self.is_cache_hit = True
             return False
 
         if cached_data is not None:
-            print(
-                f"--- [LOG DataContext] Cache STALE (Timestamps diferem: {cached_timestamp} != {source_timestamp}). ---"
+            logger.info(
+                f"Cache STALE (Timestamps diferem: {cached_timestamp} != {source_timestamp})."
             )
         else:
-            print("--- [LOG DataContext] Cache MISS (Vazio). ---")
+            logger.info("Cache MISS (Vazio).")
 
-        print("Lendo do armazenamento (GSheets/Excel)...")
+        logger.info("Lendo do armazenamento (GSheets/Excel)...")
         dataframes, is_new_file = self.storage.load_sheets(
             self.layout_config, self.strategy
         )
@@ -115,7 +118,7 @@ class FinancialDataContext:
         arquivo de origem (Excel), usando o handler.
         """
         # 1. Salva no GDrive/Excel (lento)
-        print("LOG: Salvando no armazenamento persistente (StorageHandler)...")
+        logger.info("Salvando no armazenamento persistente (StorageHandler)...")
         self.storage.save_sheets(self.data, self.strategy, add_intelligence)
 
         try:
@@ -129,7 +132,7 @@ class FinancialDataContext:
         final_source_timestamp = self.storage.get_source_modified_time()
 
         # 3. Atualiza o cache (rápido)
-        print("LOG: Atualizando o cache (CacheService)...")
+        logger.info("Atualizando o cache (CacheService)...")
         self.cache.set_entry(self.cache_key, self.data, final_source_timestamp)
 
-        print("LOG: Salvamento e atualização de cache concluídos.")
+        logger.info("Salvamento e atualização de cache concluídos.")

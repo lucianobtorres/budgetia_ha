@@ -66,20 +66,20 @@ export default function BudgetModal({ isOpen, onClose, onSave, initialData, isLo
         >
             <form id="budget-form" onSubmit={handleSubmit} className="space-y-5 pb-safe pt-2 relative">
                 {isLoading && (
-                    <div className="absolute inset-0 z-50 bg-gray-950/60 backdrop-blur-[2px] flex items-center justify-center rounded-xl transition-all duration-300">
+                    <div className="absolute inset-0 z-50 bg-surface-card/60 backdrop-blur-[2px] flex items-center justify-center rounded-xl transition-all duration-300">
                         <div className="flex flex-col items-center gap-3">
-                             <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-                             <span className="text-xs font-medium text-emerald-400 animate-pulse">Salvando...</span>
+                             <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                             <span className="text-xs font-medium text-primary-light animate-pulse">Salvando...</span>
                         </div>
                     </div>
                 )}
                 
                 <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1.5">Categoria</label>
+                    <label className="block text-sm font-medium text-text-secondary mb-1.5">Categoria</label>
                     <select 
                         value={formData.categoria}
                         onChange={(e) => setFormData({...formData, categoria: e.target.value})}
-                        className="w-full bg-gray-950 border border-gray-700 text-white rounded-xl px-4 py-3 focus:outline-none focus:border-emerald-500 transition-colors appearance-none"
+                        className="w-full bg-surface-input border border-border text-text-primary rounded-xl px-4 py-3 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors appearance-none"
                     >
                         <option value="" disabled>Selecione</option>
                         {TRANSACTION_CATEGORIES.map(cat => (
@@ -90,7 +90,7 @@ export default function BudgetModal({ isOpen, onClose, onSave, initialData, isLo
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1.5">Limite (R$)</label>
+                        <label className="block text-sm font-medium text-text-secondary mb-1.5">Limite (R$)</label>
                         <Input 
                             type="number" 
                             step="0.01"
@@ -101,11 +101,11 @@ export default function BudgetModal({ isOpen, onClose, onSave, initialData, isLo
                         />
                     </div>
                     <div>
-                            <label className="block text-sm font-medium text-gray-400 mb-1.5">Período</label>
+                            <label className="block text-sm font-medium text-text-secondary mb-1.5">Período</label>
                         <select 
                             value={formData.periodo}
                             onChange={(e) => setFormData({...formData, periodo: e.target.value})}
-                            className="w-full bg-gray-950 border border-gray-700 text-white rounded-xl px-4 py-3 focus:outline-none focus:border-emerald-500 transition-colors appearance-none"
+                            className="w-full bg-surface-input border border-border text-text-primary rounded-xl px-4 py-3 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors appearance-none"
                         >
                             <option value="Mensal">Mensal</option>
                             <option value="Anual">Anual</option>
@@ -115,13 +115,13 @@ export default function BudgetModal({ isOpen, onClose, onSave, initialData, isLo
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1.5">Observações (Opcional)</label>
+                    <label className="block text-sm font-medium text-text-secondary mb-1.5">Observações (Opcional)</label>
                     <textarea 
                         value={formData.observacoes}
                         onChange={(e) => setFormData({...formData, observacoes: e.target.value})}
                         rows={3}
                         placeholder="Ex: Meta para economizar..."
-                        className="w-full bg-gray-950 border border-gray-700 text-white rounded-xl px-4 py-3 focus:outline-none focus:border-emerald-500 transition-colors"
+                        className="w-full bg-surface-input border border-border text-text-primary rounded-xl px-4 py-3 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
                     />
                 </div>
             </form>

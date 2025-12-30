@@ -4,8 +4,8 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
-from BudgetIA.src import config
-from BudgetIA.src.core.user_config_service import UserConfigService
+import config
+from core.user_config_service import UserConfigService
 from finance.factory import FinancialSystemFactory
 from finance.planilha_manager import PlanilhaManager
 from finance.storage.excel_storage_handler import ExcelStorageHandler
@@ -18,6 +18,7 @@ def mock_excel_handler() -> MagicMock:
     """Cria um mock completo do ExcelHandler para um ARQUIVO EXISTENTE."""
     handler = MagicMock(spec=ExcelStorageHandler)
     handler.file_path = "dummy_test.xlsx"
+    handler.resource_id = "dummy_resource_id"
 
     mock_dfs = {
         aba: pd.DataFrame(columns=colunas)
@@ -45,7 +46,15 @@ def plan_manager(mock_excel_handler: MagicMock) -> PlanilhaManager:
     mock_config_service.get_mapeamento.return_value = None
 
     # Pula o 'recalculate_budgets' que é chamado no 'else' do __init__
-    with patch.object(PlanilhaManager, "recalculate_budgets", return_value=None):
+    # Pula o 'recalculate_budgets' que é chamado no 'else' do __init__
+    with patch.object(PlanilhaManager, "recalculate_budgets", return_value=None), \
+         patch("finance.factory.RedisCacheService") as mock_redis_service:
+        
+        # Configura o mock do Redis para evitar erros
+        mock_instance = mock_redis_service.return_value
+        mock_instance.get_entry.return_value = (None, None)
+        mock_instance.set_entry.return_value = True
+
         pm = FinancialSystemFactory.create_manager(
             storage_handler=mock_excel_handler,
             config_service=mock_config_service,

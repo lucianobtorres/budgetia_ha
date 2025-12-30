@@ -1,11 +1,25 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import { themeColors } from './theme.js'
+
+// Custom plugin to inject theme variables into HTML
+const htmlThemeTransform = () => {
+  return {
+    name: 'html-theme-transform',
+    transformIndexHtml(html: string) {
+      // Replace placeholders with actual values from theme.js
+      return html.replace(/%BACKGROUND_COLOR%/g, themeColors.background)
+                 .replace(/%THEME_COLOR_HEX%/g, themeColors.backgroundSafeHex)
+    }
+  }
+}
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     react(),
+    htmlThemeTransform(),
     VitePWA({
       registerType: 'autoUpdate',
       strategies: 'injectManifest',
@@ -16,8 +30,8 @@ export default defineConfig({
         name: 'BudgetIA Personal Finance',
         short_name: 'BudgetIA',
         description: 'AI-assisted Personal Finance Manager',
-        theme_color: '#111827',
-        background_color: '#111827',
+        theme_color: themeColors.backgroundSafeHex,
+        background_color: themeColors.backgroundSafeHex,
         display: 'standalone',
         orientation: 'portrait',
         icons: [
@@ -55,8 +69,7 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: 'http://127.0.0.1:8000',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, '')
+        changeOrigin: true
       }
     }
   }

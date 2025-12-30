@@ -1,5 +1,8 @@
 
 from .base_provider import NotificationProvider
+from core.logger import get_logger
+
+logger = get_logger("SMSProvider")
 
 class SMSProvider(NotificationProvider):
     @property
@@ -8,5 +11,5 @@ class SMSProvider(NotificationProvider):
 
     def send(self, recipient: str, message: str) -> bool:
         # Aqui entraria Twilio SMS
-        print(f"--- [SMS MOCK] To: {recipient} | Msg: {message} ---")
+        logger.info(f"[MOCK] To: {recipient} | Msg: {message}")
         return True

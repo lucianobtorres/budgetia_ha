@@ -132,7 +132,7 @@ export function TourOverlay({
                 {targetRect && (
                     <motion.div
                         layoutId="tour-highlight"
-                        className="absolute border-2 border-emerald-500 rounded-lg shadow-[0_0_20px_rgba(16,185,129,0.5)] pointer-events-none"
+                        className="absolute border-2 border-primary rounded-lg shadow-[0_0_20px_rgba(5,150,105,0.5)] pointer-events-none"
                         style={{
                             left: targetRect.left - 5,
                             top: targetRect.top - 5,
@@ -224,27 +224,27 @@ function Card({ step, current, total, onNext, onPrev, onClose }: any) {
         <motion.div 
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl p-5 text-white flex flex-col gap-3 relative z-50"
+            className="bg-surface-card border border-border rounded-xl shadow-2xl p-5 text-text-primary flex flex-col gap-3 relative z-50"
         >
             <div className="flex justify-between items-start">
-                <h3 className="font-bold text-lg text-emerald-400">{step.title}</h3>
-                <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
+                <h3 className="font-bold text-lg text-primary-light">{step.title}</h3>
+                <button onClick={onClose} className="text-text-muted hover:text-text-primary transition-colors">
                     <X size={18} />
                 </button>
             </div>
-            <p className="text-gray-300 text-sm leading-relaxed">
+            <p className="text-text-secondary text-sm leading-relaxed">
                 {step.content}
             </p>
             
-            <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-800">
-                <span className="text-xs text-gray-500">
+            <div className="flex items-center justify-between mt-2 pt-2 border-t border-border">
+                <span className="text-xs text-text-muted">
                     Passo {current + 1} de {total}
                 </span>
                 <div className="flex gap-2">
                     {current > 0 && (
                         <button 
                             onClick={onPrev}
-                            className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                            className="p-1.5 text-text-secondary hover:text-text-primary hover:bg-surface-hover rounded-lg transition-colors"
                         >
                             <ChevronLeft size={20} />
                         </button>
@@ -254,8 +254,8 @@ function Card({ step, current, total, onNext, onPrev, onClose }: any) {
                         className={cn(
                             "px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-1",
                             current === total - 1 
-                                ? "bg-emerald-500 hover:bg-emerald-600 text-white" 
-                                : "bg-white/10 hover:bg-white/20 text-white"
+                                ? "bg-primary hover:bg-primary-hover text-white" 
+                                : "bg-surface-hover hover:bg-white/20 text-white"
                         )}
                     >
                         {current === total - 1 ? "Concluir" : "Próximo"}

@@ -11,10 +11,12 @@ from gspread_dataframe import get_as_dataframe
 import config
 from finance.storage.google_drive_handler import GoogleDriveFileHandler
 from finance.storage.google_sheets_storage_handler import GoogleSheetsStorageHandler
+from core.logger import get_logger
 
 # O arquivo temporário que o StrategyGenerator usará
 TEMP_ANALYSIS_FILE = Path(config.DATA_DIR) / "temp_analysis_file.xlsx"
 
+logger = get_logger("FilePreparer")
 
 class FileAnalysisPreparer:
     """
@@ -30,7 +32,7 @@ class FileAnalysisPreparer:
 
     def _download_gdrive_excel(self) -> str:
         """Baixa um .xlsx do GDrive para o arquivo temporário."""
-        print("--- DEBUG Preparer: Baixando GDrive Excel para análise... ---")
+        logger.debug("--- Baixando GDrive Excel para análise... ---")
         handler = GoogleDriveFileHandler(file_url=self.path_str)
         request = handler.drive_service.files().get_media(fileId=handler.file_id)
 
@@ -41,14 +43,14 @@ class FileAnalysisPreparer:
             while not done:
                 _, done = downloader.next_chunk()
 
-        print(
-            f"--- DEBUG Preparer: Download de GDrive Excel concluído para '{TEMP_ANALYSIS_FILE}'. ---"
+        logger.debug(
+            f"--- Download de GDrive Excel concluído para '{TEMP_ANALYSIS_FILE}'. ---"
         )
         return str(TEMP_ANALYSIS_FILE)
 
     def _convert_gsheet_to_excel(self) -> str:
         """Converte uma GSheet nativa para um arquivo .xlsx temporário."""
-        print("--- DEBUG Preparer: Lendo GSheet Nativo para análise... ---")
+        logger.debug("--- Lendo GSheet Nativo para análise... ---")
         handler = GoogleSheetsStorageHandler(spreadsheet_url_or_key=self.path_str)
 
         TEMP_ANALYSIS_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -56,17 +58,17 @@ class FileAnalysisPreparer:
             spreadsheet = handler.spreadsheet
             for aba in spreadsheet.worksheets():
                 try:
-                    print(f"--- DEBUG Preparer: Lendo aba GSheet '{aba.title}'... ---")
+                    logger.debug(f"--- Lendo aba GSheet '{aba.title}'... ---")
                     df_aba = get_as_dataframe(aba, evaluate_formulas=True)
                     df_aba.to_excel(writer, sheet_name=aba.title, index=False)
                 except Exception as e:
-                    print(
-                        f"--- DEBUG Preparer: Falha ao ler aba '{aba.title}': {e}. Pulando... ---"
+                    logger.warning(
+                        f"--- Falha ao ler aba '{aba.title}': {e}. Pulando... ---"
                     )
                     continue
 
-        print(
-            f"--- DEBUG Preparer: GSheet Nativo salvo em Excel temporário '{TEMP_ANALYSIS_FILE}'. ---"
+        logger.debug(
+            f"--- GSheet Nativo salvo em Excel temporário '{TEMP_ANALYSIS_FILE}'. ---"
         )
         return str(TEMP_ANALYSIS_FILE)
 
@@ -119,8 +121,8 @@ class FileAnalysisPreparer:
                     f"Tipo de arquivo inseguro ou inválido detectado: {mime_type}"
                 )
 
-            print(
-                f"--- DEBUG Preparer: Verificação de arquivo OK. MIME: {mime_type} ---"
+            logger.debug(
+                f"--- Verificação de arquivo OK. MIME: {mime_type} ---"
             )
 
         except Exception as e:
@@ -130,17 +132,16 @@ class FileAnalysisPreparer:
         # --- FIM DA CAMADA DE SEGURANÇA ---
 
         return self._local_path_to_analyze
-        return self._local_path_to_analyze
 
     def cleanup(self) -> None:
         """Remove o arquivo temporário, se um foi criado."""
         if self._is_temp_file and TEMP_ANALYSIS_FILE.exists():
             try:
                 os.remove(TEMP_ANALYSIS_FILE)
-                print(
-                    f"--- DEBUG Preparer: Arquivo temporário '{TEMP_ANALYSIS_FILE}' removido. ---"
+                logger.debug(
+                    f"--- Arquivo temporário '{TEMP_ANALYSIS_FILE}' removido. ---"
                 )
             except OSError as e:
-                print(
-                    f"--- DEBUG Preparer: Não foi possível remover o arquivo temporário: {e} ---"
+                logger.warning(
+                    f"--- Não foi possível remover o arquivo temporário: {e} ---"
                 )

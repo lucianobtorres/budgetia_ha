@@ -6,6 +6,10 @@ from pydantic import BaseModel
 from core.base_tool import BaseTool
 from finance.schemas import DefinirOrcamentoInput
 
+from core.logger import get_logger
+
+logger = get_logger("Tool_DefineBudget")
+
 
 class DefineBudgetTool(BaseTool):  # type: ignore[misc]
     name: str = "definir_orcamento"
@@ -33,8 +37,8 @@ class DefineBudgetTool(BaseTool):  # type: ignore[misc]
         periodo: str = "Mensal",
         observacoes: str = "",
     ) -> str:
-        print(
-            f"LOG: Ferramenta '{self.name}' chamada para Categoria={categoria}, Limite={valor_limite}, Período={periodo}."
+        logger.info(
+            f"Ferramenta '{self.name}' chamada para Categoria={categoria}, Limite={valor_limite}, Período={periodo}."
         )
 
         try:

@@ -10,6 +10,9 @@ class MockAgentRunner(AgentRunner):
     
     def interagir(self, user_input: str) -> str:
         return "Resposta Mock"
+
+    def interact_with_details(self, user_input: str) -> dict:
+        return {"output": "Resposta Mock", "intermediate_steps": []}
     
     @property
     def active_llm_info(self) -> str:

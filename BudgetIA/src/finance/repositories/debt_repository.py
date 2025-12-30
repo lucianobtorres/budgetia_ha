@@ -9,6 +9,9 @@ from config import (
 
 from ..services.debt_service import DebtService
 from .data_context import FinancialDataContext
+from core.logger import get_logger
+
+logger = get_logger("DebtRepo")
 
 
 class DebtRepository:
@@ -117,5 +120,5 @@ class DebtRepository:
             mensagem = f"Nova dívida '{nome_divida}' registrada com saldo inicial de R$ {saldo_devedor_atual:,.2f}."
 
         self._context.update_dataframe(self._aba_nome, dividas_df)
-        print(f"LOG (Repo): {mensagem}")
+        logger.info(mensagem)
         return str(mensagem)

@@ -5,6 +5,9 @@ from typing import Any
 from pathlib import Path
 
 from core.google_auth_service import GoogleAuthService
+from core.logger import get_logger
+
+logger = get_logger("FileHandlers")
 
 
 # Interface para retorno padronizado
@@ -66,9 +69,8 @@ class DefaultSpreadsheetHandler(IFileHandler):
             "nova planilha",
         ]
         result = any(k in clean_input for k in keywords)
-        print(
-            f"[DEBUG DefaultHandler] Input: '{user_input}' | Clean: '{clean_input}' | Match: {result}"
-        )
+        result = any(k in clean_input for k in keywords)
+        
         return result
 
     def acquire(self, context: dict) -> AcquisitionResult:
@@ -96,8 +98,8 @@ class DefaultSpreadsheetHandler(IFileHandler):
 
             file_path = user_dir / "MinhasFinancas.xlsx"
 
-            print(
-                f"[DEBUG DefaultHandler] Criando planilha com estrutura em: {file_path}"
+            logger.info(
+                f"Criando planilha com estrutura em: {file_path}"
             )
 
             # Cria workbook com todas as abas e estrutura
@@ -176,8 +178,8 @@ class DefaultSpreadsheetHandler(IFileHandler):
 
             # Salva arquivo
             wb.save(str(file_path))
-            print(
-                f"[DEBUG DefaultHandler] Successfully created structured Excel: {file_path}"
+            logger.info(
+                f"Successfully created structured Excel: {file_path}"
             )
 
             return AcquisitionResult(
@@ -187,7 +189,7 @@ class DefaultSpreadsheetHandler(IFileHandler):
             )
 
         except Exception as e:
-            print(f"[DEBUG DefaultHandler] Error creating file: {e}")
+            logger.error(f"Error creating file: {e}")
             import traceback
 
             traceback.print_exc()
@@ -222,9 +224,8 @@ class UploadHandler(IFileHandler):
             "arquivo excel",
         ]
         result = any(k in clean_input for k in keywords)
-        print(
-            f"[DEBUG UploadHandler] Input: '{user_input}' | Clean: '{clean_input}' | Match: {result}"
-        )
+        result = any(k in clean_input for k in keywords)
+        
         return result
 
     def acquire(self, context: dict) -> AcquisitionResult:
@@ -247,14 +248,17 @@ class UploadHandler(IFileHandler):
             with open(save_path, "wb") as f:
                 f.write(uploaded_file.getbuffer())
 
-            print(f"[DEBUG UploadHandler] File saved: {save_path}")
+            with open(save_path, "wb") as f:
+                f.write(uploaded_file.getbuffer())
+
+            logger.info(f"File saved: {save_path}")
             return AcquisitionResult(
                 success=True,
                 file_path=str(save_path),
                 handler_type="upload",
             )
         except Exception as e:
-            print(f"[DEBUG UploadHandler] Error: {e}")
+            logger.error(f"Error: {e}")
             return AcquisitionResult(
                 success=False,
                 file_path=None,
@@ -275,7 +279,7 @@ class GoogleSheetsHandler(IFileHandler):
     def can_handle(self, user_input: str) -> bool:
         # Check for direct URL
         if "docs.google.com/spreadsheets" in user_input:
-            print(f"[DEBUG GoogleHandler] Input is Google Sheets URL: {user_input}")
+            logger.debug(f"Input is Google Sheets URL: {user_input}")
             return True
 
         clean_input = (
@@ -297,9 +301,19 @@ class GoogleSheetsHandler(IFileHandler):
             "mudar conta"
         ]
         result = any(k in clean_input for k in keywords)
-        print(
-            f"[DEBUG GoogleHandler] Input: '{user_input}' | Clean: '{clean_input}' | Match: {result}"
-        )
+        keywords = [
+            "google",
+            "drive",
+            "sheets",
+            "nuvem",
+            "online",
+            "seleção de planilha",
+            "reconectar",
+            "trocar conta",
+            "mudar conta"
+        ]
+        result = any(k in clean_input for k in keywords)
+        
         return result
 
     def acquire(self, context: dict) -> AcquisitionResult:
@@ -310,7 +324,7 @@ class GoogleSheetsHandler(IFileHandler):
         
         # Se o usuário pediu para reconectar, forçamos o logout
         if any(k in clean_input for k in ["reconectar", "trocar conta", "mudar conta"]):
-            print("[DEBUG GoogleHandler] Usuário solicitou reconexão. Revogando tokens locais.")
+            logger.info("Usuário solicitou reconexão. Revogando tokens locais.")
             self.auth_service.revoke_google_oauth_token()
 
         # Se o input do usuário parece uma URL de planilha, usamos ele.
@@ -332,7 +346,7 @@ class GoogleSheetsHandler(IFileHandler):
         # Isso evita loops de login desnecessários.
         existing_creds = self.auth_service.get_user_credentials()
         if existing_creds:
-            print("[DEBUG GoogleHandler] Usuário já possui credenciais válidas. Pulando fluxo de OAuth.")
+            logger.info("Usuário já possui credenciais válidas. Pulando fluxo de OAuth.")
             return AcquisitionResult(
                 success=False,
                 handler_type="google",

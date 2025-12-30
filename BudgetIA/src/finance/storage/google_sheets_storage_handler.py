@@ -7,7 +7,11 @@ from typing import Any
 from gspread_dataframe import get_as_dataframe, set_with_dataframe
 
 import config
+from config import GSPREAD_CREDENTIALS_PATH, NomesAbas
+from core.logger import get_logger
 from finance.storage.base_storage_handler import BaseStorageHandler
+
+logger = get_logger("GSheetsHandler")
 from finance.strategies.base_strategy import BaseMappingStrategy
 
 # Define o caminho para a chave de serviço
@@ -25,22 +29,22 @@ class GoogleSheetsStorageHandler(BaseStorageHandler): # type: ignore[misc]
     """
 
     def __init__(self, spreadsheet_url_or_key: str, credentials: Any | None = None):
-        print(
-            f"--- DEBUG (GSheetsHandler): __init__ chamado para: '{spreadsheet_url_or_key}' ---"
+        logger.debug(
+            f"__init__ chamado para: '{spreadsheet_url_or_key}'"
         )
         try:
             gc = None
             # 1. Tenta usar credenciais de usuário explicitamente fornecidas (OAuth)
             if credentials:
-                print("--- DEBUG (GSheetsHandler): Usando CREDENCIAIS DE USUÁRIO fornecidas. ---")
+                logger.debug("Usando CREDENCIAIS DE USUÁRIO fornecidas.")
                 try:
                     gc = gspread.authorize(credentials)
                 except Exception as e:
-                    print(f"--- AVISO (GSheetsHandler): Falha ao autorizar com credenciais de usuário: {e}. Tentando Service Account... ---")
+                    logger.warning(f"Falha ao autorizar com credenciais de usuário: {e}. Tentando Service Account...")
 
             # 2. Fallback: Autentica usando a Conta de Serviço (se não tiver user creds ou falhar)
             if not gc:
-                print("--- DEBUG (GSheetsHandler): Usando SERVICE ACCOUNT (Fallback/Default). ---")
+                logger.debug("Usando SERVICE ACCOUNT (Fallback/Default).")
                 if Path(CREDENTIALS_PATH).exists():
                      gc = gspread.service_account(filename=CREDENTIALS_PATH, scopes=SCOPES)
                 else:
@@ -49,13 +53,13 @@ class GoogleSheetsStorageHandler(BaseStorageHandler): # type: ignore[misc]
             # Abre a planilha (seja por URL ou pela Chave/ID)
             self.spreadsheet = gc.open_by_url(spreadsheet_url_or_key)
             self._is_new_file = False  # Assumimos que não é nova se conseguiu abrir
-            print(
-                f"--- DEBUG (GSheetsHandler): Planilha '{self.spreadsheet.title}' aberta com sucesso. ---"
+            logger.debug(
+                f"Planilha '{self.spreadsheet.title}' aberta com sucesso."
             )
 
         except gspread.exceptions.SpreadsheetNotFound:
-            print(
-                "--- DEBUG (GSheetsHandler): Planilha NÃO encontrada. Assumindo nova. ---"
+            logger.debug(
+                "Planilha NÃO encontrada. Assumindo nova."
             )
             # Se não encontrou, criamos uma nova (ou tratamos o erro)
             # Por enquanto, vamos parar se não for encontrada
@@ -70,13 +74,13 @@ class GoogleSheetsStorageHandler(BaseStorageHandler): # type: ignore[misc]
                     "SOLUÇÃO: Abra seu arquivo no Google Drive, vá em 'Arquivo' -> 'Salvar como Planilha Google' "
                     "e use o novo link gerado."
                 )
-                print(f"AVISO CRÍTICO: {error_msg}")
+                logger.critical(f"{error_msg}")
                 raise ValueError(error_msg)
             else:
-                print(f"ERRO (GSheetsHandler): Falha de API ao abrir planilha: {e}")
+                logger.error(f"Falha de API ao abrir planilha: {e}")
                 raise
         except Exception as e:
-            print(f"ERRO (GSheetsHandler): Falha ao autenticar ou abrir planilha: {e}")
+            logger.error(f"Falha ao autenticar ou abrir planilha: {e}")
             raise
 
     @property
@@ -109,13 +113,13 @@ class GoogleSheetsStorageHandler(BaseStorageHandler): # type: ignore[misc]
         """
         Carrega as abas da Planilha Google usando a Estratégia de Mapeamento.
         """
-        print("\n--- [LOG GSheetsHandler] Iniciando load_sheets ---")
+        logger.debug("Iniciando load_sheets")
         dataframes: dict[str, pd.DataFrame] = {}
         is_new_file = False  # Flag para saber se *abas* estão faltando
 
         try:
             abas_existentes = [ws.title for ws in self.spreadsheet.worksheets()]
-            print(f"--- [DEBUG GSheetsHandler] Abas encontradas na planilha: {abas_existentes} ---")
+            logger.debug(f"Abas encontradas na planilha: {abas_existentes}")
 
             # Itera sobre o layout padrão do sistema (Transacoes, Orcamentos...)
             for sheet_name_padrao, columns_padrao in layout_config.items():
@@ -125,15 +129,15 @@ class GoogleSheetsStorageHandler(BaseStorageHandler): # type: ignore[misc]
                 df_bruto: pd.DataFrame
 
                 if nome_aba_para_ler in abas_existentes:
-                    print(
-                        f"--- [LOG GSheetsHandler] Lendo aba: '{nome_aba_para_ler}' ---"
+                    logger.debug(
+                        f"Lendo aba: '{nome_aba_para_ler}'"
                     )
                     worksheet = self.spreadsheet.worksheet(nome_aba_para_ler)
                     # Usa gspread-dataframe para ler
                     df_bruto = get_as_dataframe(worksheet, evaluate_formulas=True)
                 else:
-                    print(
-                        f"AVISO: Aba '{nome_aba_para_ler}' (padrão: '{sheet_name_padrao}') não encontrada."
+                    logger.warning(
+                        f"Aba '{nome_aba_para_ler}' (padrão: '{sheet_name_padrao}') não encontrada."
                     )
                     df_bruto = pd.DataFrame()  # Cria vazio
                     is_new_file = True  # Marca que uma aba do sistema faltou
@@ -149,7 +153,7 @@ class GoogleSheetsStorageHandler(BaseStorageHandler): # type: ignore[misc]
             return dataframes, is_new_file
 
         except Exception as e:
-            print(f"ERRO CRÍTICO ao carregar abas do Google Sheets: {e}")
+            logger.critical(f"ERRO CRÍTICO ao carregar abas do Google Sheets: {e}")
             return {}, False
 
     def get_source_modified_time(self) -> str | None:
@@ -177,8 +181,8 @@ class GoogleSheetsStorageHandler(BaseStorageHandler): # type: ignore[misc]
             
             return None
         except Exception as e:
-            print(
-                f"AVISO: Não foi possível obter modifiedTime (updated) do GSheet: {e}"
+            logger.warning(
+                f"Não foi possível obter modifiedTime (updated) do GSheet: {e}"
             )
             return None
 
@@ -197,7 +201,7 @@ class GoogleSheetsStorageHandler(BaseStorageHandler): # type: ignore[misc]
                 # Verifica se é erro de cota (429) ou 'Quota exceeded'
                 if e.response.status_code == 429 or "Quota exceeded" in str(e):
                     wait_time = base_wait * (2 ** attempt)  # Backoff exponencial: 2, 4, 8...
-                    print(f"--- [AVISO GSheetsHandler] Cota excedida (429). Tentativa {attempt+1}/{max_retries}. Aguardando {wait_time}s... ---")
+                    logger.warning(f"Cota excedida (429). Tentativa {attempt+1}/{max_retries}. Aguardando {wait_time}s...")
                     time.sleep(wait_time)
                 else:
                     raise  # Se não for erro de cota, explode normal
@@ -217,7 +221,7 @@ class GoogleSheetsStorageHandler(BaseStorageHandler): # type: ignore[misc]
         """
         Salva os DataFrames de volta na Planilha Google.
         """
-        print("\n--- [LOG GSheetsHandler] Iniciando save_sheets ---")
+        logger.debug("Iniciando save_sheets")
         try:
             # Pega lista de abas (com retry também, pois é chamada de API)
             abas_existentes = self._retry_on_quota_error(lambda: [ws.title for ws in self.spreadsheet.worksheets()])
@@ -240,8 +244,8 @@ class GoogleSheetsStorageHandler(BaseStorageHandler): # type: ignore[misc]
                 # 3. Pega ou Cria a aba
                 worksheet: gspread.Worksheet
                 if sheet_name_to_save not in abas_existentes:
-                    print(
-                        f"--- [LOG GSheetsHandler] Criando aba: '{sheet_name_to_save}' ---"
+                    logger.info(
+                        f"Criando aba: '{sheet_name_to_save}'"
                     )
                     # Retry na criação
                     worksheet = self._retry_on_quota_error(
@@ -267,9 +271,9 @@ class GoogleSheetsStorageHandler(BaseStorageHandler): # type: ignore[misc]
                         has_data = False 
                     
                     if has_data:
-                        print(f"--- [PROTECTION] ABORTANDO SALVAMENTO na aba '{sheet_name_to_save}'. ---")
-                        print(f"--- [PROTECTION] MOTIVO: O DataFrame interno está VAZIO, mas a aba destino NÃO está. ---")
-                        print(f"--- [PROTECTION] Isso previne perda de dados acidental. Verifique se o carregamento falhou. ---")
+                        logger.warning(f"[PROTECTION] ABORTANDO SALVAMENTO na aba '{sheet_name_to_save}'.")
+                        logger.warning(f"[PROTECTION] MOTIVO: O DataFrame interno está VAZIO, mas a aba destino NÃO está.")
+                        logger.warning(f"[PROTECTION] Isso previne perda de dados acidental. Verifique se o carregamento falhou.")
                         continue # Pula para a próxima aba, NÃO limpa e não salva essa
 
                 # 5. Limpa e salva os dados usando gspread-dataframe (com retry)
@@ -281,12 +285,12 @@ class GoogleSheetsStorageHandler(BaseStorageHandler): # type: ignore[misc]
                 
                 self._retry_on_quota_error(save_operation)
                 
-                print(
-                    f"--- [LOG GSheetsHandler] Aba '{sheet_name_to_save}' salva com sucesso. ---"
+                logger.info(
+                    f"Aba '{sheet_name_to_save}' salva com sucesso."
                 )
 
         except Exception as e:
-            print(f"ERRO CRÍTICO ao salvar no Google Sheets: {e}")
+            logger.critical(f"ERRO CRÍTICO ao salvar no Google Sheets: {e}")
 
     def ping(self) -> tuple[bool, str]:
         """Verifica se a planilha GSheet está acessível e compartilhada."""

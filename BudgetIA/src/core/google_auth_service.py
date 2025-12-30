@@ -15,6 +15,9 @@ from googleapiclient.http import MediaIoBaseDownload
 import config
 
 from .user_config_service import UserConfigService
+from core.logger import get_logger
+
+logger = get_logger("GoogleAuthService")
 
 
 class GoogleAuthService:
@@ -119,29 +122,29 @@ class GoogleAuthService:
         try:
             user_creds = self.get_user_credentials()
             if user_creds:
-                print(f"--- DEBUG GoogleAuth: Tentando download com credenciais de USUÁRIO para {self.config_service.username}... ---")
+                logger.debug(f"Tentando download com credenciais de USUÁRIO para {self.config_service.username}...")
                 drive_service = build("drive", "v3", credentials=user_creds)
                 using_user_creds = True
             else:
-                print("--- DEBUG GoogleAuth: Nenhuma credencial de usuário encontrada. Tentando Service Account... ---")
+                logger.debug("Nenhuma credencial de usuário encontrada. Tentando Service Account...")
         except Exception as e:
-            print(f"--- AVISO GoogleAuth: Falha ao carregar credenciais de usuário: {e} ---")
+            logger.warning(f"Falha ao carregar credenciais de usuário: {e}")
 
         # --- 2. Fallback: Autenticar a Service Account (o robô) ---
         if not drive_service:
             try:
                 sa_path = Path(config.GSPREAD_CREDENTIALS_PATH)
                 if sa_path.exists():
-                    print("--- DEBUG GoogleAuth: Usando credenciais de SERVICE ACCOUNT (Fallback)... ---")
+                    logger.debug("Usando credenciais de SERVICE ACCOUNT (Fallback)...")
                     creds_sa = service_account.Credentials.from_service_account_file(  # type: ignore[no-untyped-call]
                         sa_path,
                         scopes=config.GOOGLE_OAUTH_SCOPES,
                     )
                     drive_service = build("drive", "v3", credentials=creds_sa)
                 else:
-                     print(f"--- AVISO GoogleAuth: Service Account não encontrada em {sa_path} ---")
+                     logger.warning(f"Service Account não encontrada em {sa_path}")
             except Exception as e:
-                 print(f"--- ERRO GoogleAuth: Falha ao carregar Service Account: {e} ---")
+                 logger.error(f"Falha ao carregar Service Account: {e}")
 
         if not drive_service:
             raise Exception("Não foi possível autenticar nem com Usuário nem com Service Account.")
@@ -164,8 +167,8 @@ class GoogleAuthService:
 
         # Se o arquivo for um Google Sheets nativo (requer export/conversão)
         if mime_type == "application/vnd.google-apps.spreadsheet":
-            print(
-                "--- DEBUG GoogleAuth: Arquivo é um Google Sheet nativo. Usando EXPORT. ---"
+            logger.debug(
+                "Arquivo é um Google Sheet nativo. Usando EXPORT."
             )
             request = drive_service.files().export(
                 fileId=file_id,
@@ -174,8 +177,8 @@ class GoogleAuthService:
 
         # Se o arquivo for um XLSX não-nativo (upload original do usuário)
         elif mime_type == xlsx_mime:
-            print(
-                "--- DEBUG GoogleAuth: Arquivo é um XLSX não-nativo. Usando GET media. ---"
+            logger.debug(
+                "Arquivo é um XLSX não-nativo. Usando GET media."
             )
             request = drive_service.files().get_media(fileId=file_id)
 
@@ -202,8 +205,8 @@ class GoogleAuthService:
             status, done = downloader.next_chunk()
 
         # Após o download, o arquivo .xlsx está pronto para o Pandas
-        print(
-            f"--- DEBUG GoogleAuth: Download temporário concluído em: {local_file_path} ---"
+        logger.debug(
+            f"Download temporário concluído em: {local_file_path}"
         )
         return str(local_file_path)
 
@@ -225,7 +228,7 @@ class GoogleAuthService:
                 # Salva o token atualizado
                 self.config_service.save_google_oauth_tokens(creds.to_json())
             except Exception as e:
-                print(f"AVISO: Falha ao atualizar token (pode estar revogado): {e}")
+                logger.warning(f"Falha ao atualizar token (pode estar revogado): {e}")
                 self.config_service.save_google_oauth_tokens(None)
                 return None
 
@@ -261,8 +264,8 @@ class GoogleAuthService:
             )
 
             files = results.get("files", [])
-            print(
-                f"--- DEBUG GoogleAuth: Encontrados {len(files)} arquivos no Drive do usuário. ---"
+            logger.debug(
+                f"Encontrados {len(files)} arquivos no Drive do usuário."
             )
             return files  # type: ignore[no-any-return]
 
@@ -291,8 +294,8 @@ class GoogleAuthService:
                 "emailAddress": config.SERVICE_ACCOUNT_EMAIL,
             }
 
-            print(
-                f"--- DEBUG GoogleAuth: Compartilhando arquivo {file_id} com {config.SERVICE_ACCOUNT_EMAIL}... ---"
+            logger.debug(
+                f"Compartilhando arquivo {file_id} com {config.SERVICE_ACCOUNT_EMAIL}..."
             )
 
             drive_service.permissions().create(
@@ -301,11 +304,11 @@ class GoogleAuthService:
                 fields="id",  # Só precisamos saber que funcionou
             ).execute()
 
-            print("--- DEBUG GoogleAuth: Compartilhamento bem-sucedido. ---")
+            logger.debug("Compartilhamento bem-sucedido.")
             return True, "Arquivo compartilhado com o back-end."
 
         except Exception as e:
-            print(f"ERRO GoogleAuth: Falha ao compartilhar arquivo: {e}")
+            logger.error(f"Falha ao compartilhar arquivo: {e}")
             return False, f"Falha ao compartilhar arquivo: {e}"
 
     # --- 2. ADICIONAR MÉTODO HELPER ---
@@ -319,8 +322,8 @@ class GoogleAuthService:
         if match:
             return match.group(1)
 
-        print(
-            f"--- DEBUG GoogleAuth: Não foi possível extrair File ID da URL: {url} ---"
+        logger.debug(
+            f"Não foi possível extrair File ID da URL: {url}"
         )
         return None
 
@@ -340,8 +343,8 @@ class GoogleAuthService:
             drive_service = build("drive", "v3", credentials=creds)
 
             # 1. Encontrar o ID da permissão do nosso "robô"
-            print(
-                f"--- DEBUG GoogleAuth: Procurando permissão para {config.SERVICE_ACCOUNT_EMAIL} no arquivo {file_id}... ---"
+            logger.debug(
+                f"Procurando permissão para {config.SERVICE_ACCOUNT_EMAIL} no arquivo {file_id}..."
             )
             permission_id_to_delete = None
             permissions = (
@@ -356,24 +359,24 @@ class GoogleAuthService:
                     break
 
             if not permission_id_to_delete:
-                print(
-                    "--- DEBUG GoogleAuth: Permissão não encontrada (já foi revogada). ---"
+                logger.debug(
+                    "Permissão não encontrada (já foi revogada)."
                 )
                 return True, "O acesso do back-end já estava revogado."
 
             # 2. Deletar a permissão
-            print(
-                f"--- DEBUG GoogleAuth: Revogando permissão ID: {permission_id_to_delete}... ---"
+            logger.debug(
+                f"Revogando permissão ID: {permission_id_to_delete}..."
             )
             drive_service.permissions().delete(
                 fileId=file_id, permissionId=permission_id_to_delete
             ).execute()
 
-            print("--- DEBUG GoogleAuth: Acesso revogado com sucesso. ---")
+            logger.debug("Acesso revogado com sucesso.")
             return True, "Acesso do back-end revogado com sucesso."
 
         except Exception as e:
-            print(f"ERRO GoogleAuth: Falha ao revogar acesso: {e}")
+            logger.error(f"Falha ao revogar acesso: {e}")
             return False, f"Falha ao revogar acesso: {e}"
 
     # --- 4. MÉTODO DE REVOGAÇÃO NÍVEL 2 (Frontend) ---
@@ -384,8 +387,8 @@ class GoogleAuthService:
         """
         creds = self.get_user_credentials()
         if not creds or not creds.refresh_token:
-            print(
-                "--- DEBUG GoogleAuth: Nenhum token para revogar. Limpando localmente. ---"
+            logger.debug(
+                "Nenhum token para revogar. Limpando localmente."
             )
             self.config_service.save_google_oauth_tokens(None)  # Limpa o token local
             return True
@@ -393,12 +396,12 @@ class GoogleAuthService:
         try:
             # Tenta revogar o token no servidor do Google
             creds.revoke(Request())  # type: ignore[no-untyped-call, attr-defined]
-            print(
-                f"--- DEBUG GoogleAuth: Token OAuth revogado com sucesso para {self.config_service.username}. ---"
+            logger.debug(
+                f"Token OAuth revogado com sucesso para {self.config_service.username}."
             )
         except Exception as e:
-            print(
-                f"AVISO GoogleAuth: Falha ao revogar token no Google (pode já estar expirado): {e}"
+            logger.warning(
+                f"Falha ao revogar token no Google (pode já estar expirado): {e}"
             )
             # Continua mesmo se a revogação falhar...
 

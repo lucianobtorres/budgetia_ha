@@ -16,7 +16,7 @@ interface SegmentedControlProps {
 
 export function SegmentedControl({ options, value, onChange, className }: SegmentedControlProps) {
     return (
-        <div className={cn("bg-gray-900/50 p-1 rounded-xl border border-gray-800 flex overflow-x-auto scrollbar-none", className)}>
+        <div className={cn("bg-surface-card/50 p-1 rounded-xl border border-border flex overflow-x-auto scrollbar-none", className)}>
             {options.map((option) => {
                 const isActive = value === option.id;
                 const Icon = option.icon;
@@ -28,8 +28,8 @@ export function SegmentedControl({ options, value, onChange, className }: Segmen
                         className={cn(
                             "flex-1 flex items-center justify-center p-3 rounded-lg text-sm font-medium transition-all md:min-w-[100px]",
                             isActive
-                                ? "bg-gray-800 text-white shadow-sm ring-1 ring-gray-700"
-                                : "text-gray-400 hover:text-white hover:bg-gray-800/50"
+                                ? "bg-surface-hover text-text-primary shadow-sm ring-1 ring-border-hover"
+                                : "text-text-secondary hover:text-text-primary hover:bg-surface-hover/50"
                         )}
                         title={option.label}
                     >

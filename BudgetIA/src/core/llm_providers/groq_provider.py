@@ -4,6 +4,9 @@ from langchain_groq import ChatGroq
 from pydantic.types import SecretStr
 
 from .base_provider import LLMProvider
+from core.logger import get_logger
+
+logger = get_logger("GroqProvider")
 
 
 class GroqProvider(LLMProvider):
@@ -21,6 +24,6 @@ class GroqProvider(LLMProvider):
         model = model_name if model_name else self.default_model
         temp = temperature if temperature is not None else self.default_temperature
 
-        print(f"LOG: Instanciando Groq LLM: Modelo='{model}', Temp={temp}")
+        logger.info(f"Instanciando Groq LLM: Modelo='{model}', Temp={temp}")
 
         return ChatGroq(model=model, temperature=temp, api_key=SecretStr(self.api_key))

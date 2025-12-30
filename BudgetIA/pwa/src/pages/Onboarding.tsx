@@ -55,46 +55,50 @@ export default function Onboarding() {
     };
 
     return (
-        <div className="flex flex-col h-[100dvh] bg-gray-950 text-white relative overflow-hidden">
+        <div className="flex flex-col h-[100dvh] bg-gradient-to-b from-gray-950 to-[#0A0A0C] text-white relative overflow-hidden">
             {/* Header */}
             <header className="bg-gray-900/50 backdrop-blur-md border-b border-gray-800 p-4 flex items-center justify-between shadow-sm z-10 shrink-0">
                 <div className="flex items-center gap-3">
-                    <div className="relative h-8 w-8 overflow-hidden rounded-lg shadow-sm ring-1 ring-white/10 shrink-0">
+                    <div className="relative h-10 w-10 overflow-hidden rounded-xl shadow-md ring-1 ring-white/20 shrink-0">
                         <img src="/pwa-512x512.png" alt="Logo" className="h-full w-full object-cover" />
                     </div>
                     <div>
-                        <h1 className="text-lg font-bold tracking-tight text-white leading-none">
-                            Budget<span className="text-emerald-500">IA</span>
+                        <h1 className="text-xl font-bold tracking-tight leading-none drop-shadow-sm">
+                            <span className="text-transparent bg-clip-text bg-gradient-to-br from-white to-gray-400">Budget</span>
+                            <span className="text-emerald-400 drop-shadow-glow">IA</span>
                         </h1>
                         <p className="text-[10px] text-gray-400 font-medium tracking-wide uppercase mt-0.5">
                             Configuração Inicial
                         </p>
                     </div>
                 </div>
+                {/* User requested to KEEP this badge */}
                 <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
                     <ShieldCheck className="w-3 h-3 text-emerald-500" />
                     <span className="text-[10px] font-medium text-emerald-400">Ambiente Seguro</span>
                 </div>
             </header>
 
-            {/* Chat Area */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-none">
-                {messages.map((msg, index) => (
-                     <MessageBubble 
-                        key={index} 
-                        message={{ role: msg.sender === 'agent' ? 'assistant' : 'user', content: msg.text }} 
-                    />
-                ))}
-                {loading && (
-                    <div className="flex justify-start">
-                         <div className="bg-gray-800/80 text-gray-100 rounded-2xl rounded-tl-sm p-4 flex items-center space-x-2 border border-gray-700/50">
-                             <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce" />
-                             <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce delay-75" />
-                             <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce delay-150" />
+            {/* Chat Area - Centered Constraint */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-6 [mask-image:linear-gradient(to_bottom,transparent,black_10%)] scrollbar-none">
+                <div className="max-w-4xl mx-auto space-y-6">
+                    {messages.map((msg, index) => (
+                         <MessageBubble 
+                            key={index} 
+                            message={{ role: msg.sender === 'agent' ? 'assistant' : 'user', content: msg.text }} 
+                        />
+                    ))}
+                    {loading && (
+                        <div className="flex justify-start">
+                             <div className="bg-gray-800/80 text-gray-100 rounded-2xl rounded-tl-sm p-4 flex items-center space-x-2 border border-gray-700/50">
+                                 <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce" />
+                                 <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce delay-75" />
+                                 <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce delay-150" />
+                            </div>
                         </div>
-                    </div>
-                )}
-                <div ref={messagesEndRef} />
+                    )}
+                    <div ref={messagesEndRef} />
+                </div>
             </div>
 
             {/* Hidden File Input */}
@@ -106,21 +110,21 @@ export default function Onboarding() {
                 onChange={handleFileChange}
             />
 
-            {/* Actions & Input */}
-            <div className="bg-gray-900 border-t border-gray-800 p-4">
-                {/* Contextual Buttons */}
-                {!googleFiles && (
-                    <OnboardingActions 
-                        options={uiOptions} 
-                        onSelect={sendMessage}
-                        onUploadClick={() => fileInputRef.current?.click()}
-                        onGoogleClick={startGoogleAuth}
-                        disabled={loading}
-                    />
-                )}
+            {/* Actions & Input - Centered Constraint */}
+            <div className="bg-gray-900/80 backend-blur-md border-t border-gray-800 p-4">
+                <div className="max-w-4xl mx-auto space-y-4">
+                    {/* Contextual Buttons */}
+                    {!googleFiles && (
+                        <OnboardingActions 
+                            options={uiOptions} 
+                            onSelect={sendMessage}
+                            onUploadClick={() => fileInputRef.current?.click()}
+                            onGoogleClick={startGoogleAuth}
+                            disabled={loading}
+                        />
+                    )}
 
-                {/* Chat Input */}
-                <div className="max-w-4xl mx-auto">
+                    {/* Chat Input */}
                      <ChatInput 
                         value={input}
                         onChange={setInput}

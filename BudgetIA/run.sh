@@ -32,10 +32,13 @@ if [ -f "$OPTIONS_PATH" ]; then
     fi
     
     # Derivar chave de criptografia Fernet (32 bytes base64) a partir da SECRET_KEY para persistência de dados do usuário
-    export USER_DATA_ENCRYPTION_KEY=$(python3 -c "import base64, hashlib, os; secret = os.environ.get('SECRET_KEY', 'default-fallback-secret'); print(base64.urlsafe_b64encode(hashlib.sha256(secret.encode()).digest()).decode())")
 else
     echo "⚠️  options.json não encontrado. Usando variáveis de ambiente."
 fi
+
+# Derivar chave de criptografia Fernet (32 bytes base64) a partir da SECRET_KEY para persistência de dados do usuário
+# Isso garante que a chave seja consistente entre reinicializações se a SECRET_KEY for mantida.
+export USER_DATA_ENCRYPTION_KEY=$(python3 -c "import base64, hashlib, os; secret = os.environ.get('SECRET_KEY', 'default-fallback-secret'); print(base64.urlsafe_b64encode(hashlib.sha256(secret.encode()).digest()).decode())")
 
 # 2. Configurar Persistência
 if [ ! -d "/data/budgetia_files" ]; then
@@ -44,23 +47,21 @@ if [ ! -d "/data/budgetia_files" ]; then
 fi
 
 # 2.1 Persistindo TUDO de /app/data (User Configs, Uploads, Novas Planilhas)
-if [ ! -d "/data/app_data" ]; then
-    echo "📁 Criando diretório de persistência da aplicação (/data/app_data)..."
-    mkdir -p /data/app_data
-fi
+# Flattening: Usamos /data diretamente para compatibilidade com ambiente local
 
 # Copia arquivos iniciais da imagem para a persistência (se não existirem lá)
 # Ex: dados_exemplo.json, etc.
 if [ -d "/app/data" ]; then
     echo "📦 Migrando dados iniciais para persistência..."
-    cp -rn /app/data/* /data/app_data/ || true
+    cp -rn /app/data/* /data/ || true
     # Remove o diretório original para criar o link
     rm -rf /app/data
 fi
 
-# Cria o link simbólico: O app escreve em /app/data -> Realmente escreve em /data/app_data
-ln -s /data/app_data /app/data
-echo "🔗 Link simbólico /app/data -> /data/app_data criado."
+# Cria o link simbólico: O app escreve em /app/data -> Realmente escreve em /data
+# Assim, config.DATA_DIR (/app/data) aponta para /data (Volume persistente)
+ln -s /data /app/data
+echo "🔗 Link simbólico /app/data -> /data criado."
 
 # Copiar planilha inicial se não existir na persistência
 if [ ! -f "/data/budgetia_files/planilha_mestra.xlsx" ]; then
@@ -79,9 +80,15 @@ export PYTHONPATH=$PYTHONPATH:/app/src
 export STATIC_DIR="/app/static"
 
 # Ler configs de SSL
-USE_SSL=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('ssl', False))")
-CERT_FILE=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('certfile', ''))")
-KEY_FILE=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('keyfile', ''))")
+if [ -f "$OPTIONS_PATH" ]; then
+    USE_SSL=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('ssl', False))")
+    CERT_FILE=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('certfile', ''))")
+    KEY_FILE=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('keyfile', ''))")
+else
+    USE_SSL="False"
+    CERT_FILE=""
+    KEY_FILE=""
+fi
 
 CMD="python3 -m uvicorn interfaces.api.main:app --host 0.0.0.0 --port 8000 --log-level ${LOG_LEVEL:-info}"
 

@@ -9,6 +9,10 @@ from ..services.budget_service import BudgetService
 from .data_context import FinancialDataContext
 from .transaction_repository import TransactionRepository
 
+from core.logger import get_logger
+
+logger = get_logger("BudgetRepo")
+
 
 class BudgetRepository:
     """
@@ -155,8 +159,8 @@ class BudgetRepository:
         # (Ex: garantir que ambos sejam float ou int da mesma forma)
         try:
             # Faz uma comparação direta primeiro
-            if df_orcamentos.equals(df_orcamentos_atualizado):
-                 print("--- DEBUG (BudgetRepo): Orçamentos recalculados são IDÊNTICOS aos atuais. Pulando salvamento. ---")
+             if df_orcamentos.equals(df_orcamentos_atualizado):
+                 logger.debug("Orçamentos recalculados são IDÊNTICOS aos atuais. Pulando salvamento.")
                  return
         except Exception:
             # Se der erro na comparação, ignora e salva por segurança
@@ -164,7 +168,7 @@ class BudgetRepository:
 
         self._context.update_dataframe(self._aba_nome, df_orcamentos_atualizado)
 
-        print(
-            "--- DEBUG (BudgetRepo): Solicitando salvamento do orçamento atualizado (Diferenças detectadas)... ---"
+        logger.debug(
+            "Solicitando salvamento do orçamento atualizado (Diferenças detectadas)..."
         )
         self._context.save()

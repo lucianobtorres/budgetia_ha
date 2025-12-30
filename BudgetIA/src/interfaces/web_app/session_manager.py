@@ -14,14 +14,48 @@ from config import DEFAULT_GROQ_MODEL, ACCESS_TOKEN_EXPIRE_MINUTES
 from interfaces.web_app.ui_components.ui_login import LoginUI
 from interfaces.api.utils.jwt import create_access_token
 from datetime import timedelta
+from core.logger import get_logger
+
+logger = get_logger("SessionManager")
 
 # TODO: Cache resource might need to be moved to a simpler provider if pickling issues arise
 @st.cache_resource
 def get_llm_orchestrator() -> LLMOrchestrator:
     """Cria e cacheia o LLMOrchestrator."""
-    print("--- DEBUG SESSION: Criando LLMOrchestrator (cache_resource)... ---")
-    primary_provider = GroqProvider(default_model=DEFAULT_GROQ_MODEL)
-    orchestrator = LLMOrchestrator(primary_provider=primary_provider)
+    provider_name = config.LLM_PROVIDER
+    logger.info(f"Criando LLMOrchestrator com Provider='{provider_name}'")
+    
+    from core.llm_factory import LLMProviderFactory
+    from core.llm_enums import LLMProviderType # Ensure import inside or top-level
+
+    primary = None
+    fallback = []
+
+    if provider_name == config.LLMProviders.GROQ:
+        primary = LLMProviderFactory.create_provider(
+            LLMProviderType.GROQ, default_model=config.LLMModels.DEFAULT_GROQ
+        )
+        fallback.append(LLMProviderFactory.create_provider(
+            LLMProviderType.GEMINI, default_model=config.LLMModels.DEFAULT_GEMINI
+        ))
+    
+    elif provider_name == config.LLMProviders.GEMINI:
+        primary = LLMProviderFactory.create_provider(
+            LLMProviderType.GEMINI, default_model=config.LLMModels.DEFAULT_GEMINI
+        )
+        try:
+             fallback.append(LLMProviderFactory.create_provider(
+                LLMProviderType.GROQ, default_model=config.LLMModels.DEFAULT_GROQ
+            ))
+        except: pass
+
+    else:
+        # Default safety
+        primary = LLMProviderFactory.create_provider(
+            LLMProviderType.GEMINI, default_model=config.LLMModels.DEFAULT_GEMINI
+        )
+
+    orchestrator = LLMOrchestrator(primary_provider=primary, fallback_providers=fallback)
     orchestrator.get_configured_llm()
     return orchestrator
 
@@ -31,8 +65,9 @@ class SessionManager:
     @staticmethod
     def load_auth_config() -> dict[str, Any]:
         """Carrega configurarão de auth do YAML."""
+        users_path = os.path.join(config.DATA_DIR, "users.yaml")
         try:
-            with open("data/users.yaml") as file:
+            with open(users_path) as file:
                 data = yaml.load(file, Loader=SafeLoader)
                 if isinstance(data, dict):
                     return data

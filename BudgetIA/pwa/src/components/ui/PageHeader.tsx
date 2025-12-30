@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Typography } from "./Typography";
 
 interface PageHeaderProps {
     title: string;
@@ -12,8 +13,8 @@ export function PageHeader({ title, description, action, className }: PageHeader
         <div className={`flex-none pt-safe gap-4 z-10 ${className || ''}`}>
             <div className="flex items-start justify-between">
                 <div>
-                     <h2 className="text-xl md:text-3xl font-bold tracking-tight text-white mb-1">{title}</h2>
-                     {description && <p className="text-sm text-gray-400">{description}</p>}
+                     <Typography variant="h2" className="mb-1 border-none">{title}</Typography>
+                     {description && <Typography variant="muted" className="text-base">{description}</Typography>}
                 </div>
                 {action && (
                     <div className="flex-shrink-0">

@@ -3,6 +3,9 @@ from typing import Any
 from application.notifications.channels.base_channel import INotificationChannel
 from application.notifications.models.notification_message import NotificationMessage
 from application.notifications.providers.sms_provider import SMSProvider
+from core.logger import get_logger
+
+logger = get_logger("SMSChannel")
 
 class SMSChannel(INotificationChannel): # type: ignore[misc]
     def __init__(self) -> None:
@@ -16,7 +19,7 @@ class SMSChannel(INotificationChannel): # type: ignore[misc]
         try:
             return self.provider.send(recipient_id, message.text) # type: ignore[no-any-return]
         except Exception as e:
-            print(f"ERRO (SMSChannel): {e}")
+            logger.error(f"{e}")
             return False
 
     def is_configured_for_user(self, user_config: dict[str, Any]) -> bool:

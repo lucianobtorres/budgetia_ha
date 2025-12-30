@@ -24,20 +24,20 @@ export function TransactionCard({ transaction, onDelete, onEdit, onCategoryClick
     const displayColor = categoryColor || getCategoryColor(transaction.Categoria);
     
     return (
-        <div className="flex items-center justify-between p-3 bg-gray-900/50 border border-gray-800 rounded-xl mb-2 hover:bg-gray-800/50 transition-colors group">
+        <div className="flex items-center justify-between p-3 bg-surface-card/50 border border-border rounded-xl mb-2 hover:bg-surface-hover/50 transition-colors group">
             <div className="flex items-center gap-3 overflow-hidden">
                 {/* Date Box */}
-                <div className="flex flex-col items-center justify-center p-2 bg-gray-800 rounded-lg min-w-[3.5rem] h-[3.5rem]">
-                    <span className={cn("text-sm font-bold text-gray-200", !isCurrentYear && "text-xs")}>{day}</span>
-                    <span className="text-[10px] uppercase text-gray-500 font-medium leading-none">{month}</span>
+                <div className="flex flex-col items-center justify-center p-2 bg-surface-hover rounded-lg min-w-[3.5rem] h-[3.5rem]">
+                    <span className={cn("text-sm font-bold text-text-primary", !isCurrentYear && "text-xs")}>{day}</span>
+                    <span className="text-[10px] uppercase text-text-muted font-medium leading-none">{month}</span>
                     {!isCurrentYear && (
-                        <span className="text-[9px] text-gray-600 font-medium leading-tight">{year}</span>
+                        <span className="text-[9px] text-text-secondary font-medium leading-tight">{year}</span>
                     )}
                 </div>
 
                 {/* Info */}
                 <div className="flex flex-col min-w-0">
-                    <span className="text-sm font-medium text-white truncate">{transaction.Descricao}</span>
+                    <span className="text-sm font-medium text-text-primary truncate">{transaction.Descricao}</span>
                     <div className="flex items-center gap-2 mt-1">
                         {/* Chip using Global Colors - Clickable */}
                         <button 
@@ -61,7 +61,7 @@ export function TransactionCard({ transaction, onDelete, onEdit, onCategoryClick
             <div className="flex flex-col items-end gap-1 flex-shrink-0 ml-2">
                  <span className={cn(
                     "text-sm font-bold font-mono",
-                    isExpense ? "text-red-400" : "text-emerald-400"
+                    isExpense ? "text-danger" : "text-primary-light"
                 )}>
                     {isExpense ? '-' : '+'}{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(transaction.Valor)}
                 </span>
@@ -70,14 +70,14 @@ export function TransactionCard({ transaction, onDelete, onEdit, onCategoryClick
                 <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 opacity-100">
                     <button 
                          onClick={() => onDelete(transaction["ID Transacao"])}
-                         className="p-1.5 text-gray-500 hover:text-red-400 bg-gray-800 hover:bg-gray-700 rounded-lg"
+                         className="p-1.5 text-text-secondary hover:text-danger bg-surface-hover hover:bg-surface-card rounded-lg"
                     >
                         <Trash2 size={14} />
                     </button>
                     {onEdit && (
                         <button 
                             onClick={() => onEdit(transaction)}
-                            className="p-1.5 text-gray-500 hover:text-blue-400 bg-gray-800 hover:bg-gray-700 rounded-lg"
+                            className="p-1.5 text-text-secondary hover:text-primary-light bg-surface-hover hover:bg-surface-card rounded-lg"
                         >
                             <Edit2 size={14} />
                         </button>

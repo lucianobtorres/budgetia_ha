@@ -1,6 +1,9 @@
 # src/finance/utils.py
 import json
 from typing import Any
+from core.logger import get_logger
+
+logger = get_logger("FinanceUtils")
 
 
 def _carregar_dados_exemplo(file_path: str) -> list[dict[str, Any]]:
@@ -11,7 +14,7 @@ def _carregar_dados_exemplo(file_path: str) -> list[dict[str, Any]]:
             transacoes: list[dict[str, Any]] = data.get("transacoes", [])
             return transacoes
     except (FileNotFoundError, json.JSONDecodeError) as e:
-        print(
-            f"AVISO: Arquivo de dados de exemplo não encontrado ou mal formatado: {file_path}. {e}"
+        logger.warning(
+            f"Arquivo de dados de exemplo não encontrado ou mal formatado: {file_path}. {e}"
         )
         return []

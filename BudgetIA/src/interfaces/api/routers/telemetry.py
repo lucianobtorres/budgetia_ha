@@ -6,6 +6,10 @@ from interfaces.api.dependencies import get_user_config_service
 from core.user_config_service import UserConfigService
 from core.behavior.user_behavior_service import UserBehaviorService
 
+from core.logger import get_logger
+
+logger = get_logger("API_Telemetry")
+
 router = APIRouter(prefix="/telemetry", tags=["Telemetry"])
 
 class TelemetryAction(BaseModel):
@@ -30,7 +34,7 @@ def log_action(
         service.log_action(action.action_type, action.metadata)
         return {"status": "ok"}
     except Exception as e:
-        print(f"ERRO TELEMETRY: {e}")
+        logger.error(f"ERRO TELEMETRY: {e}")
         # Telemetria não deve quebrar a aplicação, mas reportamos erro 500 para debug
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -48,7 +52,7 @@ def log_feedback(
         service.log_rule_feedback(feedback.rule_name, feedback.feedback_type)
         return {"status": "ok"}
     except Exception as e:
-        print(f"ERRO TELEMETRY FEEDBACK: {e}")
+        logger.error(f"ERRO TELEMETRY FEEDBACK: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/tours")
@@ -63,7 +67,7 @@ def get_seen_tours(
         service = UserBehaviorService(config_service.username)
         return {"seen_tours": service.get_seen_tours()}
     except Exception as e:
-        print(f"ERRO TELEMETRY TOURS: {e}")
+        logger.error(f"ERRO TELEMETRY TOURS: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/tours/{tour_id}")
@@ -79,5 +83,5 @@ def mark_tour_seen(
         service.mark_tour_seen(tour_id)
         return {"status": "ok", "tour_id": tour_id}
     except Exception as e:
-        print(f"ERRO TELEMETRY MARK TOUR: {e}")
+        logger.error(f"ERRO TELEMETRY MARK TOUR: {e}")
         raise HTTPException(status_code=500, detail=str(e))

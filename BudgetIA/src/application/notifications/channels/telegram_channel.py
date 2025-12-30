@@ -6,6 +6,9 @@ from telegram import Bot
 
 from application.notifications.channels.base_channel import INotificationChannel
 from application.notifications.models.notification_message import NotificationMessage
+from core.logger import get_logger
+
+logger = get_logger("TelegramChannel")
 
 
 class TelegramChannel(INotificationChannel): # type: ignore[misc]
@@ -47,20 +50,18 @@ class TelegramChannel(INotificationChannel): # type: ignore[misc]
             True se enviado com sucesso, False caso contrário.
         """
         if not recipient_id:
-            print(
-                "ERRO (TelegramChannel): recipient_id está vazio. Não é possível enviar."
-            )
+            logger.error("recipient_id está vazio. Não é possível enviar.")
             return False
 
         try:
-            print(
-                f"--- (TelegramChannel) Enviando: '{message.text[:50]}...' para chat_id: {recipient_id} ---"
+            logger.info(
+                f"Enviando: '{message.text[:50]}...' para chat_id: {recipient_id}"
             )
             await self.bot.send_message(chat_id=recipient_id, text=message.text)
-            print("--- (TelegramChannel) Mensagem enviada com sucesso. ---")
+            logger.info("Mensagem enviada com sucesso.")
             return True
         except Exception as e:
-            print(f"ERRO CRÍTICO (TelegramChannel) ao enviar mensagem: {e}")
+            logger.critical(f"Erro CRÍTICO ao enviar mensagem: {e}")
             return False
 
     def is_configured_for_user(self, user_config: dict[str, Any]) -> bool:

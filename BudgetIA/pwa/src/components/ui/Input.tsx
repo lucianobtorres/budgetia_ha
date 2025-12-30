@@ -4,9 +4,16 @@ import { cn } from '../../utils/cn';
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
     icon?: React.ElementType;
+    variant?: 'default' | 'glass';
 }
 
-const Input = forwardRef<HTMLInputElement, InputProps>(({ className, icon: Icon, ...props }, ref) => {
+const Input = forwardRef<HTMLInputElement, InputProps>(({ className, icon: Icon, variant = 'default', ...props }, ref) => {
+    
+    const variants = {
+        default: "bg-surface-input border-border focus-visible:border-primary focus-visible:ring-primary",
+        glass: "bg-gray-900/50 border-gray-700 text-white placeholder:text-gray-500 focus-visible:border-emerald-500 focus-visible:ring-emerald-500/20"
+    };
+
     return (
         <div className="relative flex-1">
             {Icon && (
@@ -17,7 +24,10 @@ const Input = forwardRef<HTMLInputElement, InputProps>(({ className, icon: Icon,
             <input
                 ref={ref}
                 className={cn(
-                    "flex w-full rounded-xl border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-500 focus-visible:outline-none focus-visible:border-emerald-500 focus-visible:ring-1 focus-visible:ring-emerald-500 disabled:cursor-not-allowed disabled:opacity-50 transition-colors",
+                    "flex w-full rounded-xl border px-3 py-2 text-sm transition-all outline-none focus-visible:ring-1 disabled:cursor-not-allowed disabled:opacity-50",
+                     // Base styles that are safe to override
+                    "file:border-0 file:bg-transparent file:text-sm file:font-medium",
+                    variants[variant],
                     Icon && "pl-10",
                     className
                 )}

@@ -3,6 +3,9 @@
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from .base_provider import LLMProvider
+from core.logger import get_logger
+
+logger = get_logger("GeminiProvider")
 
 
 import config
@@ -24,7 +27,7 @@ class GeminiProvider(LLMProvider):
         model = model_name if model_name else self.default_model
         temp = temperature if temperature is not None else self.default_temperature
 
-        print(f"LOG: Instanciando Gemini LLM: Modelo='{model}', Temp={temp}")
+        logger.info(f"Instanciando Gemini LLM: Modelo='{model}', Temp={temp}")
 
         llm = ChatGoogleGenerativeAI(
             model=model, 

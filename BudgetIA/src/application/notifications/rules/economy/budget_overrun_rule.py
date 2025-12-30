@@ -3,7 +3,10 @@ from typing import Any
 import pandas as pd
 
 import config
+from core.logger import get_logger
 from application.notifications.models.notification_message import NotificationPriority
+
+logger = get_logger("BudgetOverrunRule")
 from application.notifications.models.rule_result import RuleResult
 from application.notifications.rules.base_rule import IFinancialRule
 
@@ -33,10 +36,10 @@ class BudgetOverrunRule(IFinancialRule): # type: ignore[misc]
         """
         Verifica orçamentos estourados ou próximos de estourar.
         """
-        print(f"LOG (BudgetOverrunRule): Verificando orçamentos acima de {self.threshold_percent*100}%...")
+        logger.debug(f"Verificando orçamentos acima de {self.threshold_percent*100}%...")
 
         if budgets_df.empty:
-            print("LOG (BudgetOverrunRule): Tabela de orçamentos vazia.")
+            logger.warning("Tabela de orçamentos vazia.")
             return RuleResult(triggered=False)
 
         # Colunas esperadas: Categoria, Limite (Estimado), Gasto (Realizado)
@@ -50,7 +53,7 @@ class BudgetOverrunRule(IFinancialRule): # type: ignore[misc]
         # Assumindo que o DataFrame venha com os nomes corretos do config
         for col in required_cols:
             if col not in budgets_df.columns:
-                print(f"ERRO (BudgetOverrunRule): Coluna '{col}' não encontrada em budgets_df.")
+                logger.error(f"Coluna '{col}' não encontrada em budgets_df.")
                 return RuleResult(triggered=False)
 
         alerts = []

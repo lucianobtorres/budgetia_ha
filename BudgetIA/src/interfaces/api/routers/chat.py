@@ -4,6 +4,10 @@ from pydantic import BaseModel
 from interfaces.api.dependencies import get_agent_runner
 from core.agent_runner_interface import AgentRunner
 
+from core.logger import get_logger
+
+logger = get_logger("API_Chat")
+
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
 
@@ -32,7 +36,7 @@ def enviar_mensagem(
     Recebe mensagem, passa pro agente e retorna resposta com passos (se houver).
     """
     try:
-        print(f"--- API Chat: Recebido '{request.message}' ---")
+        logger.info(f"Recebido '{request.message}'")
 
         # Chama a verso detalhada
         result = agent.interact_with_details(request.message)
@@ -44,7 +48,7 @@ def enviar_mensagem(
         return ChatResponse(response=resposta, intermediate_steps=steps)
 
     except Exception as e:
-        print(f"Erro no endpoint de chat: {e}")
+        logger.error(f"Erro no endpoint de chat: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -84,6 +88,6 @@ def obter_historico(agent: AgentRunner = Depends(get_agent_runner)) -> list[dict
 
         return []
     except Exception as e:
-        print(f"Erro ao recuperar histórico: {e}")
+        logger.error(f"Erro ao recuperar histórico: {e}")
         # Retorna lista vazia em caso de erro pra não quebrar UI
         return []

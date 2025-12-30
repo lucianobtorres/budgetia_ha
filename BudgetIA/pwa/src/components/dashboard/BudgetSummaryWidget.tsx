@@ -10,7 +10,7 @@ export default function BudgetSummaryWidget() {
 
     if (loading) {
          return (
-            <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
+            <div className="rounded-xl border border-border bg-surface-card/50 p-4">
                  <div className="flex items-center justify-between">
                     <Skeleton className="h-5 w-32" />
                     <Skeleton className="h-4 w-16" />
@@ -33,32 +33,32 @@ export default function BudgetSummaryWidget() {
     return (
         <div 
             onClick={() => openDrawer('BUDGETS')}
-            className="cursor-pointer group relative overflow-hidden rounded-xl border border-gray-800 bg-gray-900/50 p-4 transition-all hover:border-emerald-500/30 hover:bg-gray-900/80"
+            className="cursor-pointer group relative overflow-hidden rounded-xl border border-border bg-surface-card/50 p-4 transition-all hover:border-primary/30 hover:bg-surface-card/80"
         >
             <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                     <div className="p-2 bg-emerald-500/10 rounded-lg">
-                        <Target className="w-4 h-4 text-emerald-400" />
+                     <div className="p-2 bg-primary/10 rounded-lg">
+                        <Target className="w-4 h-4 text-primary-light" />
                      </div>
                      <div>
-                         <h3 className="text-sm font-medium text-white">Meus Orçamentos</h3>
-                         <p className="text-xs text-gray-400">
+                         <h3 className="text-sm font-medium text-text-primary">Meus Orçamentos</h3>
+                         <p className="text-xs text-text-muted">
                             {safeBudgets.length} categorias • {safeBudgets.length === 0 ? "Definir metas" : overBudgetCount === 0 ? "Tudo sob controle" : `${overBudgetCount} acima do limite`}
                          </p>
                      </div>
                 </div>
-                <ChevronRight className="w-5 h-5 text-gray-500 group-hover:text-emerald-400 transition-colors" />
+                <ChevronRight className="w-5 h-5 text-text-muted group-hover:text-primary-light transition-colors" />
             </div>
 
             {/* Mini Progress Bar for Overall Health */}
             <div className="space-y-1">
-                <div className="flex justify-between text-[10px] text-gray-400 font-medium uppercase tracking-wider">
+                <div className="flex justify-between text-[10px] text-text-muted font-medium uppercase tracking-wider">
                     <span>Geral</span>
                     <span>{overallProgress.toFixed(0)}%</span>
                 </div>
-                <div className="h-2 w-full bg-gray-800 rounded-full overflow-hidden">
+                <div className="h-2 w-full bg-surface-hover rounded-full overflow-hidden">
                     <div 
-                        className={cn("h-full rounded-full transition-all duration-500", overallProgress > 100 ? "bg-red-500" : "bg-emerald-500")}
+                        className={cn("h-full rounded-full transition-all duration-500", overallProgress > 100 ? "bg-danger" : "bg-primary")}
                         style={{ width: `${Math.min(overallProgress, 100)}%` }}
                     />
                 </div>

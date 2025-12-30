@@ -8,19 +8,46 @@ from typing import Any
 from cryptography.fernet import Fernet, InvalidToken
 
 import config
+from core.logger import get_logger
 
-ENCRYPTION_KEY: bytes | None = None
-FERNET: Fernet | None = None
+logger = get_logger("UserConfigService")
 
-try:
-    _key_env = os.getenv("USER_DATA_ENCRYPTION_KEY")
-    if _key_env:
-        ENCRYPTION_KEY = _key_env.encode("utf-8")
-        FERNET = Fernet(ENCRYPTION_KEY)
-except Exception as e:
-    print(
-        f"ERRO CRÍTICO: USER_DATA_ENCRYPTION_KEY inválida ou não definida no .env. {e}"
-    )
+# Variável Global para o Singleton do Fernet (Carregamento Lazy)
+_FERNET_INSTANCE: Fernet | None = None
+
+def _get_fernet() -> Fernet:
+    """Carrega o FERNET sob demanda (Lazy Loading)."""
+    global _FERNET_INSTANCE
+    
+    if _FERNET_INSTANCE:
+        return _FERNET_INSTANCE
+
+    # Tenta obter a chave do ambiente
+    key_str = os.getenv("USER_DATA_ENCRYPTION_KEY")
+    
+    # Se não encontrar, tenta forçar o carregamento do .env via config (se ainda não rolou)
+    if not key_str:
+        # Apenas um 'touch' no config para garantir que ele rodou (ele roda no import, mas vai que...)
+        # Na verdade, se chegamos aqui, config já deveria ter rodado.
+        logger.warning("USER_DATA_ENCRYPTION_KEY não encontrada no env. Tentando reload do .env...")
+        from dotenv import load_dotenv
+        # Recalcula path do .env (mesma logica do config.py)
+        root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+        dotenv_path = os.path.join(root, ".env")
+        load_dotenv(dotenv_path, override=True)
+        key_str = os.getenv("USER_DATA_ENCRYPTION_KEY")
+
+    if not key_str:
+        msg = "CRÍTICO: USER_DATA_ENCRYPTION_KEY ausente mesmo após reload. Verifique o arquivo .env."
+        logger.critical(msg)
+        raise ValueError(msg)
+
+    try:
+        _FERNET_INSTANCE = Fernet(key_str.encode("utf-8"))
+        return _FERNET_INSTANCE
+    except Exception as e:
+        logger.critical(f"Chave de Criptografia inválida: {e}")
+        raise ValueError(f"Chave de Criptografia inválida: {e}")
 
 
 class UserConfigService:
@@ -31,10 +58,13 @@ class UserConfigService:
     """
 
     def __init__(self, username: str):
-        if not FERNET:
-            raise ValueError(
-                "Serviço de Configuração não pode operar. Chave de Criptografia está ausente."
-            )
+        # Garante que o sistema de criptografia está pronto
+        # Isso vai falhar AQUI se a chave não existir, mas agora temos certeza
+        # que o .env teve chance de carregar.
+        self._fernet = _get_fernet()
+
+        if not username:
+            raise ValueError("Username não pode ser nulo.")
 
         if not username:
             raise ValueError("Username não pode ser nulo.")
@@ -51,54 +81,52 @@ class UserConfigService:
 
     def _encrypt_data(self, data: str) -> bytes:
         """Criptografa uma string de dados."""
-        assert FERNET is not None, "FERNET not initialized"
-        return FERNET.encrypt(data.encode("utf-8"))
+        return self._fernet.encrypt(data.encode("utf-8"))
 
     def _decrypt_data(self, encrypted_data: bytes) -> str | None:
         """Descriptografa bytes de volta para uma string."""
         try:
-            assert FERNET is not None, "FERNET not initialized"
-            return FERNET.decrypt(encrypted_data).decode("utf-8")
+            return self._fernet.decrypt(encrypted_data).decode("utf-8")
         except InvalidToken:
-            print(
-                f"ERRO: Token inválido ao descriptografar config para {self.username}. O arquivo pode estar corrompido ou a chave mudou."
+            logger.error(
+                f"Token inválido ao descriptografar config para {self.username}. O arquivo pode estar corrompido ou a chave mudou."
             )
             return None
         except Exception as e:
-            print(f"ERRO ao descriptografar: {e}")
+            logger.error(f"ERRO ao descriptografar: {e}")
             return None
 
     def load_config(self) -> dict[str, Any]:
         """Carrega a configuração do arquivo JSON deste usuário."""
-        print(f"[DEBUG load_config] Tentando ler de: {self.config_file_path}")
-        print(f"[DEBUG load_config] Arquivo existe? {self.config_file_path.exists()}")
+        # logger.debug(f"Tentando ler de: {self.config_file_path}")
+        # logger.debug(f"Arquivo existe? {self.config_file_path.exists()}")
         if self.config_file_path.exists():
             try:
                 with open(self.config_file_path, "rb") as f:
                     encrypted_data = f.read()
 
                 if not encrypted_data:
-                    print("[DEBUG load_config] Arquivo vazio!")
+                    logger.warning("Arquivo vazio!")
                     return {}
 
                 json_string = self._decrypt_data(encrypted_data)
 
                 if json_string:
                     data: dict[str, Any] = json.loads(json_string)
-                    print(f"[DEBUG load_config] Dados carregados: {list(data.keys())}")
+                    # logger.debug(f"Dados carregados: {list(data.keys())}")
                     return data
                 else:
-                    print("[DEBUG load_config] Falha na descriptografia")
+                    logger.error("Falha na descriptografia")
                     return {}
             except (json.JSONDecodeError, OSError) as e:
-                print(f"Erro ao ler config do usuário {self.username}: {e}")
+                logger.error(f"Erro ao ler config do usuário {self.username}: {e}")
                 return {}
-        print("[DEBUG load_config] Arquivo não existe, retornando {}")
+        # logger.debug("Arquivo não existe, retornando {}")
         return {}  # Retorna dict vazio se não existir
 
     def save_config(self, config_data: dict[str, Any]) -> None:
         """Salva a configuração no arquivo JSON deste usuário."""
-        print(f"[DEBUG save_config] Salvando em: {self.config_file_path}")
+        # logger.debug(f"Salvando em: {self.config_file_path}")
         self._ensure_dir_exists()
         try:
             json_string = json.dumps(config_data, indent=4)
@@ -106,9 +134,9 @@ class UserConfigService:
 
             with open(self.config_file_path, "wb") as f:
                 f.write(encrypted_data)
-            print(f"[DEBUG save_config] Arquivo salvo com sucesso: {self.config_file_path.exists()}")
+            # logger.debug(f"Arquivo salvo com sucesso: {self.config_file_path.exists()}")
         except OSError as e:
-            print(f"Erro ao salvar config do usuário {self.username}: {e}")
+            logger.error(f"Erro ao salvar config do usuário {self.username}: {e}")
 
     # --- Métodos de Negócio (extraídos do utils/manager) ---
 
@@ -117,53 +145,53 @@ class UserConfigService:
         config_data = self.load_config()
         path_str = config_data.get(config.PLANILHA_KEY)
 
-        print(f"[DEBUG get_planilha_path] PLANILHA_KEY='{config.PLANILHA_KEY}', path_str='{path_str}'")
+        # logger.debug(f"PLANILHA_KEY='{config.PLANILHA_KEY}', path_str='{path_str}'")
 
         if not path_str:
-            print("[DEBUG get_planilha_path] Nenhum caminho encontrado no config")
+            logger.debug("Nenhum caminho encontrado no config")
             # Fallback para Variável de Ambiente (HA Add-on)
             env_path = os.getenv("PLANILHA_PATH")
             if env_path:
-                print(f"[DEBUG get_planilha_path] Usando Fallback ENV: {env_path}")
+                logger.info(f"Usando Fallback ENV: {env_path}")
                 return env_path
             return None
 
         # Validação (a mesma que corrigimos antes)
         if "docs.google.com/" in path_str:
-            print(f"[DEBUG get_planilha_path] Google Sheets URL detectada: {path_str}")
+            logger.debug(f"Google Sheets URL detectada: {path_str}")
             return str(path_str)
 
         file_exists = Path(path_str).is_file()
-        print(f"[DEBUG get_planilha_path] Arquivo local: '{path_str}' | Existe: {file_exists}")
+        # logger.debug(f"Arquivo local: '{path_str}' | Existe: {file_exists}")
         
         if file_exists:
             return str(path_str)
 
         # O caminho salvo é inválido, vamos limpar
-        print(f"[DEBUG get_planilha_path] Arquivo não existe! Removendo do config.")
+        logger.warning(f"Arquivo não existe! Removendo do config.")
         config_data.pop(config.PLANILHA_KEY, None)
         self.save_config(config_data)
         
         # Última tentativa: ENV
         env_path = os.getenv("PLANILHA_PATH")
         if env_path:
-             print(f"[DEBUG get_planilha_path] Usando Fallback ENV após falha local: {env_path}")
+             logger.warning(f"Usando Fallback ENV após falha local: {env_path}")
              return env_path
              
         return None
 
     def save_planilha_path(self, path_str: str) -> None:
         """Salva o caminho da planilha na configuração."""
-        print(f"[DEBUG save_planilha_path] CHAMADO com path_str='{path_str}'")
+        # logger.debug(f"CHAMADO com path_str='{path_str}'")
         config_data = self.load_config()
-        print(f"[DEBUG save_planilha_path] Config antes: {config_data.keys()}")
+        # logger.debug(f"Config antes: {config_data.keys()}")
         config_data[config.PLANILHA_KEY] = path_str
         # Limpa estados de onboarding pendentes ao salvar um novo caminho
         config_data.pop("onboarding_state", None)
         config_data.pop("pending_planilha_path", None)
-        print(f"[DEBUG save_planilha_path] Config depois: PLANILHA_KEY='{config.PLANILHA_KEY}' -> '{config_data.get(config.PLANILHA_KEY)}'")
+        # logger.debug(f"Config depois: PLANILHA_KEY='{config.PLANILHA_KEY}' -> '{config_data.get(config.PLANILHA_KEY)}'")
         self.save_config(config_data)
-        print(f"[DEBUG save_planilha_path] save_config() concluído")
+        logger.info(f"save_config() concluído")
 
     def get_mapeamento(self) -> dict[str, Any] | None:
         config_data = self.load_config()
@@ -173,7 +201,7 @@ class UserConfigService:
         """Salva o mapeamento E o nome do módulo da estratégia."""
         config_data = self.load_config()
         if "strategy_module" not in mapeamento:
-            print("AVISO: save_mapeamento chamado sem 'strategy_module' no dict.")
+            logger.warning("save_mapeamento chamado sem 'strategy_module' no dict.")
             # Adiciona o nome do módulo padrão por segurança
             mapeamento["strategy_module"] = self.strategy_module_name
 
@@ -234,8 +262,8 @@ class UserConfigService:
         Reseta o *onboarding da planilha*, mas MANTÉM as
         configurações de identidade do usuário (ex: tokens do Google).
         """
-        print(
-            f"--- DEBUG ConfigService: Resetando (clear) config da planilha para {self.username} ---"
+        logger.debug(
+            f"Resetando (clear) config da planilha para {self.username}"
         )
 
         # 1. Carrega a configuração atual
@@ -260,7 +288,7 @@ class UserConfigService:
             try:
                 os.remove(self.strategy_file_path)
             except OSError as e:
-                print(f"AVISO: Falha ao limpar {self.strategy_file_path}: {e}")
+                logger.warning(f"Falha ao limpar {self.strategy_file_path}: {e}")
 
     def save_comunicacao_field(self, field_name: str, value: Any) -> None:
         """
@@ -276,8 +304,8 @@ class UserConfigService:
         # Só salva se o valor for novo, para evitar escritas desnecessárias
         if config_data["comunicacao"].get(field_name) != value:
             config_data["comunicacao"][field_name] = value
-            print(
-                f"--- DEBUG ConfigService: Salvando '{field_name}' ({value}) para {self.username} ---"
+            logger.debug(
+                f"Salvando '{field_name}' ({value}) para {self.username}"
             )
             self.save_config(config_data)
 

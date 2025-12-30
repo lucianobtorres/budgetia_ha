@@ -1,3 +1,5 @@
+import { themeColors } from './theme.js';
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
@@ -7,28 +9,56 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Semantic Tokens for Theming
+        // --- Semantic Tokens (The Truth) ---
         primary: {
-          DEFAULT: '#059669', // emerald-600
-          hover: '#047857',   // emerald-700
-          light: '#10b981',   // emerald-500
-          soft: 'rgba(16, 185, 129, 0.1)', // emerald-500/10
+          DEFAULT: '#059669', // Emerald 600
+          hover: '#047857',   // Emerald 700
+          light: '#10b981',   // Emerald 500
+          soft: 'rgba(16, 185, 129, 0.1)', // Highlight/Ring
         },
         surface: {
-          DEFAULT: '#111827', // gray-900 (Page BG)
-          card: 'rgba(17, 24, 39, 0.5)', // gray-900/50
-          hover: '#1f2937',   // gray-800
+          DEFAULT: themeColors.background, // Centrally managed
+          card: themeColors.card,          // Centrally managed
+          hover: themeColors.hover,        // Centrally managed (Slate 800)
+          input: themeColors.card,         // Input BG (Matches card)
         },
         border: {
-          DEFAULT: '#1f2937', // gray-800
-          hover: '#374151',   // gray-700
+          DEFAULT: themeColors.border,     // Centrally managed (Slate 800)
+          hover: '#3f3f46',   // Gray 700 - Keep or update? Let's leave for contrast or update to Slate 700 (#334155) if strictly needed.
+        },
+        text: {
+          primary: themeColors.text.primary,
+          secondary: themeColors.text.secondary,
+          muted: themeColors.text.muted,
         },
         danger: {
-          DEFAULT: '#ef4444', // red-500
-          soft: 'rgba(239, 68, 68, 0.1)', // red-500/10
-          border: 'rgba(127, 29, 29, 0.3)', // red-900/30
+          DEFAULT: '#ef4444', // Red 500
+          soft: 'rgba(239, 68, 68, 0.1)',
+          border: 'rgba(127, 29, 29, 0.3)',
+        },
+        
+        // --- Legacy/Safety (Mapped to Semantics) ---
+        emerald: {
+          500: '#10b981',
+          600: '#059669', // Mapped to primary
+          700: '#047857',
+          900: '#064e3b',
+        },
+        gray: {
+            700: '#3f3f46', // Border hover
+            800: '#27272a', // Border/Card
+            900: themeColors.card, // Card fallback
+            950: themeColors.background, // Deep BG fallback
         }
       },
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+        display: ['Outfit', 'Inter', 'system-ui', 'sans-serif'], // Optional for Headers
+      },
+      dropShadow: {
+        'glow': themeColors.effects.glow,
+        'glow-subtle': themeColors.effects.glowSubtle,
+      }
     },
   },
   plugins: [],

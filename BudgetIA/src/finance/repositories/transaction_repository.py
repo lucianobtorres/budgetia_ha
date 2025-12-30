@@ -8,7 +8,12 @@ from config import ColunasTransacoes
 # Imports relativos para "subir" um nível
 from ..services.transaction_service import TransactionService
 from .data_context import FinancialDataContext
+from core.logger import get_logger
 
+logger = get_logger("TransactionRepo")
+
+
+import unicodedata
 
 class TransactionRepository:
     """
@@ -34,6 +39,33 @@ class TransactionRepository:
         """Retorna o DataFrame completo de transações."""
         return self._context.get_dataframe(sheet_name=self._aba_nome)
 
+    def _resolve_category(self, df: pd.DataFrame, input_category: str) -> str:
+        """
+        Tenta encontrar uma categoria existente que corresponda à entrada
+        ignorando case e acentos. Retorna a existente se achar,
+        ou a entrada original se não.
+        """
+        if not input_category or not isinstance(input_category, str):
+            return input_category
+            
+        if ColunasTransacoes.CATEGORIA not in df.columns:
+            return input_category
+
+        existing_categories = df[ColunasTransacoes.CATEGORIA].dropna().unique()
+        
+        def normalize(text: str) -> str:
+            return unicodedata.normalize('NFKD', text).encode('ASCII', 'ignore').decode('ASCII').lower().strip()
+            
+        normalized_input = normalize(input_category)
+        
+        for existing in existing_categories:
+            if not isinstance(existing, str):
+                continue
+            if normalize(existing) == normalized_input:
+                return existing # Retorna a versão "oficial" (com acentos)
+                
+        return input_category
+
     def add_transaction(
         self,
         data: str,
@@ -47,6 +79,9 @@ class TransactionRepository:
         Adiciona uma nova transação ao DataFrame em memória (no DataContext).
         """
         df = self.get_all_transactions()  # Pega a cópia atual
+
+        # Normalização de Categoria (Evita duplicatas sem acento)
+        categoria = self._resolve_category(df, categoria)
 
         novo_id = (
             (df[ColunasTransacoes.ID].max() + 1)
@@ -74,7 +109,7 @@ class TransactionRepository:
         df_atualizado = pd.concat([df, novo_registro], ignore_index=True)
 
         self._context.update_dataframe(self._aba_nome, df_atualizado)
-        print(f"LOG (Repo): Transação '{descricao}' adicionada ao contexto.")
+        logger.info(f"Transação '{descricao}' adicionada ao contexto.")
 
     def delete_transaction(self, transaction_id: int) -> bool:
         """Exclui uma transação pelo ID."""
@@ -121,6 +156,10 @@ class TransactionRepository:
             "status": ColunasTransacoes.STATUS
         }
         
+        # Check for category update to normalize
+        if "categoria" in novos_dados:
+            novos_dados["categoria"] = self._resolve_category(df, novos_dados["categoria"])
+
         idx = df.index[mask][0]
         
         for field, valor in novos_dados.items():
