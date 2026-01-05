@@ -1,6 +1,6 @@
 [project]
 name = "budgetia"
-version = "1.0.43"
+version = "1.0.44"
 description = ""
 authors = [{ name = "Luciano Borges", email = "lucianobtorres@gmail.com" }]
 readme = "README.md"
@@ -38,6 +38,9 @@ dependencies = [
     "requests (>=2.31.0,<3.0.0)",
     "pywebpush (>=2.1.2,<3.0.0)",
     "passlib[bcrypt] (>=1.7.4,<2.0.0)",
+    "stripe (>=14.1.0,<15.0.0)",
+    "resend (>=2.19.0,<3.0.0)",
+    "twilio (>=9.9.0,<10.0.0)",
 ]
 
 [tool.poetry]

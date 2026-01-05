@@ -44,9 +44,8 @@ export function ProfileDataTab({ data, onSave, isSaving }: Props) {
                         </div>
                         <div className="md:w-2/3">
                             <Input 
-                                value={item.Valor}
                                 onChange={(e) => handleEdit(idx, e.target.value)}
-                                className="bg-transparent focus:bg-surface-input border-b border-transparent border-t-0 border-l-0 border-r-0 focus:border-b-primary rounded-none w-full text-text-primary px-2 py-1 focus:outline-none transition-all focus:ring-0"
+                                className="w-full bg-surface-input/50" // Small adjustment to background if needed, but keeping standard is safer
                                 placeholder="Valor..."
                             />
                         </div>

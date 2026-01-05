@@ -44,35 +44,40 @@ class BehaviorAnalyst:
         csv_data = recent_df.to_csv(index=False)
 
         prompt = f"""
-        Você é um Analista Financeiro Comportamental (O Observador).
-        Seu objetivo é analisar o histórico de transações cruas e deduzir FATOS sobre o comportamento do usuário.
+        Você é um Analista Financeiro Comportamental.
+        Analise o histórico de transações e identifique PADRÕES RECORRENTES de comportamento.
         
-        Regras para Fatos:
-        1. Devem ser padrões recorrentes ou significativos (não fatos isolados triviais).
-        2. Devem ter utilidade para planejamento futuro.
-        3. Devem ser neutros e descritivos.
-        
-        Exemplos de Bons Fatos:
-        - "Usuário gasta em média R$ 400 com Delivery nos fins de semana."
-        - "Há uma assinatura recorrente de Streaming de R$ 50 no dia 15."
-        - "Gastos de transporte aumentaram significativamente na última quinzena."
-        
-        Exemplos de Maus Fatos:
-        - "Usuário comprou um café." (Trivial)
-        - "Usuário gasta muito." (Vago)
-        
+        Procure por:
+        1. Gastos Semanais (Ex: Mercado todo Sábado, Uber para trabalho)
+        2. Gastos Mensais (Ex: Assinaturas não detectadas anteriormente, Mensalidades)
+        3. Hábitos de Valor (Ex: Gasta média de R$ 50 em lanches)
+
         DADOS (CSV):
         {csv_data}
         
-        Saída:
-        Retorne APENAS um JSON com uma lista de strings.
-        Ex: {{"facts": ["fato 1", "fato 2"]}}
-        Se não encontrar nada relevante, retorne lista vazia.
+        Saída OBRIGATÓRIA em JSON:
+        Retorne uma lista de objetos com a seguinte estrutura:
+        {{
+            "facts": [
+                {{
+                    "description": "Texto legível do fato (Ex: 'Faz compra de mercado todo Sábado')",
+                    "category": "Comportamento",
+                    "metadata": {{
+                        "pattern_type": "weekly" | "monthly" | "sporadic",
+                        "expected_category": "Mercado" (ou categoria inferida),
+                        "expected_day_of_week": "Saturday" (se semanal),
+                        "expected_day_of_month": 15 (se mensal),
+                        "avg_amount": 500.0,
+                        "confidence": 0.0 to 1.0
+                    }}
+                }}
+            ]
+        }}
         """
 
         try:
             messages = [
-                SystemMessage(content="Você é um componente de backend que analisa dados financeiros."),
+                SystemMessage(content="Você é um componente de backend que analisa dados financeiros e retorna JSON estruturado."),
                 HumanMessage(content=prompt)
             ]
             
@@ -80,16 +85,17 @@ class BehaviorAnalyst:
             content = response.content.replace("```json", "").replace("```", "").strip()
             
             result = json.loads(content)
-            facts = result.get("facts", [])
+            facts_data = result.get("facts", [])
             
             learned_facts = []
-            for fact in facts:
-                # Verificar se fato já existe na memória (busca semântica ou exata simplificada)
-                # O ideal seria vector search, mas por enquanto vamos confiar na dedução do add_fact
-                # que já evita duplicatas exatas, vamos adicionar source='observer'
+            for item in facts_data:
+                description = item.get("description")
+                category = item.get("category", "Comportamento")
+                meta = item.get("metadata", {})
                 
-                self.memory.add_fact("Comportamento", fact, source="observer")
-                learned_facts.append(fact)
+                if description:
+                    self.memory.add_fact(category, description, source="behavior_analyst", metadata=meta)
+                    learned_facts.append(description)
                 
             return learned_facts
 

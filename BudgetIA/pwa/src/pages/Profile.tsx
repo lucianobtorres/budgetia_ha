@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { User, Brain, ShieldAlert, Download, Settings } from 'lucide-react';
+import { User, Download, Settings, CreditCard } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { PageHeader } from '../components/ui/PageHeader';
@@ -9,24 +9,19 @@ import { STORAGE_KEYS } from '../utils/constants';
 
 import { useProfile } from '../hooks/useProfile';
 import { ProfileDataTab } from '../components/profile/ProfileDataTab';
-import { MemoryTab } from '../components/profile/MemoryTab';
-import { RulesTab } from '../components/profile/RulesTab';
 import { SettingsTab } from '../components/profile/SettingsTab';
+import { SubscriptionTab } from '../components/profile/SubscriptionTab';
 
 
 export default function Profile() {
-    const [activeTab, setActiveTab] = useState<'profile' | 'memory' | 'rules' | 'settings'>('profile');
+    const [activeTab, setActiveTab] = useState<'profile' | 'settings' | 'subscription'>('profile');
     
     // Hook handles all data fetching and mutations
     const { 
         profileData, 
-        memoryFacts, 
-        rules, 
         driveStatus, 
         isLoading, 
         saveProfile, 
-        deleteMemory, 
-        deleteRule, 
         shareDrive, 
         revokeDrive,
         resetProfile,
@@ -57,8 +52,7 @@ export default function Profile() {
 
     const tabs = [
         { id: 'profile', label: 'Dados', icon: User, color: 'text-emerald-400' },
-        { id: 'memory', label: 'Memória', icon: Brain, color: 'text-violet-400' },
-        { id: 'rules', label: 'Regras', icon: ShieldAlert, color: 'text-orange-400' },
+        { id: 'subscription', label: 'Assinatura', icon: CreditCard, color: 'text-purple-400' },
         { id: 'settings', label: 'Conta', icon: Settings, color: 'text-blue-400' }
     ] as const;
 
@@ -93,7 +87,7 @@ export default function Profile() {
             </div>
 
             {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto pb-20 scrollbar-thin scrollbar-thumb-gray-800">
+            <div className="flex-1 overflow-y-auto pb-20 scrollbar-thin scrollbar-thumb-gray-800 scrollbar-gutter-stable">
                 <div className="bg-gray-900/30 border border-gray-800/50 rounded-2xl p-6 min-h-[300px]">
                     {isLoading ? (
                         <div className="flex items-center justify-center h-40 text-gray-400 gap-2">
@@ -111,18 +105,8 @@ export default function Profile() {
                                 />
                             )}
 
-                            {activeTab === 'memory' && (
-                                <MemoryTab 
-                                    facts={memoryFacts} 
-                                    onDelete={deleteMemory} 
-                                />
-                            )}
-
-                            {activeTab === 'rules' && (
-                                <RulesTab 
-                                    rules={rules} 
-                                    onDelete={deleteRule} 
-                                />
+                            {activeTab === 'subscription' && (
+                                <SubscriptionTab />
                             )}
 
                             {activeTab === 'settings' && (

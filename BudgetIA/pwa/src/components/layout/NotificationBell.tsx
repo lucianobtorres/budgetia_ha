@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Bell, Check, Trash2 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { fetchAPI } from '../../services/api';
 import { cn } from '../../utils/cn';
 import { toast } from 'sonner';
@@ -122,6 +123,7 @@ export function NotificationBell() {
     return (
         <>
             <Button
+                id="notification-bell"
                 onClick={() => setIsOpen(true)}
                 variant="ghost"
                 size="icon"
@@ -145,7 +147,7 @@ export function NotificationBell() {
                                 className="text-sm text-primary-light hover:text-primary flex items-center gap-1 bg-primary/10 px-3 py-1.5 rounded-full border border-primary/20"
                             >
                                 <Check size={14} />
-                                Marcar todas como lidas
+                                Marcado todas como lidas
                             </button>
                          </div>
                     )}
@@ -199,9 +201,19 @@ export function NotificationBell() {
                                             </h4>
                                         </div>
                                         {/* Allow whitespace-pre-wrap to handle newlines in message if any */}
-                                        <p className="text-sm text-text-secondary mt-1 leading-relaxed whitespace-pre-wrap line-clamp-3">
-                                            {message.replace(/\*\*/g, '')} {/* Simple strip markdown bold */}
-                                        </p>
+                                        <div className="text-sm text-text-secondary mt-1 leading-relaxed markdown-content">
+                                            <ReactMarkdown 
+                                                components={{
+                                                    a: ({node, ...props}) => <a {...props} className="text-primary hover:underline" target="_blank" rel="noopener noreferrer" />,
+                                                    strong: ({node, ...props}) => <strong {...props} className="font-bold text-white" />,
+                                                    ul: ({node, ...props}) => <ul {...props} className="list-disc list-inside my-1" />,
+                                                    ol: ({node, ...props}) => <ol {...props} className="list-decimal list-inside my-1" />,
+                                                    li: ({node, ...props}) => <li {...props} className="ml-1" />
+                                                }}
+                                            >
+                                                {message} 
+                                            </ReactMarkdown>
+                                        </div>
                                         <p className="text-xs text-text-muted mt-2 font-medium">
                                             {dateDisplay}
                                         </p>

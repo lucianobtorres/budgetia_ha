@@ -10,14 +10,16 @@ import { useLocation } from "react-router-dom";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
+import { Select } from "../components/ui/Select";
 import { EmptyState } from "../components/ui/EmptyState";
 
 
+import { usePageTour } from "../hooks/usePageTour";
 import { useDrawer } from "../context/DrawerContext";
 
 export default function Transactions() {
     const { openDrawer } = useDrawer();
-    const { startTour } = useTour();
+    const { startTour } = useTour(); // Can remove this if startTour not used directly anymore, but keeps it for now
     const location = useLocation();
 
     // Current date for default filter
@@ -29,12 +31,8 @@ export default function Transactions() {
     // Initial Category from navigation state
     const [categoryFilter, setCategoryFilter] = useState(location.state?.initialCategory || 'all');
     
-    useEffect(() => {
-        // Small delay to ensure table is rendered (even if skeletal)
-        setTimeout(() => {
-            startTour('transactions_walkthrough');
-        }, 1000);
-    }, []);
+    // Standardized Tour Hook
+    usePageTour('transactions_walkthrough');
 
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -90,7 +88,7 @@ export default function Transactions() {
         return matchesSearch && matchesCategory;
     });
 
-    const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement> | { target: { value: string } }) => {
         setFilterValue(e.target.value);
     };
 
@@ -159,36 +157,34 @@ export default function Transactions() {
                 {/* Filters Row */}
                 {/* Filters Row */}
                 <div id="tx-filters" className="flex flex-col md:flex-row gap-3">
-                    <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 scrollbar-none">
+                    <div className="flex flex-wrap gap-2 w-full md:w-auto">
                         {/* Month Select */}
                         <div className="relative flex-1 min-w-[140px] md:flex-none">
-                            <div className="absolute inset-y-0 left-2 flex items-center pointer-events-none text-gray-400">
-                                 <Filter size={14} />
-                            </div>
-                            <select 
+                            <Select 
+                                icon={Filter}
                                 value={filterValue}
-                                onChange={handleFilterChange}
-                                className="w-full pl-8 pr-4 py-2 bg-gray-900 border border-gray-800 rounded-xl text-sm text-white appearance-none focus:border-emerald-500 outline-none capitalize transition-colors"
-                            >
-                                <option value="all">Todo o Período</option>
-                                {months.map(m => (
-                                    <option key={m.value} value={m.value}>{m.label}</option>
-                                ))}
-                            </select>
+                                onChange={(e) => handleFilterChange(e as any)}
+                                variant="glass"
+                                options={[
+                                    { label: "Todo o Período", value: "all" },
+                                    ...months.map(m => ({ label: m.label, value: m.value }))
+                                ]}
+                                className="bg-gray-900 border-gray-800 focus-visible:border-emerald-500" 
+                            />
                         </div>
 
                         {/* Category Select */}
                         <div className="relative flex-1 min-w-[140px] md:flex-none">
-                            <select 
+                            <Select 
                                 value={categoryFilter}
                                 onChange={(e) => setCategoryFilter(e.target.value)}
-                                className="w-full px-4 py-2 bg-gray-900 border border-gray-800 rounded-xl text-sm text-white appearance-none focus:border-emerald-500 outline-none capitalize transition-colors"
-                            >
-                                <option value="all">Todas as Categorias</option>
-                                {uniqueCategories.map(cat => (
-                                    <option key={cat} value={cat}>{cat}</option>
-                                ))}
-                            </select>
+                                variant="glass"
+                                options={[
+                                    { label: "Todas as Categorias", value: "all" },
+                                    ...uniqueCategories.map(cat => ({ label: cat, value: cat }))
+                                ]}
+                                className="bg-gray-900 border-gray-800 focus-visible:border-emerald-500"
+                            />
                         </div>
                     </div>
 

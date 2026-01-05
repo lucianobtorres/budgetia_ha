@@ -91,21 +91,25 @@ class PlanilhaManager:
         self.transaction_repo.add_transaction(
             data, tipo, categoria, descricao, valor, status
         )
-        self.recalculate_budgets()
+        self.recalculate_budgets() # Memória
+        self.save() # Single Commit
+
     def recalculate_budgets(self) -> None:
         self.budget_repo.recalculate_all_budgets()
 
     def delete_transaction(self, transaction_id: int) -> bool:
         success = self.transaction_repo.delete_transaction(transaction_id)
         if success:
-            self.recalculate_budgets() # Recalcula orçamentos se remover gasto
-        return success # type: ignore[no-any-return]
+            self.recalculate_budgets()
+            self.save() # Single Commit
+        return success
 
     def update_transaction(self, transaction_id: int, dados: dict[str, Any]) -> bool:
         success = self.transaction_repo.update_transaction(transaction_id, dados)
         if success:
             self.recalculate_budgets()
-        return success # type: ignore[no-any-return]
+            self.save() # Single Commit
+        return success
 
     def get_summary(self) -> dict[str, float]:
         return self.transaction_repo.get_summary() # type: ignore[no-any-return]
@@ -127,19 +131,22 @@ class PlanilhaManager:
             observacoes=observacoes,
         )
         self.recalculate_budgets()
-        return mensagem # type: ignore[no-any-return]
+        self.save() # Single Commit
+        return mensagem
 
     def delete_budget(self, budget_id: int) -> bool:
         success = self.budget_repo.delete_budget(budget_id)
         if success:
             self.recalculate_budgets()
-        return success # type: ignore[no-any-return]
+            self.save()
+        return success
 
     def update_budget(self, budget_id: int, dados: dict[str, Any]) -> bool:
         success = self.budget_repo.update_budget_by_id(budget_id, dados)
         if success:
             self.recalculate_budgets()
-        return success # type: ignore[no-any-return]
+            self.save()
+        return success
 
 
 

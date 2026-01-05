@@ -1,21 +1,14 @@
-import { LayoutDashboard, ArrowRightLeft, Link, User } from "lucide-react";
 import { Link as RouterLink, useLocation } from "react-router-dom";
 import { cn } from "../../utils/cn";
-
-const navigation = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'Transações', href: '/transactions', icon: ArrowRightLeft },
-  { name: 'Conexões', href: '/connections', icon: Link },
-  { name: 'Perfil', href: '/profile', icon: User },
-];
+import { navigationItems } from "../../config/navigation";
 
 export function BottomNav() {
   const location = useLocation();
 
   return (
     <div className="fixed bottom-0 left-0 z-50 w-full h-16 bg-surface-card border-t border-border md:hidden pb-[env(safe-area-inset-bottom)]">
-      <div className="grid h-full max-w-lg grid-cols-4 mx-auto font-medium">
-        {navigation.map((item) => {
+      <div className="grid h-full w-full grid-flow-col auto-cols-fr mx-auto font-medium">
+        {navigationItems.map((item) => {
             const isActive = location.pathname === item.href;
             return (
                 <RouterLink

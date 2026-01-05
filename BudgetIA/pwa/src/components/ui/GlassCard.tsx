@@ -1,6 +1,6 @@
 import { cn } from "../../utils/cn";
 
-export type CardVariant = 'default' | 'emerald' | 'violet' | 'orange' | 'blue' | 'red';
+export type CardVariant = 'default' | 'emerald' | 'violet' | 'orange' | 'blue' | 'red' | 'pink';
 
 interface GlassCardProps extends React.HTMLAttributes<HTMLDivElement> {
     hoverEffect?: boolean;
@@ -14,6 +14,7 @@ const HOVER_STYLES = {
     orange: "hover:border-orange-500/50 hover:shadow-orange-900/10",
     blue: "hover:border-blue-500/50 hover:shadow-blue-900/10",
     red: "hover:border-danger/50 hover:shadow-danger/10",
+    pink: "hover:border-pink-500/50 hover:shadow-pink-900/10",
 };
 
 export function GlassCard({ 

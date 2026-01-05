@@ -86,7 +86,13 @@ class ProactiveNotificationOrchestrator:
             # 1. Carregar dados
             transactions_df = plan_manager.visualizar_dados("Visão Geral e Transações")
             budgets_df = plan_manager.visualizar_dados("Meus Orçamentos")
-            user_profile: dict[str, Any] = {} # Todo: carregar profile
+            
+            # Carrega configuração para passar às regras
+            user_config = self.config_service.load_config()
+            
+            user_profile: dict[str, Any] = {
+                "config": user_config
+            }
 
         except Exception as e:
             logger.error(f"Falha ao carregar dados: {e}")

@@ -3,6 +3,7 @@ import { User, Lock, ArrowRight } from 'lucide-react';
 import { AuthService } from '../../services/auth';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { Link } from 'react-router-dom';
 
 interface LoginFormProps {
     onLogin: (user: string) => void;
@@ -52,7 +53,7 @@ export function LoginForm({ onLogin }: LoginFormProps) {
                         required
                         icon={User}
                         variant="glass"
-                        placeholder="Usuário"
+                        placeholder="Email ou Usuário"
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
                     />
@@ -71,6 +72,15 @@ export function LoginForm({ onLogin }: LoginFormProps) {
                         onChange={(e) => setPassword(e.target.value)}
                     />
                 </div>
+            </div>
+
+            <div className="flex justify-end">
+                <Link 
+                    to="/forgot-password"
+                    className="text-sm text-gray-400 hover:text-primary transition-colors"
+                >
+                    Esqueci minha senha
+                </Link>
             </div>
 
             <Button

@@ -168,7 +168,7 @@ class BudgetRepository:
 
         self._context.update_dataframe(self._aba_nome, df_orcamentos_atualizado)
 
-        logger.debug(
-            "Solicitando salvamento do orçamento atualizado (Diferenças detectadas)..."
-        )
-        self._context.save()
+        self._context.update_dataframe(self._aba_nome, df_orcamentos_atualizado)
+        
+        # O salvamento agora é responsabilidade do chamador (PlanilhaManager) (Single Save Pattern)
+        logger.debug("Orçamentos recalculados em memória.")

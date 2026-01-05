@@ -85,3 +85,18 @@ def mark_tour_seen(
     except Exception as e:
         logger.error(f"ERRO TELEMETRY MARK TOUR: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/tours")
+def reset_tours(
+    config_service: UserConfigService = Depends(get_user_config_service)
+):
+    """
+    Reseta o histórico de tours do usuário.
+    """
+    try:
+        service = UserBehaviorService(config_service.username)
+        service.reset_tours()
+        return {"status": "ok", "message": "Tours resetados com sucesso"}
+    except Exception as e:
+        logger.error(f"ERRO TELEMETRY RESET TOURS: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

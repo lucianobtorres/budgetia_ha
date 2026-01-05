@@ -20,6 +20,7 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 DATA_DIR = os.path.join(PROJECT_ROOT, "data")
 
 DEFAULT_CRED_FILENAME = "gen-lang-client-0988185244-c9e312f68267.json"
+USERS_FILE = os.path.join(DATA_DIR, "users.yaml")
 GSPREAD_CREDENTIALS_PATH = os.getenv("GSPREAD_CREDENTIALS_PATH")
 if GSPREAD_CREDENTIALS_PATH:
     GSPREAD_CREDENTIALS_PATH = GSPREAD_CREDENTIALS_PATH.strip("'").strip('"')
@@ -98,6 +99,21 @@ LLM_PROVIDER = os.getenv("LLM_PROVIDER", LLMProviders.GEMINI).upper()
 # mas agora apontando para a classe central.
 DEFAULT_GROQ_MODEL = os.getenv("GROQ_MODEL", LLMModels.DEFAULT_GROQ)
 DEFAULT_GEMINI_MODEL = LLMModels.DEFAULT_GEMINI
+
+
+# --- SAAS / DEPLOY MODE ---
+DEPLOY_MODE = os.getenv("DEPLOY_MODE", "SELF_HOSTED").upper() # SAAS or SELF_HOSTED
+
+# --- EMAIL CONFIGURATION (Resend.com) ---
+RESEND_API_KEY = os.getenv("RESEND_API_KEY")
+EMAIL_FROM = os.getenv("EMAIL_FROM", "BudgetIA <onboarding@resend.dev>")
+
+# --- STRIPE CONFIGURATION ---
+STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
+STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY")
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
+# STRIPE_TEST_KEY support for development
+STRIPE_TEST_KEY = os.getenv("STRIPE_TEST_KEY")
 
 
 # Caminho padrão robusto

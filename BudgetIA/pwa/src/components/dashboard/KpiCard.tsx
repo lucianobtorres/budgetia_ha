@@ -33,7 +33,7 @@ export function KpiCard({ id, title, value, icon: Icon, color, compact }: KpiCar
 
     return (
         <div id={id} className={cn(
-            "rounded-xl border bg-gradient-to-br to-transparent shadow-sm transition-all",
+            "rounded-xl border bg-gradient-to-br to-transparent shadow-sm transition-all hover:bg-white/5 cursor-default",
             gradient,
             border,
             compact ? "p-3" : "p-6"

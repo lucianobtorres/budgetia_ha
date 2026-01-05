@@ -318,3 +318,7 @@ class UserConfigService:
     def get_user_dir(self) -> str:
         """Retorna o caminho absoluto do diretório de dados deste usuário."""
         return str(self.config_dir.resolve())
+
+    def is_configured(self) -> bool:
+        """Verifica se o usuário já completou o setup principal (tem planilha)."""
+        return bool(self.get_planilha_path())

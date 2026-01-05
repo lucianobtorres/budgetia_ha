@@ -42,6 +42,23 @@ def get_state(
         "initial_message": orchestrator.get_initial_message()
     }
 
+@router.get("/status/{username}")
+def get_status(
+    username: str,
+    orchestrator: OnboardingOrchestrator = Depends(get_onboarding_orchestrator)
+) -> dict[str, str]:
+    """
+    Retorna o status simples (START, DOING, COMPLETE, ERROR) 
+    para decisão de roteamento do frontend.
+    """
+    # Se o ConfigService diz que está configurado, retorna COMPLETE
+    if orchestrator.config_service.is_configured():
+        return {"status": "COMPLETE"}
+    
+    # Caso contrário, retorna o estado atual mapeado ou o nome direto
+    state = orchestrator.get_current_state().name
+    return {"status": state}
+
 @router.post("/chat", response_model=ChatResponse)
 def chat(
     input_data: ChatInput,

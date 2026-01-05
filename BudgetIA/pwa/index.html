@@ -13,42 +13,117 @@
   </head>
   <body>
     <style>
+      body { margin: 0; padding: 0; background-color: #020617; } /* Match app background immediately */
+      
       #splash-screen {
         position: fixed;
         inset: 0;
-        background-color: %BACKGROUND_COLOR%;
         display: flex;
-        align-items: center;
-        justify-content: center;
         z-index: 9999;
         transition: opacity 0.3s ease-out;
       }
+
+      /* Mobile Default: Single dark background */
+      .splash-left { display: none; }
+      .splash-right { width: 100%; height: 100%; background-color: #020617; }
+      
+      /* Desktop: Split Screen Configuration to MATCH Login.tsx exactly */
+      @media (min-width: 1024px) {
+        .splash-left {
+            display: block;
+            width: 50%;
+            height: 100%;
+            position: relative;
+            overflow: hidden;
+            background-color: #064e3b; /* bg-emerald-900 */
+        }
+
+        /* Gradient Overlay: bg-gradient-to-br from-emerald-900 via-gray-900 to-black opacity-90 */
+        .splash-left::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, #064e3b, #111827, #000000);
+            opacity: 0.9; 
+        }
+
+        /* Blur 1: -top-24 -left-24 w-96 h-96 bg-emerald-500/20 rounded-full blur-3xl */
+        .splash-decor-1 {
+            position: absolute;
+            top: -6rem;
+            left: -6rem;
+            width: 24rem;
+            height: 24rem;
+            background-color: rgba(16, 185, 129, 0.2);
+            border-radius: 50%;
+            filter: blur(64px);
+            z-index: 1;
+        }
+
+        /* Blur 2: bottom-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl */
+        .splash-decor-2 {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 24rem;
+            height: 24rem;
+            background-color: rgba(59, 130, 246, 0.1);
+            border-radius: 50%;
+            filter: blur(64px);
+            z-index: 1;
+        }
+
+        .splash-right {
+           width: 50%;
+           height: 100%;
+           background-color: #020617; /* bg-gray-950 */
+        }
+      }
+
+      /* Logo Centered Globally */
+      .splash-center-content {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 10000;
+      }
+
       .splash-logo-container {
         width: 80px;
         height: 80px;
-        border-radius: 20px; /* rounded-xl proportional to size */
+        border-radius: 20px;
         overflow: hidden;
-        position: relative;
-        /* Shadow + Ring-1 white/20 equivalent */
         box-shadow: 
             0 10px 15px -3px rgba(0, 0, 0, 0.5), 
             0 4px 6px -2px rgba(0, 0, 0, 0.5),
             0 0 0 1px rgba(255, 255, 255, 0.2);
         animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
       }
+      
       .splash-icon {
         width: 100%;
         height: 100%;
         object-fit: cover;
       }
+
       @keyframes pulse {
         0%, 100% { opacity: 1; transform: scale(1); }
         50% { opacity: .7; transform: scale(0.95); }
       }
     </style>
+    
     <div id="splash-screen">
-       <div class="splash-logo-container">
-            <img src="/pwa-512x512.png" class="splash-icon" alt="BudgetIA" />
+       <div class="splash-left">
+           <div class="splash-decor-1"></div>
+           <div class="splash-decor-2"></div>
+       </div>
+       <div class="splash-right"></div>
+       
+       <div class="splash-center-content">
+           <div class="splash-logo-container">
+                <img src="/pwa-512x512.png" class="splash-icon" alt="BudgetIA" />
+           </div>
        </div>
     </div>
     <div id="root"></div>

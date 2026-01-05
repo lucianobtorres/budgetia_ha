@@ -1,7 +1,7 @@
 import { ShieldAlert, Trash2 } from 'lucide-react';
 import { GlassCard } from '../ui/GlassCard';
 import { GradientBanner } from '../ui/GradientBanner';
-import type { WatchdogRule } from '../../hooks/useProfile';
+import type { WatchdogRule } from '../../hooks/useIntelligence';
 
 interface Props {
     rules: WatchdogRule[];

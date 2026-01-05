@@ -9,6 +9,7 @@ interface GradientBannerProps {
     description: string;
     variant?: BannerVariant;
     className?: string;
+    children?: React.ReactNode;
 }
 
 const VARIANTS = {
@@ -49,7 +50,7 @@ const VARIANTS = {
     }
 };
 
-export function GradientBanner({ icon: Icon, title, description, variant = 'emerald', className }: GradientBannerProps) {
+export function GradientBanner({ icon: Icon, title, description, variant = 'emerald', className, children }: GradientBannerProps) {
     const styles = VARIANTS[variant] || VARIANTS.emerald;
 
     return (
@@ -58,14 +59,17 @@ export function GradientBanner({ icon: Icon, title, description, variant = 'emer
             styles.container,
             className
         )}>
-            <div className="flex items-center gap-4">
-                <div className={cn("p-3 rounded-full", styles.iconBg)}>
-                    <Icon size={32} />
+            <div className="flex flex-col md:flex-row items-start md:items-center gap-4 justify-between">
+                <div className="flex items-center gap-4">
+                    <div className={cn("p-3 rounded-full", styles.iconBg)}>
+                        <Icon size={32} />
+                    </div>
+                    <div>
+                        <h3 className="text-xl font-bold text-white">{title}</h3>
+                        <p className={cn("text-sm", styles.desc)}>{description}</p>
+                    </div>
                 </div>
-                <div>
-                    <h3 className="text-xl font-bold text-white">{title}</h3>
-                    <p className={cn("text-sm", styles.desc)}>{description}</p>
-                </div>
+                {children && <div className="mt-4 md:mt-0 w-full md:w-auto">{children}</div>}
             </div>
         </div>
     );

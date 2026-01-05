@@ -25,11 +25,13 @@ export function ChatInput({
     const inputRef = React.useRef<HTMLInputElement>(null);
 
     React.useEffect(() => {
-        if (!loading && autoFocus) {
-             // Small timeout to ensure DOM is ready and preventing race conditions
-             setTimeout(() => {
-                inputRef.current?.focus();
-             }, 10);
+        if (!loading) {
+            // Re-focus after loading finishes or on mount if autoFocus is true
+            if (autoFocus) {
+                 setTimeout(() => {
+                    inputRef.current?.focus();
+                 }, 10);
+            }
         }
     }, [loading, autoFocus]);
 

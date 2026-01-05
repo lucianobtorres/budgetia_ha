@@ -130,7 +130,7 @@ export default function Chat({ className, variant = 'full', onAction }: ChatProp
                      <div className="flex justify-start">
                         <div className="bg-gray-800/80 text-gray-100 rounded-2xl rounded-tl-sm p-4 flex items-center space-x-2 border border-gray-700/50">
                              <Loader2 size={16} className="animate-spin text-emerald-400" />
-                             <span className="text-sm text-gray-400">Digitando...</span>
+                             <span className="text-sm text-gray-400">Pensando...</span>
                         </div>
                     </div>
                 )}
@@ -146,6 +146,7 @@ export default function Chat({ className, variant = 'full', onAction }: ChatProp
                     onClear={handleClear}
                     loading={loading}
                     showClear={true}
+                    autoFocus={true}
                 />
             </div>
         </div>

@@ -1,4 +1,5 @@
 import { cn } from '../../utils/cn';
+import ReactMarkdown from 'react-markdown';
 
 export interface MessageProps {
     role: 'user' | 'assistant';
@@ -58,7 +59,32 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                     ? "bg-emerald-600/90 text-white rounded-tr-sm"
                     : "bg-gray-800/80 text-gray-100 rounded-tl-sm border border-gray-700/50"
             )}>
-                <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                 <div className="whitespace-pre-wrap leading-relaxed markdown-content">
+                    <ReactMarkdown
+                        components={{
+                            a: ({node, ...props}) => <a {...props} className="text-emerald-400 hover:underline" target="_blank" rel="noopener noreferrer" />,
+                            strong: ({node, ...props}) => <strong {...props} className="font-bold text-white" />,
+                            ul: ({node, ...props}) => <ul {...props} className="list-disc leading-relaxed list-inside my-1" />,
+                            ol: ({node, ...props}) => <ol {...props} className="list-decimal leading-relaxed list-inside my-1" />,
+                            li: ({node, ...props}) => <li {...props} className="ml-1" />,
+                            code: ({node, className, children, ...props}) => {
+                                const match = /language-(\w+)/.exec(className || '')
+                                return match ? (
+                                    <code className={`${className} bg-black/30 rounded px-1 py-0.5`} {...props}>
+                                        {children}
+                                    </code>
+                                ) : (
+                                    <code className="bg-black/30 rounded px-1 py-0.5 text-xs font-mono" {...props}>
+                                        {children}
+                                    </code>
+                                )
+                            },
+                            pre: ({node, ...props}) => <pre {...props} className="bg-black/30 p-2 rounded-lg overflow-x-auto my-2 text-xs font-mono border border-white/10" />
+                        }}
+                    >
+                        {message.content}
+                    </ReactMarkdown>
+                </div>
             </div>
         </div>
     );

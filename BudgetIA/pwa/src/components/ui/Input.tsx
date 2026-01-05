@@ -24,7 +24,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(({ className, icon: Icon,
             <input
                 ref={ref}
                 className={cn(
-                    "flex w-full rounded-xl border px-3 py-2 text-sm transition-all outline-none focus-visible:ring-1 disabled:cursor-not-allowed disabled:opacity-50",
+                    "flex w-full rounded-xl border px-3 py-2 text-sm transition-all outline-none focus-visible:ring-1 disabled:cursor-not-allowed disabled:opacity-50 h-11",
                      // Base styles that are safe to override
                     "file:border-0 file:bg-transparent file:text-sm file:font-medium",
                     variants[variant],

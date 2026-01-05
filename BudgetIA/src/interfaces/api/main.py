@@ -1,5 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from fastapi import APIRouter
+import os
+import uvicorn
 
 from interfaces.api.routers import (
     auth,
@@ -14,6 +19,10 @@ from interfaces.api.routers import (
     profile,
     telemetry,
     transactions,
+    intelligence,
+    admin,
+    subscription, 
+    system,
 )
 
 description = """
@@ -44,7 +53,6 @@ app.add_middleware(
 
 # Incluir Rotas
 # Criar Router Principal da API
-from fastapi import APIRouter
 api_router = APIRouter(prefix="/api")
 
 api_router.include_router(health.router)
@@ -59,6 +67,10 @@ api_router.include_router(presence.router)
 api_router.include_router(auth.router)
 api_router.include_router(onboarding.router)
 api_router.include_router(telemetry.router)
+api_router.include_router(intelligence.router)
+api_router.include_router(admin.router)
+api_router.include_router(subscription.router)
+api_router.include_router(system.router)
 
 # Incluir na App Principal
 app.include_router(api_router)
@@ -78,15 +90,10 @@ async def startup_event():
 
 
 if __name__ == "__main__":
-    import uvicorn
     # Permite rodar diretamente via 'python src/api/main.py'
     uvicorn.run("interfaces.api.main:app", host="0.0.0.0", port=8000, reload=True)
 
 # --- Serving Static Files (Frontend) for Docker/Add-on ---
-import os
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-
 # Check where the static files are (configured in Dockerfile)
 STATIC_DIR = os.getenv("STATIC_DIR", "/app/static")
 
@@ -109,4 +116,3 @@ if os.path.isdir(STATIC_DIR):
             
         # Default to index.html for React Router
         return FileResponse(os.path.join(STATIC_DIR, "index.html"))
-

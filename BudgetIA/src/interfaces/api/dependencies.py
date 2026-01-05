@@ -15,6 +15,47 @@ logger = get_logger("API_Deps")
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
+def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
+    """Retorna o payload do token (usuário atual)"""
+    payload = decode_access_token(token)
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token inválido ou expirado",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    username: str = payload.get("sub")
+    if username is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token inválido: sub ausente",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+        
+    # Load full user data to get trial_ends_at, role, etc.
+    from interfaces.api.utils.security import get_user
+    user_data = get_user(username)
+    
+    if not user_data:
+        # Token valid but user deleted?
+         raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Usuário não encontrado",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+        
+    # Inject username back if missing in the file object for consistency, though it's the key
+    user_data['username'] = username
+    
+    if user_data.get("disabled", False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Conta bloqueada pelo administrador.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return user_data
+
 # --- CACHE DE SISTEMAS FINANCEIROS ---
 # Mapeia user_id -> PlanilhaManager
 # Isso garante que não abrimos múltiplos handlers para a mesma planilha
@@ -26,6 +67,7 @@ def get_user_config_service(
     token: str = Depends(oauth2_scheme),
 ) -> UserConfigService:
     """Dependency que valida o JWT e retorna o Config Service."""
+    # Reutilizando lógica de validação se quisesse, mas mantendo separado para evitar refactor grande agora
     payload = decode_access_token(token)
     
     if payload is None:
@@ -49,6 +91,22 @@ def get_user_config_service(
 
     # Debug para confirmar quem está chamando
     logger.debug(f"Acesso AUTENTICADO para user='{username}'")
+    
+    # SECURITY CHECK: Verify if user is still active in DB (not blocked/deleted)
+    from interfaces.api.utils.security import get_user
+    user_data = get_user(username)
+    if not user_data:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            detail="Usuário não encontrado."
+        )
+    
+    if user_data.get("disabled", False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Conta bloqueada pelo administrador."
+        )
+
     return UserConfigService(username=username)
 
 
@@ -302,3 +360,26 @@ def get_onboarding_orchestrator(
         _onboarding_cache[user_id] = orchestrator
 
     return _onboarding_cache[user_id]
+
+
+# --- EMAIL ---
+from core.email_service import EmailService
+
+def get_email_service() -> EmailService:
+    return EmailService()
+
+# --- SUBSCRIPTION ---
+from core.subscription.providers import SubscriptionProvider, StripeSubscriptionProvider, MockSubscriptionProvider
+from core.subscription.entitlements import EntitlementService
+import config
+
+def get_subscription_provider() -> SubscriptionProvider:
+    # Se estiver em modo SAAS e tiver chave stripe, usa Stripe
+    if config.DEPLOY_MODE == "SAAS" and config.STRIPE_SECRET_KEY:
+        return StripeSubscriptionProvider()
+    return MockSubscriptionProvider()
+
+def get_entitlement_service(
+    provider: SubscriptionProvider = Depends(get_subscription_provider)
+) -> EntitlementService:
+    return EntitlementService(provider)

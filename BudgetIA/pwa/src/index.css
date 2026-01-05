@@ -67,3 +67,27 @@ a {
 a:hover {
   color: #10b981; /* Emerald 500 */
 }
+
+/* Enforce pointer cursor on all buttons and clickable elements */
+button, 
+[role="button"],
+input[type="submit"],
+input[type="reset"],
+input[type="button"] {
+  cursor: pointer;
+}
+
+button:disabled,
+[role="button"][aria-disabled="true"],
+input:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.drop-shadow-glow {
+  filter: drop-shadow(0 0 8px rgba(52, 211, 153, 0.5));
+}
+
+.scrollbar-gutter-stable {
+  scrollbar-gutter: stable;
+}

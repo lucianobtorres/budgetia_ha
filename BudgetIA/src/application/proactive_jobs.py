@@ -24,6 +24,30 @@ logger = get_logger("ProactiveJobs")
 
 from application.services.push_notification_service import PushNotificationService
 
+from application.notifications.rules.economy.recurring_expense_monitor import RecurringExpenseMonitor
+
+# Helper para API de Inteligência listar o que temos
+def get_default_rules(user_config_service: UserConfigService = None):
+    """
+    Retorna as regras padrão do sistema.
+    Algumas regras podem precisar de config para inicialização (ex: ler keywords).
+    """
+    # Ler keywords do config se disponível para o SubscriptionAuditor
+    sub_keywords = None
+    if user_config_service:
+        try:
+            config = user_config_service.load_config()
+            sub_keywords = config.get("comunicacao", {}).get("subscription_keywords")
+        except Exception:
+            pass
+
+    return [
+        TransportMissingRule(days_threshold=2),
+        BudgetOverrunRule(threshold_percent=0.9),
+        SubscriptionAuditorRule(days_lookback=30, custom_keywords=sub_keywords),
+        RecurringExpenseMonitor(days_lookback=30, threshold_percent=1.2)
+    ]
+
 async def run_proactive_notifications(
     config_service: UserConfigService,
     llm_orchestrator: LLMOrchestrator,
@@ -46,11 +70,7 @@ async def run_proactive_notifications(
 
         # 3. Registrar regras de negócio
         # Regras "Hardcoded" do sistema
-        rules = [
-            # Configurado para 2 dias de inatividade
-            TransportMissingRule(days_threshold=2),
-            BudgetOverrunRule(threshold_percent=0.9),
-        ]
+        rules = get_default_rules()
         
         # Regras Dinâmicas (Jarvis Guard)
         repo = RuleRepository(config_service.get_user_dir())

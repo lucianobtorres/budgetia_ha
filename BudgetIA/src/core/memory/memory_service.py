@@ -37,14 +37,14 @@ class MemoryService:
             json.dump(memory, f, indent=4, ensure_ascii=False)
         os.replace(temp_file, self.memory_file)
 
-    def add_fact(self, category: str, content: str, source: str = "user") -> str:
+    def add_fact(self, category: str, content: str, source: str = "user", metadata: dict[str, Any] | None = None) -> str:
         """Adds a new fact to the memory."""
         memory = self._load_memory()
         
         # Check if identical fact exists
         for fact in memory:
             if fact["category"] == category and fact["content"] == content:
-                # Update source if strictly generated now? Optional.
+                # Update metadata if provided? For now, just skip unique duplicates.
                 return "Fact already known."
 
         new_fact = {
@@ -52,6 +52,7 @@ class MemoryService:
             "category": category,
             "content": content,
             "source": source,
+            "metadata": metadata or {},
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat()
         }

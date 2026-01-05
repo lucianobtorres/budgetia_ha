@@ -10,6 +10,7 @@ class BaseTool(ABC):
 
     name: str
     description: str
+    label: str | None = None # Nome amigável para UI
     args_schema: type[BaseModel]
 
     @abstractmethod

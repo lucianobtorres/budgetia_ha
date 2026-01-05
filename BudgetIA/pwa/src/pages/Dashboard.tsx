@@ -15,6 +15,7 @@ import { useLocation } from 'react-router-dom';
 import { telemetry } from '../services/telemetry';
 import { useTour } from '../context/TourContext';
 import { PageHeader } from '../components/ui/PageHeader';
+import { usePageTour } from '../hooks/usePageTour';
 
 export default function Dashboard() {
   const { openDrawer } = useDrawer();
@@ -22,39 +23,21 @@ export default function Dashboard() {
   const queryClient = useQueryClient();
   const { data: summary, isLoading: loadingSummary } = useSummary();
   const { data: expenses, isLoading: loadingExpenses } = useExpenses(50);
-  const { startTour } = useTour(); // Hook do Tour
+  const { startTour, isTourLoading } = useTour(); // Hook do Tour
 
   const loading = loadingSummary || loadingExpenses;
   const hasData = summary && (summary.total_receitas > 0 || summary.total_despesas > 0);
 
-  // Telemetria & Tour
+  // Determine logical tour ID based on data state
+  const tourName = hasData ? 'dashboard_full' : 'dashboard_empty';
+  
+  // Use the new simplified hook
+  usePageTour(tourName as any, !loading);
+
+  // Telemetria (View Dashboard) - Keep simple log
   useEffect(() => {
       telemetry.logAction('view_dashboard');
-      
-      if (!loading) {
-         // Lógica Adaptativa: Se tem dados => Tour Avançado, senão => Onboarding
-         const tourName = hasData ? 'dashboard_full' : 'dashboard_empty';
-         
-         // Check if we should restart tour from Profile
-         const shouldRestart = location.state?.restartTour;
-
-         if (shouldRestart) {
-             // Delay to ensure UI is ready
-             setTimeout(() => {
-                 startTour(tourName as any, true);
-                 // Clear state to prevent loop on refresh? (React router state persists on refresh usually, but logic here is safe enough if hasData doesn't change wildly)
-                 // Ideally we clear it, but modifying history stack is complex.
-                 // Since 'true' forces it, it's fine.
-             }, 800);
-         } else {
-             // Normal flow (checks localStorage internally)
-             // Pequeno delay para garantir que o DOM renderizou
-             setTimeout(() => {
-                startTour(tourName as any);
-             }, 1000);
-         }
-      }
-  }, [loading, hasData, location]);
+  }, []);
 
   const handleChatAction = () => {
       // Invalidate all dashboard queries to refresh data

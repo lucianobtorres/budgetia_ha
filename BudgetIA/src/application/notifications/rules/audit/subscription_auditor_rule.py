@@ -21,13 +21,21 @@ class SubscriptionAuditorRule(IFinancialRule): # type: ignore[misc]
     Objetivo: Questionar a utilidade do gasto assim que ele ocorre.
     """
 
-    def __init__(self, days_lookback: int = 3):
+    DEFAULT_KEYWORDS = [
+        "netflix", "spotify", "amazon prime", "prime video", 
+        "disney", "hbo", "apple.com/bill", "google storage", 
+        "youtube premium", "smartfit", "gympass", "sem par", "veloe",
+        # Telecom & Utilities (BR)
+        "claro", "vivo", "tim", "oi", "sky", "net",
+        "sabesp", "cpfl", "enel", "sanasa", "copasa", "embasa", "compesa",
+        "comgas", "naturgy",
+        # Taxes & Insurance
+        "iptu", "ipva", "dpvat", "seguro auto", "seguro vida", "plano de saude", "unimed", "sulamerica", "bradesco saude"
+    ]
+
+    def __init__(self, days_lookback: int = 3, custom_keywords: list[str] = None):
         self.days_lookback = days_lookback
-        self.subscription_keywords = [
-            "netflix", "spotify", "amazon prime", "prime video", 
-            "disney", "hbo", "apple.com/bill", "google storage", 
-            "youtube premium", "smartfit", "gympass", "sem par", "veloe"
-        ]
+        self.subscription_keywords = [k.lower() for k in custom_keywords] if custom_keywords else self.DEFAULT_KEYWORDS.copy()
 
     @property
     def rule_name(self) -> str:
@@ -52,6 +60,13 @@ class SubscriptionAuditorRule(IFinancialRule): # type: ignore[misc]
             
         df[config.ColunasTransacoes.DATA] = pd.to_datetime(df[config.ColunasTransacoes.DATA], errors='coerce')
         
+        # Tenta carregar keywords customizadas do usuário
+        if user_profile and "config" in user_profile:
+             custom_keywords = user_profile["config"].get("comunicacao", {}).get("subscription_keywords")
+             if custom_keywords and isinstance(custom_keywords, list) and len(custom_keywords) > 0:
+                 self.subscription_keywords = [k.lower() for k in custom_keywords]
+                 logger.debug(f"Usando {len(self.subscription_keywords)} keywords customizadas para auditoria.")
+
         # 2. Filtrar data recente (Janela de Auditoria)
         cutoff_date = datetime.now() - timedelta(days=self.days_lookback)
         recent_tx = df[df[config.ColunasTransacoes.DATA] >= cutoff_date]

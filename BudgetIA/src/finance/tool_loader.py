@@ -22,6 +22,64 @@ from finance.repositories.transaction_repository import TransactionRepository
 from core.memory.memory_service import MemoryService # NEW
 from core.user_config_service import UserConfigService # NEW
 
+# Mapa de Traduções (Backend Source of Truth)
+TOOL_TRANSLATIONS = {
+    'add_transaction': 'Adicionar Transação',
+    'adicionar_transacao': 'Adicionar Transação', # PT Key Support
+    'add_debt': 'Adicionar Dívida', 
+    'adicionar_divida': 'Adicionar Dívida', # PT Key Support
+    'analyze_adherence': 'Analisar Aderência',
+    'analisar_aderencia': 'Analisar Aderência', # PT Key Support
+    'analyze_debt': 'Analisar Dívidas',
+    'analisar_dividas': 'Analisar Dívidas', # PT Key Support
+    'analyze_habits': 'Analisar Hábitos',
+    'analisar_habitos': 'Analisar Hábitos', # PT Key Support
+    'analyze_spending_trends': 'Tendências de Gastos',
+    'analisar_tendencias_gastos': 'Tendências de Gastos', # PT Key Support
+    'calculate_balance': 'Calcular Saldo',
+    'calcular_saldo': 'Calcular Saldo', # PT Key Support
+    'calculate_expenses_by_category': 'Despesas por Categoria',
+    'calcular_despesas_por_categoria': 'Despesas por Categoria', # PT Key Support
+    'check_budget_status': 'Status do Orçamento',
+    'verificar_status_orcamento': 'Status do Orçamento', # PT Key Support
+    'collect_user_profile': 'Coletar Perfil',
+    'coletar_perfil_usuario': 'Coletar Perfil', # PT Key Support
+    'define_budget': 'Definir Orçamento',
+    'definir_orcamento': 'Definir Orçamento', # PT Key Support
+    'delete_transaction': 'Excluir Transação',
+    'excluir_transacao': 'Excluir Transação', # PT Key Support
+    'extract_transactions': 'Extrair Transações',
+    'extrair_transacoes': 'Extrair Transações', # PT Key Support
+    'generate_monthly_summary': 'Resumo Mensal',
+    'gerar_resumo_mensal': 'Resumo Mensal', # PT Key Support
+    'identify_top_expenses': 'Maiores Despesas',
+    'identificar_maiores_despesas': 'Maiores Despesas', # PT Key Support
+    'memory_tools': 'Ferramentas de Memória',
+    'recommend_rule': 'Recomendar Regras',
+    'recomendar_regra': 'Recomendar Regras', # PT Key Support
+    'register_ai_insight': 'Registrar Insight',
+    'registrar_insight': 'Registrar Insight', # PT Key Support
+    'rule_tools': 'Ferramentas de Regras',
+    'update_transaction': 'Atualizar Transação',
+    'atualizar_transacao': 'Atualizar Transação', # PT Key Support
+    'view_data': 'Visualizar Dados',
+    'visualizar_dados': 'Visualizar Dados', # PT Key Support
+    'view_debts': 'Visualizar Dívidas',
+    'visualizar_dividas': 'Visualizar Dívidas', # PT Key Support
+    'visualizar_ultimas_transacoes': 'Últimas Transações',
+    # Missing Keys identified by User
+    'analisar_adesao_financeira': 'Analisar Adesão Financeira',
+    'analisar_divida': 'Analisar Dívida',
+    'calcular_saldo_total': 'Calcular Saldo Total',
+    'create_spending_alert': 'Criar Alerta de Gastos',
+    'extrair_transacoes_do_texto': 'Extrair Transações do Texto',
+    'forget_user_fact': 'Esquecer Fato',
+    'identificar_maiores_gastos': 'Identificar Maiores Gastos',
+    'recomendar_regra_ideal': 'Recomendar Regra Ideal',
+    'registrar_insight_ia': 'Registrar Insight',
+    'visualizar_dados_planilha': 'Visualizar Dados Planilha',
+}
+
 def load_all_financial_tools(
     # planilha_manager: PlanilhaManager, # Removido
     data_context: FinancialDataContext,
@@ -42,6 +100,8 @@ def load_all_financial_tools(
     """
     tools_list: list[BaseTool] = []
     tools_dir = os.path.join(os.path.dirname(__file__), "tools")
+
+
 
     # Lista de ferramentas essenciais para modelos menores (Llama 8B / Groq)
     ESSENTIAL_TOOLS_FILES = [
@@ -134,6 +194,17 @@ def load_all_financial_tools(
                                     )
 
                             tool_instance = tool_class(**kwargs_for_tool)
+                            
+                            # Inject Label (Translation)
+                            tool_name_key = tool_instance.name.replace("_tool", "")
+                            if tool_instance.name in TOOL_TRANSLATIONS:
+                                tool_instance.label = TOOL_TRANSLATIONS[tool_instance.name]
+                            elif tool_name_key in TOOL_TRANSLATIONS:
+                                tool_instance.label = TOOL_TRANSLATIONS[tool_name_key]
+                            else:
+                                # Fallback: Title Case replacing underscores
+                                tool_instance.label = tool_instance.name.replace("_", " ").title()
+
                             tools_list.append(tool_instance)
 
                         except TypeError as e:

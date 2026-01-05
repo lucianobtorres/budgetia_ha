@@ -146,3 +146,9 @@ class UserBehaviorService:
         if tour_id not in data["tours_seen"]:
             data["tours_seen"].append(tour_id)
             self._save_data(data)
+
+    def reset_tours(self) -> None:
+        """Limpa o histórico de tours vistos."""
+        data = self._load_data()
+        data["tours_seen"] = []
+        self._save_data(data)
