@@ -41,7 +41,7 @@ RUN pip install poetry
 COPY pyproject.toml poetry.lock ./
 
 # Install Backend Dependencies
-RUN poetry install --only main --no-interaction --no-ansi --no-root
+RUN poetry lock --no-update && poetry install --only main --no-interaction --no-ansi --no-root
 
 # Copy Application Code
 COPY src ./src
