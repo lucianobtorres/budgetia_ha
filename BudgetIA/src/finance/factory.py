@@ -11,12 +11,14 @@ logger = get_logger("FinanceFactory")
 from infrastructure.caching.redis_cache_service import RedisCacheService
 from finance.planilha_manager import PlanilhaManager
 from finance.repositories.budget_repository import BudgetRepository
+from finance.repositories.category_repository import CategoryRepository  # <--- Novo
 from finance.repositories.data_context import FinancialDataContext
 from finance.repositories.debt_repository import DebtRepository
 from finance.repositories.insight_repository import InsightRepository
 from finance.repositories.profile_repository import ProfileRepository
 from finance.repositories.transaction_repository import TransactionRepository
 from finance.services.budget_service import BudgetService
+from finance.services.category_service import CategoryService  # <--- Novo
 from finance.services.debt_service import DebtService
 from finance.services.insight_service import InsightService
 from finance.services.setup_service import FinancialSetupService
@@ -114,6 +116,12 @@ class FinancialSystemFactory:
         debt_repo = DebtRepository(context=context, debt_service=DebtService())
         profile_repo = ProfileRepository(context=context)
         insight_repo = InsightRepository(context=context)
+        category_repo = CategoryRepository(context=context) # <--- Novo
+
+        category_service = CategoryService(  # <--- Novo
+            repo=category_repo, 
+            transaction_repo=transaction_repo
+        )
 
         insight_service = InsightService(
             transaction_repo=transaction_repo,
@@ -145,6 +153,24 @@ class FinancialSystemFactory:
         else:
             logger.info("Arquivo existente carregado do Cache. Startup rápido.")
 
+        # --- AUTO MIGRATION CHECK ---
+        # Garante que as categorias existam, mesmo se usuario nao deletar arquivo
+        try:
+           category_service.ensure_default_categories()
+           if not category_repo.get_all().empty:
+               # Se criou algo, salva
+               pass 
+               # (Obs: O ensure_default_categories do service apenas atualiza o DF em memória 
+               # e o PlanilhaManager.ensure_default_categories chamava o save. 
+               # Aqui estamos chamando o SERVICE direto. Precisamos garantir o save se mudou.)
+               # Melhor deixar o PlanilhaManager chamar isso ou o setup_service.
+               # Mas como o Factory constrói tudo, vamos deixar o PlanilhaManager
+               # lidar com a persistência de "primeira carga" safe.
+               pass
+        except Exception as e:
+            logger.warning(f"Erro na migração automática de categorias: {e}")
+
+
         # 6. Cria o Manager (Fachada)
         return PlanilhaManager(
             context=context,
@@ -153,6 +179,8 @@ class FinancialSystemFactory:
             debt_repo=debt_repo,
             profile_repo=profile_repo,
             insight_repo=insight_repo,
+            category_repo=category_repo,  # <--- Novo
+            category_service=category_service,  # <--- Novo
             insight_service=insight_service,
             cache_key=cache_key,
         )

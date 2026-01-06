@@ -14,6 +14,7 @@ from core.llm_manager import LLMOrchestrator
 from core.memory.memory_service import MemoryService # NEW
 from core.user_config_service import UserConfigService # NEW
 from finance.repositories.budget_repository import BudgetRepository
+from finance.repositories.category_repository import CategoryRepository # NEW
 
 # Importa todos os repositórios e o contexto
 from finance.repositories.data_context import FinancialDataContext
@@ -48,6 +49,7 @@ class IADeFinancas(AgentRunner):  # type: ignore[misc]
         debt_repo: DebtRepository,
         profile_repo: ProfileRepository,
         insight_repo: InsightRepository,
+        category_repo: CategoryRepository, # NEW
         memory_service: MemoryService, # NEW Dependency
         config_service: UserConfigService, # NEW Dependency
         # --- FIM NOVOS ARGUMENTOS ---
@@ -78,7 +80,33 @@ class IADeFinancas(AgentRunner):  # type: ignore[misc]
         # 1. Data Atual
         final_system_prompt = "Data e Hora Atual: {data_atual}\n\n" + final_system_prompt
         
-        # 2. Memória de Longo Prazo (Jarvis Mind)
+        # 2. Injeção de Categorias Dinâmicas
+        try:
+           cats_df = category_repo.get_all()
+           if not cats_df.empty:
+               from config import ColunasCategorias
+               lista_cats = []
+               for _, row in cats_df.iterrows():
+                   nome = str(row.get(ColunasCategorias.NOME, ""))
+                   tipo = str(row.get(ColunasCategorias.TIPO, ""))
+                   tags = str(row.get(ColunasCategorias.TAGS, ""))
+                   line = f"- [{tipo}] {nome}"
+                   if tags and tags != "nan":
+                       line += f" (Tags: {tags})"
+                   lista_cats.append(line)
+               
+               cats_str = "\n".join(lista_cats)
+               msg_cats = (
+                   f"\n\n=== CATEGORIAS DO USUÁRIO ===\n"
+                   f"Estas são as categorias OFICIAIS. Tente classificar usando apenas estas.\n"
+                   f"{cats_str}\n"
+                   f"=============================="
+               )
+               final_system_prompt += msg_cats
+        except Exception as e:
+            logger.warning(f"Erro ao injetar categorias no prompt: {e}")
+
+        # 3. Memória de Longo Prazo (Jarvis Mind)
         memory_context = self.memory_service.get_context_string()
         final_system_prompt += f"\n\n=== MEMÓRIA DE LONGO PRAZO ===\n{memory_context}\n=============================="
 

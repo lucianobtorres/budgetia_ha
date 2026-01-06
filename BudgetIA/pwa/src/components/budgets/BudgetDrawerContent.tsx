@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
-import { useBudgetsList, useCreateBudget, useUpdateBudget, useDeleteBudget, type Budget } from '../../hooks/useBudgets';
+import { useBudgetsList, useCreateBudget, useUpdateBudget, useDeleteBudget } from '../../hooks/useBudgets';
+import type { Budget } from '../../types/domain';
 import { useCategoryColorMap } from '../../hooks/useCategoryColorMap';
 import { Plus } from 'lucide-react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import BudgetModal from './BudgetFormDrawer';
 import { Button } from '../ui/Button';
 import { Drawer } from '../ui/Drawer';
-import { ProgressListItem } from '../ui/ProgressListItem';
+import { DistributionPieChart } from '../dashboard/DistributionPieChart';
+import { BudgetList } from './BudgetList';
 
 interface Props {
     isOpen: boolean;
@@ -83,6 +84,10 @@ export default function BudgetDrawer({ isOpen, onClose, highlightCategory, highl
         setIsModalOpen(true);
     };
 
+    const registerRef = (key: string, el: HTMLDivElement | null) => {
+        itemRefs.current[key] = el;
+    };
+
     const getInitialData = () => {
         if (!editingBudget) return undefined;
         return {
@@ -92,6 +97,12 @@ export default function BudgetDrawer({ isOpen, onClose, highlightCategory, highl
             observacoes: editingBudget.Observações || ''
         };
     };
+
+    // Prepare data for Chart
+    const chartData = budgets.map(b => ({
+        name: b.Categoria,
+        value: b['Valor Gasto Atual'] || 0
+    }));
 
     return (
         <Drawer 
@@ -111,40 +122,13 @@ export default function BudgetDrawer({ isOpen, onClose, highlightCategory, highl
             <div className="flex flex-col md:flex-row h-full bg-transparent gap-4 md:gap-6 pb-4 md:pb-0">
                 {/* Left Column: Chart (Desktop) / Top (Mobile) */}
                 <div className="w-full md:w-5/12 flex-none flex flex-col gap-4">
-                     {totalBudgets > 0 ? (
-                        <div className="h-[250px] md:h-[350px] w-full bg-surface-card/40 rounded-xl border border-border p-2 flex items-center justify-center">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                    <Pie
-                                        data={budgets}
-                                        dataKey="Valor Gasto Atual"
-                                        nameKey="Categoria"
-                                        cx="50%"
-                                        cy="50%"
-                                        innerRadius={60}
-                                        outerRadius={90}
-                                        paddingAngle={3}
-                                        cornerRadius={4}
-                                    >
-                                        {budgets.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={getCategoryColor(entry.Categoria)} stroke="rgba(0,0,0,0.1)" strokeWidth={1} />
-                                        ))}
-                                    </Pie>
-                                    <Tooltip 
-                                        contentStyle={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '8px', color: 'var(--color-text-primary)' }}
-                                        itemStyle={{ color: 'var(--color-text-primary)' }}
-                                        formatter={(value: any) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)}
-                                    />
-                                </PieChart>
-                            </ResponsiveContainer>
-                        </div>
-                    ) : (
-                        <div className="h-[250px] w-full bg-surface-card/40 rounded-xl border border-border flex items-center justify-center text-text-muted">
-                             Nenhum orçamento definido
-                        </div>
-                    )}
+                     {/* Reusing the Distribution Chart */}
+                     <DistributionPieChart 
+                        data={chartData} 
+                        getCategoryColor={getCategoryColor} 
+                     />
                     
-                    {/* Desktop Only: Summary Box */}
+                    {/* Desktop Only: Summary Box (Keep specific logic here as it differs from CategoryDrawer) */}
                     <div className="hidden md:block p-4 bg-surface-card/40 rounded-xl border border-border">
                          {(() => {
                             const totalLimit = budgets.reduce((acc, b) => acc + (b['Valor Limite'] || 0), 0);
@@ -177,37 +161,15 @@ export default function BudgetDrawer({ isOpen, onClose, highlightCategory, highl
 
                 {/* Right Column: List (Desktop) / Bottom (Mobile) */}
                 <div className="flex-1 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-border">
-                    <div className="space-y-2">
-                        {budgets.length === 0 ? (
-                            <div className="text-center py-10 text-text-muted">
-                                <p>Nenhum orçamento definido.</p>
-                                <p className="text-sm">Clique em "+" para começar.</p>
-                            </div>
-                        ) : (
-                            budgets.map((budget, idx) => {
-                                const isHighlighted = (highlightCategory && budget.Categoria === highlightCategory) || 
-                                                      (highlightId && budget["ID Orcamento"] === highlightId);
-                                
-                                return (
-                                    <div 
-                                        key={idx} 
-                                        ref={el => { itemRefs.current[budget.Categoria] = el; }}
-                                        className={`transition-colors rounded-xl ${isHighlighted ? 'bg-white/10 ring-1 ring-white/20' : ''}`}
-                                    >
-                                        <ProgressListItem
-                                            title={budget.Categoria}
-                                            subtitle={budget['Período Orçamento']}
-                                            color={getCategoryColor(budget.Categoria)}
-                                            value={budget['Valor Gasto Atual'] || 0}
-                                            limit={budget['Valor Limite'] || 0}
-                                            onEdit={() => { setEditingBudget(budget as Budget); setIsModalOpen(true); }}
-                                            onDelete={() => handleDelete(budget["ID Orcamento"])}
-                                        />
-                                    </div>
-                                )
-                            })
-                        )}
-                    </div>
+                    <BudgetList 
+                        budgets={budgets}
+                        highlightCategory={highlightCategory}
+                        highlightId={highlightId}
+                        getCategoryColor={getCategoryColor}
+                        onEdit={(b) => { setEditingBudget(b); setIsModalOpen(true); }}
+                        onDelete={handleDelete}
+                        registerRef={registerRef}
+                    />
                 </div>
 
                 <BudgetModal 

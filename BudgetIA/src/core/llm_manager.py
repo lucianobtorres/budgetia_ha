@@ -95,3 +95,26 @@ class LLMOrchestrator:
                 f"Usando IA: {self._active_provider_name} - {self._active_model_name}"
             )
         return "IA não carregada."
+
+    def get_vision_capable_llm(self, temperature: float = 0.2) -> Any:
+        """
+        Retorna uma instância de LLM que suporta visão (multimodal).
+        Procura nos provedores configurados (primário + fallback) por um que suporte visão.
+        """
+        providers_to_try = [self.primary_provider] + self.fallback_providers
+        
+        for provider in providers_to_try:
+            if provider.supports_vision and provider.api_key:
+                try:
+                    logger.info(f"Selecionando provedor Vision: {provider.name}")
+                    return provider.get_llm(temperature=temperature)
+                except Exception as e:
+                    logger.warning(f"Falha ao instanciar LLM Vision do provedor '{provider.name}': {e}")
+        
+        raise RuntimeError("Nenhum provedor de LLM com suporte a Visão (OCR) está disponível ou configurado.")
+
+    @property
+    def is_vision_available(self) -> bool:
+        """Verifica se há algum provedor configurado com suporte a visão."""
+        providers_to_try = [self.primary_provider] + self.fallback_providers
+        return any(p.supports_vision and p.api_key for p in providers_to_try)

@@ -1,23 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { fetchAPI } from "../services/api";
-
-export interface Summary {
-    saldo_atual: number;
-    total_receitas: number;
-    total_despesas: number;
-    [key: string]: number;
-}
-
-export interface ExpenseData {
-    name: string;
-    value: number;
-}
-
-interface Budget {
-    Categoria: string;
-    'Valor Limite': number;
-    'Valor Gasto Atual': number;
-}
+import type { Summary, ExpenseData, Budget } from "../types/domain";
 
 
 export function useSummary() {

@@ -42,6 +42,7 @@ export default function Dashboard() {
   const handleChatAction = () => {
       // Invalidate all dashboard queries to refresh data
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
   };
 
   if (loading) {

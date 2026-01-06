@@ -5,21 +5,24 @@ import { useCategoryColorMap } from "../hooks/useCategoryColorMap";
 import { TransactionCard } from "../components/transactions/TransactionCard";
 import TransactionModal from "../components/transactions/TransactionFormDrawer";
 import { Skeleton } from "../components/ui/Skeleton";
-import { Filter, Search, Plus } from "lucide-react";
+import { Filter, Search, Plus, Camera, UploadCloud } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { Select } from "../components/ui/Select";
 import { EmptyState } from "../components/ui/EmptyState";
-
+import { OCRModal } from "../components/ocr/OCRModal";
 
 import { usePageTour } from "../hooks/usePageTour";
 import { useDrawer } from "../context/DrawerContext";
+import { ImportDrawer } from "../components/transactions/ImportDrawer";
+import { LoadingOverlay } from "../components/ui/LoadingOverlay";
+import { fetchAPI } from "../services/api";
 
 export default function Transactions() {
     const { openDrawer } = useDrawer();
-    const { startTour } = useTour(); // Can remove this if startTour not used directly anymore, but keeps it for now
+    const { startTour } = useTour();
     const location = useLocation();
 
     // Current date for default filter
@@ -34,10 +37,6 @@ export default function Transactions() {
     // Standardized Tour Hook
     usePageTour('transactions_walkthrough');
 
-    // Modal State
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [editingTx, setEditingTx] = useState<Transaction | null>(null);
-
     // Parse filter value
     const isAll = filterValue === 'all';
     const [selectedYear, selectedMonth] = isAll 
@@ -47,21 +46,30 @@ export default function Transactions() {
     const { data: transactions, isLoading } = useTransactions({ 
         month: selectedMonth, 
         year: selectedYear,
-        limit: 1000 // Ensure we get enough recent ones if viewing all
+        limit: 1000
     });
-    // Fetch global rank-based colors
+    
     const { getCategoryColor } = useCategoryColorMap();
 
-    const { mutate: deleteTransaction } = useDeleteTransaction();
+    const { mutate: deleteTransaction, isPending: isDeleting } = useDeleteTransaction();
     const { mutateAsync: createTransaction, isPending: isCreating } = useCreateTransaction();
     const { mutateAsync: updateTransaction, isPending: isUpdating } = useUpdateTransaction();
 
-    // Category sorting is handled by backend or default, color is now hash-based.
-    // No need for complex rank calculation here.
+    // Modal State
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isImportOpen, setIsImportOpen] = useState(false);
+    const [isOCROpen, setIsOCROpen] = useState(false);
+    const [editingTx, setEditingTx] = useState<Transaction | null>(null);
+    const [ocrData, setOcrData] = useState<any>(null);
+    const [ocrAvailable, setOcrAvailable] = useState(false); // Check availability
+    
+    // Check OCR Availability
+    useEffect(() => {
+        fetchAPI<{ available: boolean }>('/ocr/status')
+            .then(res => setOcrAvailable(res?.available ?? false))
+            .catch(() => setOcrAvailable(false));
+    }, []);
 
-
-
-    // Extract unique categories from loaded transactions for the filter dropdown
     const uniqueCategories = Array.from(new Set(transactions?.map(t => t.Categoria) || [])).sort();
 
     // Smart Navigation Handler
@@ -81,15 +89,20 @@ export default function Transactions() {
     }, [location.state, transactions, filterValue]); // Re-run when transactions load to verify
 
     const filteredTransactions = transactions?.filter(t => {
-        const matchesSearch = t.Descricao.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        const matchesSearch = t.Descricao.toLowerCase().includes(searchTerm.toLowerCase()) ||
                               t.Categoria.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesCategory = categoryFilter === 'all' || t.Categoria === categoryFilter;
-        
         return matchesSearch && matchesCategory;
     });
 
     const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement> | { target: { value: string } }) => {
         setFilterValue(e.target.value);
+    };
+
+    const handleEdit = (tx: Transaction) => {
+        setEditingTx(tx);
+        setOcrData(null);
+        setIsModalOpen(true);
     };
 
     const handleCategoryClick = (category: string) => {
@@ -105,14 +118,17 @@ export default function Transactions() {
             }
             setIsModalOpen(false);
             setEditingTx(null);
+            setOcrData(null);
         } catch (error) {
             console.error("Erro ao salvar:", error);
         }
     };
 
-    const handleEdit = (tx: Transaction) => {
-        setEditingTx(tx);
-        setIsModalOpen(true);
+    const handleOCRSuccess = (data: any) => {
+        setOcrData(data);
+        setEditingTx(null); // Ensure we are not in edit mode
+        setIsOCROpen(false); // Close OCR modal
+        setIsModalOpen(true); // Open Transaction Form
     };
 
     // Generate last 12 months for selector
@@ -132,29 +148,52 @@ export default function Transactions() {
         tipo: editingTx["Tipo (Receita/Despesa)"],
         categoria: editingTx.Categoria,
         status: editingTx.Status
-    } : undefined;
+    } : ocrData; // Use OCR data if available
 
     return (
         <div className="h-full flex flex-col gap-4 overflow-hidden">
+            <LoadingOverlay isVisible={isDeleting} message="Excluindo transação..." />
+
             {/* Header - Fixed */}
             <div id="tx-header">
                 <PageHeader
                     title="Transações"
                     description="Gerencie suas receitas e despesas."
                     action={
-                        <Button 
-                            id="tx-add-btn"
-                            onClick={() => { setEditingTx(null); setIsModalOpen(true); }}
-                            variant="primary"
-                            size="icon"
-                            className="rounded-xl shadow-lg hover:bg-emerald-600 transition-colors"
-                            icon={Plus}
-                        />
+                        <div className="flex gap-2">
+                             <Button 
+                                onClick={() => setIsOCROpen(true)}
+                                variant="outline" 
+                                size="icon"
+                                disabled={!ocrAvailable}
+                                className={`rounded-xl shadow-lg border-emerald-500/20 transition-colors ${
+                                    ocrAvailable 
+                                    ? "hover:bg-emerald-500/10 hover:text-emerald-400 text-emerald-500" 
+                                    : "opacity-50 cursor-not-allowed text-gray-500"
+                                }`}
+                                icon={Camera}
+                                title={ocrAvailable ? "Ler Cupom (OCR)" : "OCR Indisponível (Requer modelo Vision)"}
+                            />
+                             <Button 
+                                onClick={() => setIsImportOpen(true)}
+                                variant="outline" 
+                                size="icon"
+                                className="rounded-xl shadow-lg hover:bg-gray-700 transition-colors"
+                                icon={UploadCloud}
+                                title="Importar Extrato (OFX)"
+                            />
+                            <Button 
+                                id="tx-add-btn"
+                                onClick={() => { setEditingTx(null); setOcrData(null); setIsModalOpen(true); }}
+                                variant="primary"
+                                size="icon"
+                                className="rounded-xl shadow-lg hover:bg-emerald-600 transition-colors"
+                                icon={Plus}
+                            />
+                        </div>
                     }
                 />
             </div>
-
-                {/* Filters Row */}
                 {/* Filters Row */}
                 <div id="tx-filters" className="flex flex-col md:flex-row gap-3">
                     <div className="flex flex-wrap gap-2 w-full md:w-auto">
@@ -200,7 +239,6 @@ export default function Transactions() {
                     </div>
                 </div>
 
-
             {/* List - Scrollable */}
             <div id="tx-list" className="flex-1 overflow-y-auto scrollbar-none pb-20">
                 {isLoading ? (
@@ -245,13 +283,24 @@ export default function Transactions() {
                     </div>
                 )}
             </div>
-            
+
             <TransactionModal 
                 isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
+                onClose={() => { setIsModalOpen(false); setOcrData(null); }}
                 onSave={handleSave}
                 initialData={initialFormData}
                 isLoading={isCreating || isUpdating}
+            />
+
+            <ImportDrawer 
+                isOpen={isImportOpen} 
+                onClose={() => setIsImportOpen(false)} 
+            />
+            
+            <OCRModal 
+                isOpen={isOCROpen}
+                onClose={() => setIsOCROpen(false)}
+                onSuccess={handleOCRSuccess}
             />
         </div>
     );

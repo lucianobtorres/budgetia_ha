@@ -59,7 +59,10 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
 # --- CACHE DE SISTEMAS FINANCEIROS ---
 # Mapeia user_id -> PlanilhaManager
 # Isso garante que não abrimos múltiplos handlers para a mesma planilha
+import threading
+
 _managers_cache: dict[str, PlanilhaManager] = {}
+_managers_lock = threading.Lock()
 
 
 # @lru_cache # Cache removido pois agora depende do Header dinâmico
@@ -115,6 +118,7 @@ def get_planilha_manager(
 ) -> PlanilhaManager:
     """
     Dependency que fornece uma instância válida do PlanilhaManager.
+    Thread-safe para evitar múltiplas cargas da mesma planilha.
     """
     # 1. Recupera onde está o arquivo
     path_str = config_service.get_planilha_path()
@@ -127,44 +131,49 @@ def get_planilha_manager(
 
     # 2. Verifica Cache
     user_id = config_service.username
-
     cache_key = f"{user_id}:{path_str}"
 
+    # Double-checked locking optimization
     if cache_key in _managers_cache:
-        # Debug:
-
         return _managers_cache[cache_key]
 
-    # 3. Obtém credenciais de usuário (se houver) para acesso ao GSheets
-    from core.google_auth_service import GoogleAuthService
-    auth_service = GoogleAuthService(config_service)
-    user_credentials = auth_service.get_user_credentials()
+    with _managers_lock:
+        # Verifica novamente dentro do lock
+        if cache_key in _managers_cache:
+            return _managers_cache[cache_key]
+        
+        logger.warning(f"CACHE MISS para {cache_key}. Criando novo Manager...")
+        
+        # 3. Obtém credenciais de usuário (se houver) para acesso ao GSheets
+        from core.google_auth_service import GoogleAuthService
+        auth_service = GoogleAuthService(config_service)
+        user_credentials = auth_service.get_user_credentials()
 
-    if user_credentials:
-        logger.info("Injetando credenciais de usuário para acesso à planilha")
+        if user_credentials:
+            logger.info("Injetando credenciais de usuário para acesso à planilha")
 
-    # 4. Cria o Handler de Storage (Local, Google Sheets ou Google Drive Excel)
-    from finance.storage.storage_factory import StorageHandlerFactory
+        # 4. Cria o Handler de Storage (Local, Google Sheets ou Google Drive Excel)
+        from finance.storage.storage_factory import StorageHandlerFactory
 
-    try:
-        storage_handler = StorageHandlerFactory.create_handler(path_str, credentials=user_credentials)
-        logger.info(f"Handler de Storage criado: {type(storage_handler).__name__} para {path_str}")
-    except ValueError as e:
-        logger.error(f"Falha ao criar handler de storage: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Erro de configuração de storage: {str(e)}"
+        try:
+            storage_handler = StorageHandlerFactory.create_handler(path_str, credentials=user_credentials)
+            logger.info(f"Handler de Storage criado: {type(storage_handler).__name__} para {path_str}")
+        except ValueError as e:
+            logger.error(f"Falha ao criar handler de storage: {e}")
+            raise HTTPException(
+                status_code=500, detail=f"Erro de configuração de storage: {str(e)}"
+            )
+
+        # 4. Usa a Factory existente para montar tudo (Repositories, Services, Context)
+        manager = FinancialSystemFactory.create_manager(
+            storage_handler=storage_handler, config_service=config_service
         )
 
-    # 4. Usa a Factory existente para montar tudo (Repositories, Services, Context)
-    manager = FinancialSystemFactory.create_manager(
-        storage_handler=storage_handler, config_service=config_service
-    )
+        # Debug:
+        logger.warning(f"Novo Manager Criado e C acheado para {cache_key}")
+        _managers_cache[cache_key] = manager
 
-    # Debug:
-    logger.debug(f"Novo Manager Criado para {cache_key}")
-    _managers_cache[cache_key] = manager
-
-    return manager
+        return manager
 
 
 import config
@@ -173,82 +182,89 @@ from core.llm_factory import LLMProviderFactory
 
 # --- CACHE GLOBAL SIMPLIFICADO (Para MVP RAM) ---
 _global_llm_orchestrator: LLMOrchestrator | None = None
+_llm_lock = threading.Lock()
 
 
 def get_llm_orchestrator(
     config_service: UserConfigService = Depends(get_user_config_service),
 ) -> LLMOrchestrator:
-    """Retorna o orquestrador de LLM (Singleton no processo)."""
+    """Retorna o orquestrador de LLM (Singleton no processo). Thread-safe."""
     global _global_llm_orchestrator
-    if _global_llm_orchestrator is None:
-        # Inicializa se não existir
-        provider_name = config.LLM_PROVIDER
-        logger.info(
-            f"Inicializando LLMOrchestrator com Provider='{provider_name}'"
-        )
-        try:
-            primary_provider = None
-            fallback_providers = []
+    
+    # Double-checked locking
+    if _global_llm_orchestrator is not None:
+        return _global_llm_orchestrator
 
-            # 1. Configura Provedor Primário baseado na ENV
-            if provider_name == config.LLMProviders.GROQ:
-                primary_provider = LLMProviderFactory.create_provider(
-                    LLMProviderType.GROQ,
-                    default_model=config.LLMModels.DEFAULT_GROQ,
-                )
-                # Fallback: Gemini
-                fallback_providers.append(
-                    LLMProviderFactory.create_provider(
+    with _llm_lock:
+        if _global_llm_orchestrator is None:
+            # Inicializa se não existir
+            provider_name = config.LLM_PROVIDER
+            logger.info(
+                f"Inicializando LLMOrchestrator com Provider='{provider_name}'"
+            )
+            try:
+                primary_provider = None
+                fallback_providers = []
+
+                # 1. Configura Provedor Primário baseado na ENV
+                if provider_name == config.LLMProviders.GROQ:
+                    primary_provider = LLMProviderFactory.create_provider(
+                        LLMProviderType.GROQ,
+                        default_model=config.LLMModels.DEFAULT_GROQ,
+                    )
+                    # Fallback: Gemini
+                    fallback_providers.append(
+                        LLMProviderFactory.create_provider(
+                            LLMProviderType.GEMINI,
+                            default_model=config.LLMModels.DEFAULT_GEMINI,
+                        )
+                    )
+
+                elif provider_name == config.LLMProviders.GEMINI:
+                    primary_provider = LLMProviderFactory.create_provider(
                         LLMProviderType.GEMINI,
                         default_model=config.LLMModels.DEFAULT_GEMINI,
                     )
-                )
-
-            elif provider_name == config.LLMProviders.GEMINI:
-                primary_provider = LLMProviderFactory.create_provider(
-                    LLMProviderType.GEMINI,
-                    default_model=config.LLMModels.DEFAULT_GEMINI,
-                )
-                # Fallback: Groq (se tiver chave)
-                try:
-                    fallback_providers.append(
-                         LLMProviderFactory.create_provider(
-                            LLMProviderType.GROQ,
-                            default_model=config.LLMModels.DEFAULT_GROQ,
+                    # Fallback: Groq (se tiver chave)
+                    try:
+                        fallback_providers.append(
+                             LLMProviderFactory.create_provider(
+                                LLMProviderType.GROQ,
+                                default_model=config.LLMModels.DEFAULT_GROQ,
+                            )
                         )
+                    except Exception:
+                        logger.warning("Falha ao configurar Groq como fallback (possivelmente sem chave).")
+
+                elif provider_name == config.LLMProviders.OPENAI:
+                     # TODO: Implementar OpenAI Provider na Factory se usarmos
+                     # Por enquanto, fallback para Gemini
+                     logger.warning("OpenAI Provider selecionado mas init pendente. Usando Gemini.")
+                     primary_provider = LLMProviderFactory.create_provider(
+                        LLMProviderType.GEMINI,
+                        default_model=config.LLMModels.DEFAULT_GEMINI,
                     )
-                except Exception:
-                    logger.warning("Falha ao configurar Groq como fallback (possivelmente sem chave).")
+                else:
+                    # Default safety net
+                    logger.warning(f"Provider '{provider_name}' desconhecido. Usando Gemini Default.")
+                    primary_provider = LLMProviderFactory.create_provider(
+                        LLMProviderType.GEMINI,
+                        default_model=config.LLMModels.DEFAULT_GEMINI,
+                    )
 
-            elif provider_name == config.LLMProviders.OPENAI:
-                 # TODO: Implementar OpenAI Provider na Factory se usarmos
-                 # Por enquanto, fallback para Gemini
-                 logger.warning("OpenAI Provider selecionado mas init pendente. Usando Gemini.")
-                 primary_provider = LLMProviderFactory.create_provider(
-                    LLMProviderType.GEMINI,
-                    default_model=config.LLMModels.DEFAULT_GEMINI,
-                )
-            else:
-                # Default safety net
-                logger.warning(f"Provider '{provider_name}' desconhecido. Usando Gemini Default.")
-                primary_provider = LLMProviderFactory.create_provider(
-                    LLMProviderType.GEMINI,
-                    default_model=config.LLMModels.DEFAULT_GEMINI,
+                _global_llm_orchestrator = LLMOrchestrator(
+                    primary_provider=primary_provider,
+                    fallback_providers=fallback_providers,
                 )
 
-            _global_llm_orchestrator = LLMOrchestrator(
-                primary_provider=primary_provider,
-                fallback_providers=fallback_providers,
-            )
+                # Força carregamento e checagem de saúde
+                _global_llm_orchestrator.get_configured_llm()
 
-            # Força carregamento e checagem de saúde
-            _global_llm_orchestrator.get_configured_llm()
+            except Exception as e:
+                logger.critical(f"ERRO CRÍTICO ao iniciar LLM: {e}")
+                raise HTTPException(status_code=500, detail=f"Erro ao iniciar IA: {e}")
 
-        except Exception as e:
-            logger.critical(f"ERRO CRÍTICO ao iniciar LLM: {e}")
-            raise HTTPException(status_code=500, detail=f"Erro ao iniciar IA: {e}")
-
-    return _global_llm_orchestrator
+        return _global_llm_orchestrator
 
 
 # --- CACHE DE AGENTES ---

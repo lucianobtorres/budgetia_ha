@@ -5,6 +5,9 @@ from interfaces.api.dependencies import get_planilha_manager
 from finance.planilha_manager import PlanilhaManager
 from finance.schemas import AddTransactionInput
 from config import NomesAbas, ColunasTransacoes
+from core.logger import get_logger
+
+logger = get_logger("TransactionsRouter")
 
 router = APIRouter(prefix="/transactions", tags=["Transações"])
 
@@ -182,7 +185,8 @@ def adicionar_transacao(
                 categoria=transaction.categoria,
                 descricao=str(transaction.descricao),
                 valor=transaction.valor,
-                status=transaction.status
+                status=transaction.status,
+                parcelas=transaction.parcelas # NEW
             )
             # Save is automatic inside adicionar_registro? NO.
             # Manager.adicionar_registro calls repo.add which updates DF. 
@@ -195,6 +199,72 @@ def adicionar_transacao(
             
             manager.save() # Ensure save is called
             
-        return {"message": "Transação adicionada com sucesso", "data": transaction}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao salvar transação: {e}")
+
+@router.post("/batch")
+def adicionar_transacoes_em_lote(
+    transactions: list[AddTransactionInput],
+    manager: PlanilhaManager = Depends(get_planilha_manager)
+) -> dict[str, Any]:
+    """
+    Adiciona múltiplas transações de uma vez.
+    Eficiente para importações, pois salva apenas uma vez no final.
+    """
+    try:
+        if not transactions:
+            return {"message": "Nenhuma transação enviada."}
+
+        with manager.lock_file(timeout_seconds=60):
+            manager.refresh_data()
+            
+            # 1. Auto-Register New Categories
+            existing_cols = manager.category_repo.get_all_category_names()
+            # Normalize for comparison
+            existing_norm = {c.lower() for c in existing_cols}
+            
+            new_categories_map = {} # name -> type
+            
+            for tx in transactions:
+                cat = tx.categoria
+                if not cat or cat == "A Classificar" or cat == "Outros":
+                    continue
+                    
+                if cat.lower() not in existing_norm:
+                    # New category found!
+                    # Infer type based on transaction type (majority vote or first occurrence)
+                    if cat not in new_categories_map:
+                         new_categories_map[cat] = tx.tipo
+            
+            # Register them
+            for cat_name, cat_type in new_categories_map.items():
+                manager.category_repo.add_category(
+                    nome=cat_name,
+                    tipo=cat_type, # Receita or Despesa
+                    icone="HelpCircle", # Generic icon
+                    tags="Importado"
+                )
+                logger.info(f"Categoria '{cat_name}' criada automaticamente via importação.")
+
+            # 2. Add Transactions (Batch)
+            # Converte objetos pydantic para dict
+            tx_dicts = [
+                {
+                    "data": tx.data,
+                    "tipo": tx.tipo,
+                    "categoria": tx.categoria,
+                    "descricao": str(tx.descricao),
+                    "valor": tx.valor,
+                    "status": tx.status,
+                    "parcelas": tx.parcelas
+                }
+                for tx in transactions
+            ]
+            
+            count = manager.adicionar_registros_lote(tx_dicts)
+            # Manager saves automatically inside batch method
+            
+        return {"message": f"{count} transações importadas com sucesso."}
+    except Exception as e:
+        logger.error(f"Erro no batch upload: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Erro na importação em lote: {e}")

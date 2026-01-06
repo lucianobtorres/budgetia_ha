@@ -23,6 +23,9 @@ from interfaces.api.routers import (
     admin,
     subscription, 
     system,
+    categories,
+    imports,
+    ocr, # <--- Novo
 )
 
 description = """
@@ -42,10 +45,27 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# Configuração de CORS (Permite que React/Frontend externo acesse)
+# Configuração de CORS (Flexível para Docker/Home Assistant)
+# Permite definir origens via variável de ambiente (separadas por vírgula)
+# Ex: ALLOWED_ORIGINS="https://homeassistant.local:8123,http://192.168.1.100:8123"
+raw_origins = os.getenv("ALLOWED_ORIGINS", "")
+allowed_origins = [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
+
+# Adiciona defaults locais essenciais
+default_origins = [
+    "http://localhost:5173",  # Vite Dev
+    "http://localhost:4173",  # Vite Preview
+    "http://localhost:8000",  # API Local
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:8000",
+]
+
+# Unifica garantindo unicidade
+final_origins = list(set(allowed_origins + default_origins))
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Em produção, especifique os domínios
+    allow_origins=final_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -71,6 +91,9 @@ api_router.include_router(intelligence.router)
 api_router.include_router(admin.router)
 api_router.include_router(subscription.router)
 api_router.include_router(system.router)
+api_router.include_router(categories.router)
+api_router.include_router(imports.router)
+api_router.include_router(ocr.router) # <--- Novo
 
 # Incluir na App Principal
 app.include_router(api_router)

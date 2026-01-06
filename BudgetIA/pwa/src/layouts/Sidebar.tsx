@@ -1,4 +1,4 @@
-import { Home, CreditCard, User, LogOut, Link as LinkIcon, Brain, Shield } from "lucide-react";
+import { Home, CreditCard, User, LogOut, Link as LinkIcon, Brain, Shield, Tag } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { AuthService } from "../services/auth";

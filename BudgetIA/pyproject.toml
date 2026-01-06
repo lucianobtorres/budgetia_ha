@@ -1,6 +1,6 @@
 [project]
 name = "budgetia"
-version = "1.0.46"
+version = "1.0.47"
 description = ""
 authors = [{ name = "Luciano Borges", email = "lucianobtorres@gmail.com" }]
 readme = "README.md"
@@ -41,6 +41,7 @@ dependencies = [
     "stripe (>=14.1.0,<15.0.0)",
     "resend (>=2.19.0,<3.0.0)",
     "twilio (>=9.9.0,<10.0.0)",
+    "ofxparse (>=0.21,<0.22)",
 ]
 
 [tool.poetry]

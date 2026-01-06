@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { User, Download, Settings, CreditCard } from 'lucide-react';
+import { User, Download, Settings, CreditCard, Tag } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { PageHeader } from '../components/ui/PageHeader';
@@ -11,10 +11,11 @@ import { useProfile } from '../hooks/useProfile';
 import { ProfileDataTab } from '../components/profile/ProfileDataTab';
 import { SettingsTab } from '../components/profile/SettingsTab';
 import { SubscriptionTab } from '../components/profile/SubscriptionTab';
+import { CategoriesTab } from '../components/profile/CategoriesTab';
 
 
 export default function Profile() {
-    const [activeTab, setActiveTab] = useState<'profile' | 'settings' | 'subscription'>('profile');
+    const [activeTab, setActiveTab] = useState<'profile' | 'categories' | 'settings' | 'subscription'>('profile');
     
     // Hook handles all data fetching and mutations
     const { 
@@ -52,6 +53,7 @@ export default function Profile() {
 
     const tabs = [
         { id: 'profile', label: 'Dados', icon: User, color: 'text-emerald-400' },
+        { id: 'categories', label: 'Categorias', icon: Tag, color: 'text-orange-400' },
         { id: 'subscription', label: 'Assinatura', icon: CreditCard, color: 'text-purple-400' },
         { id: 'settings', label: 'Conta', icon: Settings, color: 'text-blue-400' }
     ] as const;
@@ -103,6 +105,10 @@ export default function Profile() {
                                     onSave={saveProfile} 
                                     isSaving={isSaving} 
                                 />
+                            )}
+
+                            {activeTab === 'categories' && (
+                                <CategoriesTab />
                             )}
 
                             {activeTab === 'subscription' && (

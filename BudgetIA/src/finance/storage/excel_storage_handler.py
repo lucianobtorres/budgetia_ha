@@ -149,10 +149,30 @@ class ExcelStorageHandler(BaseStorageHandler): # type: ignore[misc]
         self.is_new_file = is_new_file
         return dataframes, is_new_file
 
+    def _sanitize_dataframe_for_excel(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Prevents Excel Formula Injection (CSV Injection) by prepending "'" to cells
+        that start with characters like =, +, -, or @.
+        """
+        # Create a copy to avoid mutating the original DF in memory
+        clean_df = df.copy()
+        
+        # Select object/string columns only
+        string_cols = clean_df.select_dtypes(include=['object']).columns
+        
+        for col in string_cols:
+            # Vectorized sanitization for string columns efficiently
+            # We use a lambda but applied only to string values
+            clean_df[col] = clean_df[col].apply(
+                lambda x: f"'{x}" if isinstance(x, str) and x.startswith(("=", "+", "-", "@")) else x
+            )
+            
+        return clean_df
+
     def save_sheets(
         self,
         dataframes: dict[str, pd.DataFrame],
-        strategy: BaseMappingStrategy,  # <-- Agora recebe a ESTRATÉGIA
+        strategy: BaseMappingStrategy,
         add_intelligence: bool = False,
     ) -> None:
         """
@@ -177,6 +197,9 @@ class ExcelStorageHandler(BaseStorageHandler): # type: ignore[misc]
                         df_para_salvar = strategy.map_other_sheet(
                             df_interno, internal_sheet_name
                         )
+
+                    # --- SECURITY: EXCEL FORMULA INJECTION PREVENTION ---
+                    df_para_salvar = self._sanitize_dataframe_for_excel(df_para_salvar)
 
                     # 3. Tratar NaT (Not a Time) antes de salvar
                     for col in df_para_salvar.select_dtypes(

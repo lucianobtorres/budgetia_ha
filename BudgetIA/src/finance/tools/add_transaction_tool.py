@@ -38,6 +38,7 @@ class AddTransactionTool(BaseTool):  # type: ignore[misc]
         valor: float,
         status: str = "Concluído",
         data: str | None = None,
+        parcelas: int = 1,
     ) -> str:
         # Lógica de inteligência da ferramenta (processamento de data)
         data_final: str
@@ -63,6 +64,7 @@ class AddTransactionTool(BaseTool):  # type: ignore[misc]
                 descricao=descricao,
                 valor=valor,
                 status=status,
+                parcelas=parcelas,
             )
             self.save()  # Salva a transação
 

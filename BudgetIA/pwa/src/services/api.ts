@@ -30,6 +30,11 @@ export async function fetchAPI<T = any>(endpoint: string, options: RequestOption
         },
     };
 
+    // If body is FormData, let browser set Content-Type with boundary
+    if (options.body instanceof FormData) {
+        delete (config.headers as Record<string, string>)['Content-Type'];
+    }
+
     try {
         const response = await fetch(url, config);
         

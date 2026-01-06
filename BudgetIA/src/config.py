@@ -279,6 +279,15 @@ class ColunasInsights:
     STATUS = "Status (Novo/Lido/Concluído)"
 
 
+class ColunasCategorias:
+    """Nomes das colunas internas da aba 'Categorias'."""
+    NOME = "Nome"
+    TIPO = "Tipo (Despesa/Receita)"
+    # COR removida: Front-end calcula dinamicamente
+    ICONE = "Icone"
+    TAGS = "Palavras-Chave"
+
+
 class NomesAbas:
     """Define os nomes exatos das abas da planilha como constantes."""
 
@@ -288,6 +297,7 @@ class NomesAbas:
     METAS = "Metas Financeiras"
     CONSULTORIA_IA = "Consultoria da IA"
     PERFIL_FINANCEIRO = "Perfil Financeiro"
+    CATEGORIAS = "Categorias"
 
 
 class NomesPaginas:
@@ -361,6 +371,13 @@ LAYOUT_PLANILHA: dict[str, list[str]] = {
         ColunasPerfil.VALOR,
         ColunasPerfil.OBS,
     ],
+    # Nova Aba: Categorias
+    NomesAbas.CATEGORIAS: [
+        ColunasCategorias.NOME,
+        ColunasCategorias.TIPO,
+        ColunasCategorias.ICONE,
+        ColunasCategorias.TAGS,
+    ],
 }
 
 # --- 5. Tipos de Dados (d-types) para as Colunas ---
@@ -392,6 +409,7 @@ LAYOUT_DTYPES: dict[str, str] = {
     # Insights
     ColunasInsights.ID: "Int64",
     ColunasInsights.DATA: "datetime64[ns]",
+    # Categorias (Tudo string por padrão, mas podemos reforçar)
 }
 
 SERVICE_ACCOUNT_CREDENTIALS_PATH = os.path.join(

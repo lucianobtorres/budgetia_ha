@@ -11,6 +11,10 @@ logger = get_logger("GeminiProvider")
 import config
 
 class GeminiProvider(LLMProvider):
+    @property
+    def supports_vision(self) -> bool:
+        return True
+
     def __init__(
         self,
         default_model: str = config.LLMModels.DEFAULT_GEMINI,

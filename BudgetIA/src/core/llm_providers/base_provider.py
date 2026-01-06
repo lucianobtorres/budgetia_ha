@@ -39,3 +39,8 @@ class LLMProvider(ABC):
     @property
     def name(self) -> str:
         return self.__class__.__name__.replace("Provider", "")
+
+    @property
+    def supports_vision(self) -> bool:
+        """Indica se o provedor suporta entrada de imagens (multimodal)."""
+        return False

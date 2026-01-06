@@ -16,7 +16,7 @@ import Connections from "./pages/Connections";
 import Admin from "./pages/Admin";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
-import VerifyEmail from "./pages/VerifyEmail";
+import VerifyEmail from "./pages/VerifyEmail"; // <--- Restored
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 

@@ -59,12 +59,16 @@ class FinancialDataContext:
         # --- 3. VALIDAÇÃO MAIS RIGOROSA DE CACHE ---
         is_valid_cache = False
         if cached_data is not None and isinstance(cached_data, dict):
-            # Verifica se contém a aba principal (Transações) e se não está vazia (opcional)
-            if config.NomesAbas.TRANSACOES in cached_data:
+            # Verifica se TODAS as abas esperadas no layout atual estão presentes no cache
+            expected_sheets = set(self.layout_config.keys())
+            cached_sheets = set(cached_data.keys())
+            
+            if expected_sheets.issubset(cached_sheets):
                 is_valid_cache = True
             else:
+                missing = expected_sheets - cached_sheets
                 logger.warning(
-                    "Cache INVALIDADO (Dados corrompidos/incompletos no Redis)."
+                    f"Cache INVALIDADO (Schema evoluiu). Abas faltantes: {missing}"
                 )
 
         if is_valid_cache and cached_timestamp == source_timestamp:

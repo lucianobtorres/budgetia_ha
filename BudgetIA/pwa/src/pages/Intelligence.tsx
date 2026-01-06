@@ -22,6 +22,7 @@ export default function Intelligence() {
         deleteMemory, 
         deleteRule, 
         triggerCleaning,
+        isCleaning,
         isLoading 
     } = useIntelligence();
 
@@ -146,11 +147,15 @@ export default function Intelligence() {
                                         {/* FAXINEIRO AUTÔNOMO (New) */}
                                         <GlassCard 
                                             variant="pink"
-                                            className="p-5 flex items-center gap-4 group cursor-pointer hover:bg-pink-500/5 transition-colors"
-                                            onClick={() => triggerCleaning()}
+                                            className={`p-5 flex items-center gap-4 group transition-all ${isCleaning ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer hover:bg-pink-500/5'}`}
+                                            onClick={() => !isCleaning && triggerCleaning()}
                                         >
                                             <div className="flex-none p-3 bg-pink-500/10 rounded-xl group-hover:bg-pink-500/20 transition-colors">
-                                                <i className="lucide-sparkles w-6 h-6 text-pink-400" />
+                                                {isCleaning ? (
+                                                    <i className="lucide-loader-2 w-6 h-6 text-pink-400 animate-spin" />
+                                                ) : (
+                                                    <i className="lucide-sparkles w-6 h-6 text-pink-400" />
+                                                )}
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2 mb-1">
@@ -166,8 +171,11 @@ export default function Intelligence() {
                                                 </p>
                                             </div>
                                             <div className="flex-none">
-                                                <button className="px-4 py-2 bg-pink-500 hover:bg-pink-600 text-white text-sm font-medium rounded-lg transition-colors shadow-lg shadow-pink-500/20">
-                                                    Executar Agora
+                                                <button 
+                                                    className={`px-4 py-2 bg-pink-500 hover:bg-pink-600 text-white text-sm font-medium rounded-lg transition-colors shadow-lg shadow-pink-500/20 flex items-center gap-2 ${isCleaning ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                    disabled={isCleaning}
+                                                >
+                                                    {isCleaning ? 'Limpando...' : 'Executar Agora'}
                                                 </button>
                                             </div>
                                         </GlassCard>

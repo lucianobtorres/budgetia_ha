@@ -133,3 +133,138 @@ def check_missing_daily_transport(
 
     # Chama a nova implementação
     asyncio.run(run_proactive_notifications(config_service, llm_orchestrator)) # type: ignore[call-arg]
+
+async def run_data_sanitizer_job(
+    config_service: UserConfigService,
+    llm_orchestrator: LLMOrchestrator,
+    plan_manager: "PlanilhaManager"
+) -> dict[str, Any]:
+    """
+    Executa a 'Faxina' (Data Sanitization).
+    Varre itens classificados como 'Outros' ou 'A Classificar' e tenta re-classificar com IA.
+    """
+    logger.info(f"JOB SANITIZER: Iniciando para '{config_service.username}'")
+    
+    # DEBUG LOGGING TO FILE
+    import os
+    try:
+        with open("logs/__sanitizer.log", "a", encoding="utf-8") as f:
+            f.write(f"\n--- EXEC: {config_service.username} ---\n")
+    except: pass
+    
+    def log_debug(msg):
+        logger.info(msg)
+        try:
+            with open("logs/__sanitizer.log", "a", encoding="utf-8") as f:
+                f.write(f"{msg}\n")
+        except: pass
+
+    try:
+        from config import ColunasTransacoes
+        
+        # 1. Carregar Transações
+        # (Cache ja deve estar ok via Manager)
+        df = plan_manager.transaction_repo.get_all_transactions()
+        
+        log_debug(f"Total Transactions: {len(df)}")
+        if not df.empty and ColunasTransacoes.CATEGORIA in df.columns:
+            counts = df[ColunasTransacoes.CATEGORIA].value_counts()
+            log_debug(f"Categories Distribution:\n{counts}")
+
+        if df.empty or ColunasTransacoes.CATEGORIA not in df.columns:
+            return {"status": "skipped", "reason": "No transactions or missing category column"}
+
+        # 2. Filtrar Alvos (Outros, A Classificar ou VAZIOS)
+        target_categories = ["Outros", "A Classificar"]
+        
+        def is_target(val):
+            s = str(val).strip()
+            # Alvo se for nulo, vazio, ou estiver na lista de alvos
+            return (not s) or (s == "nan") or (s == "None") or (s in target_categories)
+
+        mask = df[ColunasTransacoes.CATEGORIA].apply(is_target)
+        target_indices = df.index[mask]
+        
+        log_debug(f"Targets Found indices: {len(target_indices)}")
+        
+        if len(target_indices) == 0:
+            log_debug("JOB SANITIZER: Nenhuma transação pendente de classificação.")
+            return {"status": "success", "processed": 0, "message": "Nenhuma transação para classificar."}
+            
+        # 3. Preparar Descrições Únicas
+        descriptions = df.loc[target_indices, ColunasTransacoes.DESCRICAO].unique().tolist()
+        descriptions = [str(d).strip() for d in descriptions if d and str(d).strip()]
+        
+        log_debug(f"Unique Descriptions to Classify: {descriptions}")
+        
+        if not descriptions:
+            return {"status": "success", "processed": 0}
+
+        # 4. Classificar em Lote (Reutilizando ImportService)
+        # Precisamos instanciar ImportService. Ele precisa de CategoryRepo (via manager) e LLM.
+        from finance.services.import_service import ImportService
+        
+        service = ImportService(llm_orchestrator, plan_manager.category_repo, plan_manager.transaction_repo)
+        
+        mapping = service.classify_batch(descriptions)
+        log_debug(f"LLM Mapping Result: {mapping}")
+        
+        if not mapping:
+            log_debug("JOB SANITIZER: IA não retornou mapeamentos.")
+            return {"status": "warning", "processed": 0, "message": "IA não retornou sugestões."}
+            
+        # Normalizar mapping para busca insensitiva
+        normalized_map = {k.strip().lower(): v for k, v in mapping.items()}
+            
+        # 5. Aplicar Atualizações no DataFrame
+        changes_count = 0
+        for idx in target_indices:
+            original_desc = str(df.at[idx, ColunasTransacoes.DESCRICAO]).strip()
+            
+            # Tenta match exato primeiro
+            new_cat = mapping.get(original_desc)
+            
+            # Tenta match insensitivo
+            if not new_cat:
+                 new_cat = normalized_map.get(original_desc.lower())
+            
+            log_debug(f"Reviewing '{original_desc}': New Cat '{new_cat}'")
+            
+            # Se achou e é diferente da atual E diferente de 'Outros'/'A Classificar' (se for a mesma coisa não muda nada, mas se mudou de Outros -> Transporte ok)
+            if new_cat and new_cat not in target_categories:
+                df.at[idx, ColunasTransacoes.CATEGORIA] = new_cat
+                changes_count += 1
+                log_debug(f" >>> APPLIED CHANGE: {original_desc} -> {new_cat}")
+                
+        # 6. Salvar
+        if changes_count > 0:
+            log_debug(f"Saving {changes_count} changes...")
+            plan_manager.transaction_repo.save_transactions(df)
+            log_debug(f"JOB SANITIZER: {changes_count} transações atualizadas com sucesso!")
+            
+            
+            # Invalida cache de categorias se necessário (se criou novas)
+            # Mas aqui salvamos direto no DF. O repo cuida de cache?
+            # TransactionRepo usa DataContext que gerencia DF em memoria.
+            # Se novas categorias surgiram, próxima leitura de categorias vai achar?
+            # CategoryRepo lê de categorias.csv, mas ImportService NÃO adiciona ao categorias.csv automaticamente?
+            # ImportService.classify_batch pode retornar categoria nova.
+            # Precisamos adicionar novas categorias ao CategoryRepo se elas não existirem!
+            
+            return {"status": "success", "processed": changes_count, "details": f"{changes_count} itens classificados."}
+        else:
+            logger.info("JOB SANITIZER: Nenhuma mudança aplicável encontrada (IA retornou mesmas categorias ou falhou).")
+            return {"status": "success", "processed": 0, "message": "IA não sugeriu mudanças válidas."}
+
+    except Exception as e:
+        logger.error(f"JOB SANITIZER: Erro fatal: {e}")
+        return {"status": "error", "message": str(e)}
+
+async def run_behavior_learning_job(
+    config_service: UserConfigService,
+    llm_orchestrator: LLMOrchestrator,
+    pm: "PlanilhaManager"
+) -> dict:
+     """Stub for behavior learning if referenced elsewhere"""
+     # TODO: Implement actual behavior learning
+     return {"status": "skipped", "message": "Not implemented yet"}

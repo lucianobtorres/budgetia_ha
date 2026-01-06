@@ -96,45 +96,73 @@ class UserConfigService:
             logger.error(f"ERRO ao descriptografar: {e}")
             return None
 
+    # Class-level Cache (Shared across instances)
+    _CONFIG_CACHE: dict[str, dict[str, Any]] = {}
+    _CONFIG_MTIME_CACHE: dict[str, float] = {}
+
     def load_config(self) -> dict[str, Any]:
-        """Carrega a configuração do arquivo JSON deste usuário."""
-        # logger.debug(f"Tentando ler de: {self.config_file_path}")
-        # logger.debug(f"Arquivo existe? {self.config_file_path.exists()}")
-        if self.config_file_path.exists():
-            try:
-                with open(self.config_file_path, "rb") as f:
-                    encrypted_data = f.read()
+        """Carrega a configuração do arquivo JSON deste usuário (L1 Cached)."""
+        cache_key = self.username
+        
+        # 1. Verifica existência física
+        if not self.config_file_path.exists():
+            return {}
+            
+        try:
+            current_mtime = self.config_file_path.stat().st_mtime
+            
+            # 2. Check Cache
+            if cache_key in self._CONFIG_CACHE:
+                cached_mtime = self._CONFIG_MTIME_CACHE.get(cache_key, 0)
+                if current_mtime == cached_mtime:
+                    # Cache Hit
+                    return self._CONFIG_CACHE[cache_key].copy() # Return copy to prevent mutation bugs
 
-                if not encrypted_data:
-                    logger.warning("Arquivo vazio!")
-                    return {}
+            # 3. Cache Miss (Load from Disk)
+            with open(self.config_file_path, "rb") as f:
+                encrypted_data = f.read()
 
-                json_string = self._decrypt_data(encrypted_data)
-
-                if json_string:
-                    data: dict[str, Any] = json.loads(json_string)
-                    # logger.debug(f"Dados carregados: {list(data.keys())}")
-                    return data
-                else:
-                    logger.error("Falha na descriptografia")
-                    return {}
-            except (json.JSONDecodeError, OSError) as e:
-                logger.error(f"Erro ao ler config do usuário {self.username}: {e}")
+            if not encrypted_data:
+                logger.warning("Arquivo vazio!")
                 return {}
-        # logger.debug("Arquivo não existe, retornando {}")
-        return {}  # Retorna dict vazio se não existir
+
+            json_string = self._decrypt_data(encrypted_data)
+
+            if json_string:
+                data: dict[str, Any] = json.loads(json_string)
+                # Update Cache
+                self._CONFIG_CACHE[cache_key] = data
+                self._CONFIG_MTIME_CACHE[cache_key] = current_mtime
+                return data.copy()
+            else:
+                logger.error("Falha na descriptografia")
+                return {}
+        except (json.JSONDecodeError, OSError) as e:
+            logger.error(f"Erro ao ler config do usuário {self.username}: {e}")
+            return {}
 
     def save_config(self, config_data: dict[str, Any]) -> None:
-        """Salva a configuração no arquivo JSON deste usuário."""
-        # logger.debug(f"Salvando em: {self.config_file_path}")
+        """Salva a configuração no arquivo JSON deste usuário e atualiza Cache."""
         self._ensure_dir_exists()
         try:
             json_string = json.dumps(config_data, indent=4)
             encrypted_data = self._encrypt_data(json_string)
 
+            # Write to disk
             with open(self.config_file_path, "wb") as f:
                 f.write(encrypted_data)
-            # logger.debug(f"Arquivo salvo com sucesso: {self.config_file_path.exists()}")
+            
+            # Update Cache immediately (Optimistic UI style)
+            # We need to update mtime too, but FS mtime might lag slightly or be precise.
+            # Best to reload mtime or set it explicitly? 
+            # Let's just update cache content. Next load_config will check mtime.
+            # If filesystem is slow, mtime check might see "old" mtime and trigger reload. 
+            # To be safe, we update the cache content so subsequent calls *in same request* use it.
+            self._CONFIG_CACHE[self.username] = config_data.copy()
+            # Force mtime update to avoid immediate reload if stat() is fast
+            if self.config_file_path.exists():
+                 self._CONFIG_MTIME_CACHE[self.username] = self.config_file_path.stat().st_mtime
+            
         except OSError as e:
             logger.error(f"Erro ao salvar config do usuário {self.username}: {e}")
 

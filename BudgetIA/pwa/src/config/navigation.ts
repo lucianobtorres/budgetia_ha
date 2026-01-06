@@ -1,4 +1,4 @@
-import { Home, CreditCard, Bot, Link as LinkIcon, User } from "lucide-react";
+import { Home, CreditCard, Bot, Link as LinkIcon, User, Tag } from "lucide-react";
 
 export const navigationItems = [
   { name: 'Dashboard', href: '/', icon: Home },

@@ -19,6 +19,12 @@ class AddTransactionInput(BaseModel):
         default="Concluído",
         description="Status da transação (ex: 'Concluído', 'Pendente'). Padrão é 'Concluído'.",
     )
+    parcelas: int = Field(
+        default=1,
+        description="Número de parcelas. Se maior que 1, criará múltiplas transações futuras. (Ex: 12 para '12x'). Padrão é 1.",
+        ge=1,
+        le=99
+    )
 
 
 class ExtrairTransacoesDoTextoInput(BaseModel):

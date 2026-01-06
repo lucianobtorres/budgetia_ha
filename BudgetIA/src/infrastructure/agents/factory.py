@@ -59,6 +59,7 @@ class AgentFactory:
                 debt_repo=plan_manager.debt_repo,
                 profile_repo=plan_manager.profile_repo,
                 insight_repo=plan_manager.insight_repo,
+                category_repo=plan_manager.category_repo, # <--- Novo
                 memory_service=memory_service,
                 config_service=config_service,
             )

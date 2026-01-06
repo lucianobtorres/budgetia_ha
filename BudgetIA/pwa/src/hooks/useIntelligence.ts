@@ -97,6 +97,31 @@ export function useIntelligence() {
             queryClient.invalidateQueries({ queryKey: ['intelligence', 'observers'] }); // To update config sample
             toast.success("Lista de assinaturas atualizada.");
         }
+    }); 
+    
+    // We need to return the mutation object itself or its properties
+    const cleaningMutation = useMutation({
+        mutationFn: () => fetchAPI('/intelligence/clean', { method: 'POST' }),
+        onSuccess: (data) => {
+            // Invalidate queries to refresh UI immediately
+            queryClient.invalidateQueries({ queryKey: ['transactions'] });
+            queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+            queryClient.invalidateQueries({ queryKey: ['categories'] });
+
+            // Check 'processed' (backend arg) or 'updated_count'
+            const count = data.processed !== undefined ? data.processed : data.updated_count;
+
+            if (data.status === 'success' && count > 0) {
+                 toast.success(`Faxina concluída! ${count} transações corrigidas.`);
+            } else if (data.status === 'success' && count === 0) {
+                 toast.info(data.message || "Tudo limpo! Nenhuma transação pendente.");
+            } else if (data.status === 'sem_pendencias') {
+                 toast.info("Tudo limpo! Nenhuma transação pendente.");
+            } else {
+                 toast.success("Faxina concluída.");
+            }
+        },
+        onError: () => toast.error('Erro ao executar faxina.')
     });
 
     return {
@@ -113,19 +138,9 @@ export function useIntelligence() {
 
         deleteMemory: deleteMemoryMutation.mutateAsync,
         deleteRule: deleteRuleMutation.mutateAsync,
-        triggerCleaning: useMutation({
-            mutationFn: () => fetchAPI('/intelligence/clean', { method: 'POST' }),
-            onSuccess: (data) => {
-                if (data.status === 'success' && data.updated_count > 0) {
-                     toast.success(`Faxina concluída! ${data.updated_count} transações corrigidas.`);
-                } else if (data.status === 'sem_pendencias') {
-                     toast.info("Tudo limpo! Nenhuma transação pendente.");
-                } else {
-                     toast.success("Faxina concluída.");
-                }
-            },
-            onError: () => toast.error('Erro ao executar faxina.')
-        }).mutateAsync
+        
+        triggerCleaning: cleaningMutation.mutateAsync,
+        isCleaning: cleaningMutation.isPending
     };
 }
 

@@ -6,11 +6,14 @@ import pandas as pd
 
 if TYPE_CHECKING:
     from finance.repositories.budget_repository import BudgetRepository
+    from finance.repositories.category_repository import CategoryRepository  # <--- Novo
     from finance.repositories.data_context import FinancialDataContext
     from finance.repositories.debt_repository import DebtRepository
     from finance.repositories.insight_repository import InsightRepository
     from finance.repositories.profile_repository import ProfileRepository
     from finance.repositories.transaction_repository import TransactionRepository
+    from finance.services.category_service import CategoryService  # <--- Novo
+    from finance.services.insight_service import InsightService
 from core.logger import get_logger
 
 logger = get_logger("PlanilhaManager")
@@ -31,6 +34,8 @@ class PlanilhaManager:
         debt_repo: "DebtRepository",
         profile_repo: "ProfileRepository",
         insight_repo: "InsightRepository",
+        category_repo: "CategoryRepository",  # <--- Novo
+        category_service: "CategoryService",  # <--- Novo
         insight_service: "InsightService",
         cache_key: str,
     ) -> None:
@@ -43,6 +48,8 @@ class PlanilhaManager:
         self.debt_repo = debt_repo
         self.profile_repo = profile_repo
         self.insight_repo = insight_repo
+        self.category_repo = category_repo  # <--- Novo
+        self.category_service = category_service  # <--- Novo
         self.insight_service = insight_service
         self.cache_key = cache_key
 
@@ -87,12 +94,32 @@ class PlanilhaManager:
         descricao: str,
         valor: float,
         status: str = "Concluído",
+        parcelas: int = 1, # NEW Argument
     ) -> None:
+        """
+        Adiciona uma transação.
+        A lógica de parcelamento (explosão em múltiplas transações) 
+        agora reside no TransactionRepository.
+        """
         self.transaction_repo.add_transaction(
-            data, tipo, categoria, descricao, valor, status
+            data, tipo, categoria, descricao, valor, status, parcelas
         )
         self.recalculate_budgets() # Memória
         self.save() # Single Commit
+
+    def adicionar_registros_lote(
+        self,
+        transacoes: list[dict[str, Any]]
+    ) -> int:
+        """
+        Adiciona múltiplas transações de uma vez.
+        """
+        count = self.transaction_repo.add_batch(transacoes)
+        if count > 0:
+            self.recalculate_budgets()
+            self.save()
+        return count
+
 
     def recalculate_budgets(self) -> None:
         self.budget_repo.recalculate_all_budgets()
@@ -200,6 +227,56 @@ class PlanilhaManager:
     def analisar_para_insights_proativos(self) -> list[dict[str, Any]]:
         logger.info("Delegando análise proativa para o InsightService.")
         return self.insight_service.run_proactive_analysis_orchestration() # type: ignore[no-any-return]
+
+    # --- NOVO: MÉTODOS DE CATEGORIAS ---
+    def get_categories(self) -> pd.DataFrame:
+        """Retorna todas as categorias cadastradas."""
+        return self.category_repo.get_all()
+
+    def add_category(self, nome: str, tipo: str, icone: str = "", tags: str = "") -> bool:
+        """Adiciona uma nova categoria."""
+        success = self.category_repo.add_category(nome, tipo, icone, tags)
+        if success:
+            self.save()
+        return success
+
+    def delete_category(self, name: str) -> bool:
+        """Remove uma categoria se não estiver em uso."""
+        # 1. Check Use
+        usage_count = self.transaction_repo.count_category_usage(name)
+        if usage_count > 0:
+            msg = f"Não é possível excluir '{name}': ela é usada em {usage_count} transações. Edite as transações ou renomeie a categoria."
+            logger.warning(msg)
+            # Retornar False aqui faria o endpoint retornar 404, o que é semânticamente errado mas ok-ish. 
+            # Idealmente lançaríamos uma exceção específica, mas vamos logar e retornar False, 
+            # e o Router pode tratar melhor se quiséssemos. 
+            # BETTER: Raise ValueError to be caught by Router or let boolean fail.
+            # Vamos levantar exception para mensagem customizada chegar na API
+            raise ValueError(msg)
+
+        success = self.category_repo.delete_category(name)
+        if success:
+            self.save()
+        return success
+
+    def update_category(self, old_name: str, new_name: str, tipo: str, icone: str, tags: str) -> bool:
+        """Atualiza uma categoria existente."""
+        success = self.category_repo.update_category(old_name, new_name, tipo, icone, tags)
+        if success:
+            # Se o nome mudou, atualiza em cascata nas transações
+            if old_name.strip().lower() != new_name.strip().lower():
+                self.transaction_repo.update_category_name(old_name, new_name)
+            
+            self.save()
+        return success
+
+    def ensure_default_categories(self) -> None:
+        """Garante que existam categorias básicas (migração automática)."""
+        pre_empty = self.category_repo.get_all().empty
+        self.category_service.ensure_default_categories()
+        # Salva apenas se houve alteração (estava vazia antes)
+        if pre_empty and not self.category_repo.get_all().empty:
+            self.save()  
 
     def check_connection(self) -> tuple[bool, str]:
         logger.debug("Verificando saúde da conexão com o armazenamento...")

@@ -5,10 +5,9 @@ import { useExpenses } from '../../hooks/useDashboard';
 import { useBudgetsList } from '../../hooks/useBudgets';
 import { useDrawer } from '../../context/DrawerContext';
 import { Drawer } from '../ui/Drawer';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { TRANSACTION_CATEGORIES } from '../../utils/constants';
-import { ProgressListItem } from '../ui/ProgressListItem';
-import { Target, CreditCard } from 'lucide-react';
+import { DistributionPieChart } from './DistributionPieChart';
+import { CategoryList } from './CategoryList';
 
 interface Props {
     isOpen: boolean;
@@ -68,8 +67,8 @@ export default function CategoryDrawer({ isOpen, onClose, highlightCategory }: P
     }, [expenses]);
 
     // Helper to check if budget exists
-    const getBudgetForCategory = (category: string) => {
-        return budgets?.find(b => b.Categoria === category);
+    const checkBudgetExists = (category: string) => {
+        return !!budgets?.find(b => b.Categoria === category);
     };
 
     const handleBudgetClick = (category: string) => {
@@ -85,6 +84,10 @@ export default function CategoryDrawer({ isOpen, onClose, highlightCategory }: P
         onClose();
     };
 
+    const registerRef = (category: string, el: HTMLDivElement | null) => {
+        itemRefs.current[category] = el;
+    };
+
     // Valid data for Pie Chart (only > 0)
     const pieData = sortedData.filter(c => c.value > 0);
     const totalExpenses = pieData.reduce((acc, c) => acc + c.value, 0);
@@ -98,40 +101,12 @@ export default function CategoryDrawer({ isOpen, onClose, highlightCategory }: P
              <div className="flex flex-col md:flex-row h-full bg-transparent gap-4 md:gap-6 pb-4 md:pb-0">
                 {/* Left Column: Chart (Desktop) / Top (Mobile) */}
                 <div className="w-full md:w-5/12 flex-none flex flex-col gap-4">
-                     {pieData.length > 0 ? (
-                        <div className="h-[250px] md:h-[350px] w-full bg-surface-card/40 rounded-xl border border-border p-2 flex items-center justify-center">
-                             <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                    <Pie
-                                        data={pieData as any[]}
-                                        dataKey="value"
-                                        nameKey="name"
-                                        cx="50%"
-                                        cy="50%"
-                                        innerRadius={60}
-                                        outerRadius={90}
-                                        paddingAngle={3}
-                                        cornerRadius={4}
-                                    >
-                                        {pieData.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={getCategoryColor(entry.name)} stroke="rgba(0,0,0,0.1)" strokeWidth={1} />
-                                        ))}
-                                    </Pie>
-                                    <Tooltip 
-                                        contentStyle={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '8px', color: 'var(--color-text-primary)' }}
-                                        itemStyle={{ color: 'var(--color-text-primary)' }}
-                                        formatter={(value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0)}
-                                    />
-                                </PieChart>
-                            </ResponsiveContainer>
-                        </div>
-                    ) : (
-                        <div className="h-[250px] w-full bg-surface-card/40 rounded-xl border border-border flex items-center justify-center text-text-muted">
-                            Sem dados para exibir
-                        </div>
-                    )}
+                     <DistributionPieChart 
+                        data={pieData} 
+                        getCategoryColor={getCategoryColor} 
+                     />
                     
-                    {/* Desktop Only: Summary Box or Legend could go here */}
+                    {/* Desktop Only: Summary Box */}
                     <div className="hidden md:block p-4 bg-surface-card/40 rounded-xl border border-border">
                         <div className="flex justify-between items-center mb-2">
                             <span className="text-sm text-text-muted">Total Despesas</span>
@@ -147,57 +122,16 @@ export default function CategoryDrawer({ isOpen, onClose, highlightCategory }: P
 
                 {/* Right Column: List (Desktop) / Bottom (Mobile) */}
                 <div className="flex-1 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-border">
-                    <div className="space-y-2">
-                        {sortedData.length > 0 ? (
-                            sortedData.map((cat) => {
-                                const color = getCategoryColor(cat.name);
-                                const hasBudget = !!getBudgetForCategory(cat.name);
-                                const isHighlighted = highlightCategory === cat.name;
-                                
-                                return (
-                                    <div 
-                                        key={cat.name} 
-                                        ref={el => { if(itemRefs.current) itemRefs.current[cat.name] = el }}
-                                        className={`transition-colors rounded-xl ${isHighlighted ? 'bg-surface-hover ring-1 ring-border-hover' : ''}`}
-                                    >
-                                        <ProgressListItem
-                                            title={cat.name}
-                                            color={color}
-                                            value={cat.value}
-                                            totalReference={totalExpenses}
-                                            alwaysShowActions={true}
-                                            action={
-                                                <div className="flex items-center gap-1">
-                                                    {hasBudget && (
-                                                        <button
-                                                            onClick={() => handleBudgetClick(cat.name)}
-                                                            className="p-1.5 text-text-secondary hover:text-primary-light hover:bg-surface-hover rounded-md transition-colors"
-                                                            title="Ver Orçamento"
-                                                        >
-                                                            <Target size={14} />
-                                                        </button>
-                                                    )}
-                                                    {cat.value > 0 && (
-                                                        <button
-                                                            onClick={() => handleTransactionsClick(cat.name)}
-                                                            className="p-1.5 text-text-secondary hover:text-primary-light hover:bg-surface-hover rounded-md transition-colors"
-                                                            title="Ver Transações"
-                                                        >
-                                                            <CreditCard size={14} />
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            }
-                                        />
-                                    </div>
-                                );
-                            })
-                        ) : (
-                            <div className="text-center text-text-muted py-8">
-                                Nenhuma categoria encontrada.
-                            </div>
-                        )}
-                    </div>
+                    <CategoryList 
+                        data={sortedData}
+                        totalExpenses={totalExpenses}
+                        highlightCategory={highlightCategory}
+                        getCategoryColor={getCategoryColor}
+                        checkBudgetExists={checkBudgetExists}
+                        onBudgetClick={handleBudgetClick}
+                        onTransactionsClick={handleTransactionsClick}
+                        registerRef={registerRef}
+                    />
                 </div>
              </div>
         </Drawer>

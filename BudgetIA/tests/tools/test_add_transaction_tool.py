@@ -60,6 +60,7 @@ def test_add_transaction_tool_com_data(
         descricao=descricao,
         valor=valor,
         status="Concluído",  # Verifica o status padrão
+        parcelas=1,
     )
 
     # 3. Verifica se o recálculo do orçamento foi chamado

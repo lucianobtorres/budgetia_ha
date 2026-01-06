@@ -86,3 +86,22 @@ export function useUpdateTransaction() {
         onError: () => toast.error("Erro ao atualizar transação")
     });
 }
+
+export function useCreateTransactionsBatch() {
+    const queryClient = useQueryClient();
+    
+    return useMutation({
+        mutationFn: async (data: any[]) => {
+             return fetchAPI('/transactions/batch', {
+                 method: 'POST',
+                 body: JSON.stringify(data)
+             });
+        },
+        onSuccess: (data) => {
+             toast.success(data.message || "Transações importadas com sucesso!");
+             queryClient.invalidateQueries({ queryKey: ['transactions'] });
+             queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+        },
+        onError: () =>  toast.error("Erro ao importar transações")
+    });
+}

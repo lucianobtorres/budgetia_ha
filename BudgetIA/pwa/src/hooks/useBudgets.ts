@@ -1,17 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchAPI } from "../services/api";
 import { toast } from "sonner";
-
-export interface Budget {
-    "ID Orcamento"?: number;
-    Categoria: string;
-    'Valor Limite': number;
-    'Valor Gasto Atual': number;
-    'Status Orçamento': string;
-    'Período Orçamento': string;
-    'Observações'?: string;
-    [key: string]: any;
-}
+import type { Budget } from "../types/domain";
 
 export function useBudgetsList() {
     return useQuery<Budget[]>({
