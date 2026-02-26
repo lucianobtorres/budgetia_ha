@@ -25,7 +25,8 @@ from interfaces.api.routers import (
     system,
     categories,
     imports,
-    ocr, # <--- Novo
+    ocr,
+    mcp, # <--- Novo
 )
 
 description = """
@@ -93,7 +94,8 @@ api_router.include_router(subscription.router)
 api_router.include_router(system.router)
 api_router.include_router(categories.router)
 api_router.include_router(imports.router)
-api_router.include_router(ocr.router) # <--- Novo
+api_router.include_router(ocr.router)
+api_router.include_router(mcp.router) # <--- Novo
 
 # Incluir na App Principal
 app.include_router(api_router)

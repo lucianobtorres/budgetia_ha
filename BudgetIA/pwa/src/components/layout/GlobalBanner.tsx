@@ -75,7 +75,7 @@ export function GlobalBanner() {
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: 'auto', opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
-                className={`${getStyles()} relative z-50 shadow-md`}
+                className={`${getStyles()} relative z-50 shadow-md pt-safe`}
             >
                 <div className="max-w-7xl mx-auto px-4 py-2 relative flex items-center justify-center text-xs md:text-sm font-medium">
                     <div className="flex items-center gap-2">

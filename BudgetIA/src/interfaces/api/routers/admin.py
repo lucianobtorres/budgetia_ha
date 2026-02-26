@@ -154,6 +154,26 @@ def toggle_block_endpoint(username: str, admin: dict = Depends(verify_admin_role
     new_state = toggle_user_block(username)
     return {"message": "Bloqueado" if new_state else "Desbloqueado", "is_blocked": new_state}
 
+class ResetPasswordRequest(BaseModel):
+    new_password: str
+
+@router.post("/users/{username}/reset-password")
+def reset_password_endpoint(username: str, req: ResetPasswordRequest, admin: dict = Depends(verify_admin_role)):
+    """Redefine a senha de um usuário (apenas Admin)."""
+    from interfaces.api.utils.security import update_password
+    
+    # 1. Verifica se o usuário existe
+    target = get_user(username)
+    if not target:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+        
+    # 2. Executa o reset
+    try:
+        update_password(username, req.new_password)
+        return {"message": f"Senha do usuário '{username}' redefinida com sucesso."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao resetar senha: {e}")
+
 class BroadcastRequest(BaseModel):
     message: str
     title: str = "Mensagem do Admin"

@@ -6,7 +6,7 @@ export function BottomNav() {
   const location = useLocation();
 
   return (
-    <div className="fixed bottom-0 left-0 z-50 w-full h-16 bg-surface-card border-t border-border md:hidden pb-[env(safe-area-inset-bottom)]">
+    <div className="fixed bottom-0 left-0 z-50 w-full min-h-[4rem] h-auto bg-surface-card border-t border-border md:hidden pb-safe">
       <div className="grid h-full w-full grid-flow-col auto-cols-fr mx-auto font-medium">
         {navigationItems.map((item) => {
             const isActive = location.pathname === item.href;
