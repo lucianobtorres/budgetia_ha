@@ -7,7 +7,8 @@ from interfaces.api.dependencies import (
     get_planilha_manager,
     get_llm_orchestrator,
     get_memory_service,
-    get_user_config_service
+    get_memory_service,
+    get_mcp_user
 )
 from interfaces.mcp.server import BudgetIAMCPServer
 from core.logger import get_logger
@@ -24,7 +25,7 @@ async def sse(
     plan_manager=Depends(get_planilha_manager),
     llm_orchestrator=Depends(get_llm_orchestrator),
     memory_service=Depends(get_memory_service),
-    config_service=Depends(get_user_config_service)
+    config_service=Depends(get_mcp_user)
 ):
     """
     Endpoint para conexão SSE do protocolo MCP.
@@ -71,14 +72,23 @@ async def sse(
                 if user_id in sse_transports:
                     del sse_transports[user_id]
 
-    return Response(content=None, status_code=200) # Placeholder, o Starlette handle_mcp_session deve ser chamado.
+    # No FastAPI, o SseServerTransport.handle_sse_request retorna um objeto
+    # que o Starlette interpreta como uma resposta SSE completa.
+    return await transport.handle_sse_request(request)
 
-    # RETIFICANDO: A forma correta de injetar um handler ASGI no FastAPI 
-    # é usar a própria app do transport se ela existir, ou chamar o connect_sse.
-    # Como queremos integrar no Router, vamos usar o padrão de retornar o transport handler.
+@router.post("/messages")
+async def messages(
+    request: Request,
+    config_service=Depends(get_mcp_user)
+):
+    """
+    Endpoint para o cliente MCP enviar mensagens (POST) após conectar o SSE.
+    """
+    user_id = config_service.username
+    transport = sse_transports.get(user_id)
     
-    # Vamos usar o EventSourceResponse do sse-starlette se o transport for compatível,
-    # mas o mcp.server.sse.SseServerTransport.connect_sse é um ASGI middlware-like.
-    
-    # Versão simplificada que funciona com FastAPI:
-    return Response(content=handle_mcp_session, media_type="text/event-stream")
+    if not transport:
+        return Response("Transporte não encontrado", status_code=404)
+        
+    await transport.handle_post_request(request)
+    return Response(status_code=202)

@@ -113,6 +113,49 @@ def get_user_config_service(
     return UserConfigService(username=username)
 
 
+async def get_mcp_user(
+    request: Request,
+) -> UserConfigService:
+    """
+    Dependency especial para o MCP que suporta Dual-Auth:
+    1. Tenta validar como Token de Longa Duração do HA (se for Add-on).
+    2. Fallback para JWT padrão do BudgetIA.
+    """
+    from core.ha_auth_service import is_running_as_ha_addon, validate_ha_token, resolve_ha_user_to_budgetia
+    
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token de autenticação ausente ou malformatado",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    token = auth_header.split(" ")[1]
+
+    # 1. Tenta Home Assistant (se for Add-on)
+    if is_running_as_ha_addon():
+        ha_user = await validate_ha_token(token)
+        if ha_user:
+            budgetia_username = resolve_ha_user_to_budgetia(ha_user.ha_username)
+            if budgetia_username:
+                logger.info(f"MCP Auth: Usuário HA '{ha_user.ha_username}' autenticado como '{budgetia_username}'")
+                return UserConfigService(username=budgetia_username)
+            else:
+                logger.warning(f"MCP Auth: Token HA válido mas não mapeado para usuário BudgetIA: {ha_user.ha_username}")
+                # Não falha aqui, pode ser um JWT do BudgetIA sendo passado no ambiente HA
+
+    # 2. Fallback para JWT padrão
+    try:
+        # Reutilizamos a lógica do get_user_config_service passando o token extraído
+        return get_user_config_service(token=token)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"MCP Auth: Erro inesperado na validação JWT: {e}")
+        raise HTTPException(status_code=401, detail="Falha na autenticação")
+
+
 def get_planilha_manager(
     config_service: UserConfigService = Depends(get_user_config_service),
 ) -> PlanilhaManager:

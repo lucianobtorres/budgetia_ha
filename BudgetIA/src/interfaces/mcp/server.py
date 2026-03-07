@@ -24,10 +24,15 @@ class BudgetIAMCPServer:
             # Verifica se a planilha está disponível primeiro
             data_context: FinancialDataContext = self.dependencies.get("data_context")
             if not data_context or not data_context.storage.ping()[0]:
-                logger.warning("MCP: Planilha não disponível. Retornando lista vazia ou erro informativo.")
-                # No MCP, podemos retornar ferramentas, mas a execução falhará.
-                # Ou podemos injetar uma 'ferramenta de erro' ou simplesmente retornar o que temos.
-                # Vamos injetar uma mensagem na descrição se não estiver disponível.
+                logger.warning("MCP: Planilha não disponível. Injetando ferramenta de aviso.")
+                return [types.Tool(
+                    name="status_planilha",
+                    description="RETORNA O STATUS DA PLANILHA. Única ferramenta disponível quando a planilha não está configurada.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {},
+                    }
+                )]
             
             tools = self._get_budgetia_tools()
             mcp_tools = []
