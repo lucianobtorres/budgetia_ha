@@ -21,7 +21,7 @@ sse_transports: dict[str, SseServerTransport] = {}
 
 @router.get("/sse")
 async def sse(
-    request: Request,
+    scope: Scope, receive: Receive, send: Send,
     plan_manager=Depends(get_planilha_manager),
     llm_orchestrator=Depends(get_llm_orchestrator),
     memory_service=Depends(get_memory_service),
@@ -72,12 +72,12 @@ async def sse(
                 if user_id in sse_transports:
                     del sse_transports[user_id]
 
-    # Hand-off manual para o handler ASGI
-    await handle_mcp_session(request.scope, request.receive, request.send)
+    # Hand-off correto para o protocolo ASGI
+    await handle_mcp_session(scope, receive, send)
 
 @router.post("/messages")
 async def messages(
-    request: Request,
+    scope: Scope, receive: Receive, send: Send,
     config_service=Depends(get_mcp_user)
 ):
     """
@@ -87,8 +87,10 @@ async def messages(
     transport = sse_transports.get(user_id)
     
     if not transport:
-        return Response("Transporte não encontrado", status_code=404)
+        # Se não houver transporte, precisamos retornar 404 via ASGI
+        response = Response("Transporte não encontrado", status_code=404)
+        await response(scope, receive, send)
+        return
         
-    # SseServerTransport.handle_post_message também é um handler ASGI
-    await transport.handle_post_message(request.scope, request.receive, request.send)
-    return Response(status_code=202)
+    # SseServerTransport.handle_post_message é um ASGI app
+    await transport.handle_post_message(scope, receive, send)
