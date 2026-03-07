@@ -72,9 +72,8 @@ async def sse(
                 if user_id in sse_transports:
                     del sse_transports[user_id]
 
-    # No FastAPI, o SseServerTransport.handle_sse_request retorna um objeto
-    # que o Starlette interpreta como uma resposta SSE completa.
-    return await transport.handle_sse_request(request)
+    # Hand-off manual para o handler ASGI
+    await handle_mcp_session(request.scope, request.receive, request.send)
 
 @router.post("/messages")
 async def messages(
@@ -90,5 +89,6 @@ async def messages(
     if not transport:
         return Response("Transporte não encontrado", status_code=404)
         
-    await transport.handle_post_request(request)
+    # SseServerTransport.handle_post_message também é um handler ASGI
+    await transport.handle_post_message(request.scope, request.receive, request.send)
     return Response(status_code=202)
