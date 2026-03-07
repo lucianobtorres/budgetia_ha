@@ -1,4 +1,4 @@
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from interfaces.api.utils.jwt import decode_access_token
 
