@@ -40,41 +40,54 @@ class HAUserInfo:
 async def validate_ha_token(bearer_token: str) -> Optional[HAUserInfo]:
     """
     Verifica se um Bearer token é um token válido do Home Assistant.
-
-    Utiliza o proxy do Supervisor para chamar a API do HA Core (/core/api/).
-    Se retornar 200, o token é válido.
     """
     if not SUPERVISOR_TOKEN:
-        logger.warning("HAAuth: SUPERVISOR_TOKEN não configurado. Impossível validar token do HA.")
+        logger.warning("HAAuth: SUPERVISOR_TOKEN não encontrado no ambiente.")
         return None
 
-    # URL do proxy do Supervisor para o Core do HA
-    ha_core_url = "http://supervisor/core/api/"
+    # URL do proxy do Supervisor para o Core do HA. 
+    # Tentamos /api/config que é um endpoint padrão que exige autenticação.
+    ha_core_url = "http://supervisor/core/api/config"
 
+    logger.debug(f"HAAuth: Solicitando validação para endpoint: {ha_core_url}")
+    
     try:
         async with httpx.AsyncClient() as client:
-            # Validamos o token chamando o endpoint base da API do HA
+            # Em alguns ambientes do Supervisor, pode ser necessário passar o token do supervisor
+            # no header X-Supervisor-Token mesmo para chamadas proxy do Core.
+            headers = {
+                "Authorization": f"Bearer {bearer_token}",
+                "X-Supervisor-Token": SUPERVISOR_TOKEN
+            }
+            
             response = await client.get(
                 ha_core_url,
-                headers={
-                    "Authorization": f"Bearer {bearer_token}",
-                },
-                timeout=5.0,
+                headers=headers,
+                timeout=10.0,
             )
 
         if response.status_code == 200:
-            logger.info("HAAuth: Token HA validado com sucesso via API Core.")
+            logger.info("HAAuth: Token HA validado com sucesso via /api/config.")
+            # Opcional: extrair nome real do usuário se o HA retornar no JSON de config (raro nesse endpoint)
             return HAUserInfo(
                 ha_username="ha_authenticated_user",
                 display_name="HA User",
                 is_admin=True,
             )
         else:
-            logger.error(f"HAAuth: O Core do HA retornou status {response.status_code} para este token. (Não autenticado)")
+            logger.error(f"HAAuth: Falha na validação. Core retornou {response.status_code}")
+            # Log de depuração do corpo para entender o erro (ex: 401 Unauthorized)
+            try:
+                error_detail = response.text[:200]
+                logger.debug(f"HAAuth: Resposta do Core: {error_detail}")
+            except: pass
             return None
 
-    except httpx.RequestError as e:
-        logger.error(f"HAAuth: Erro crítico ao contactar Supervisor/HA Core: {e}")
+    except httpx.TimeoutException:
+        logger.error("HAAuth: Timeout ao contactar Supervisor/HA Core.")
+        return None
+    except Exception as e:
+        logger.error(f"HAAuth: Erro inesperado na validação HA: {type(e).__name__}: {e}")
         return None
 
 
