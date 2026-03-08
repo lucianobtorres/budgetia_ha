@@ -66,17 +66,31 @@ _managers_lock = threading.Lock()
 
 
 # @lru_cache # Cache removido pois agora depende do Header dinâmico
-def get_user_config_service(
+async def get_user_config_service(
     token: str = Depends(oauth2_scheme),
 ) -> UserConfigService:
-    """Dependency que valida o JWT e retorna o Config Service."""
-    # Reutilizando lógica de validação se quisesse, mas mantendo separado para evitar refactor grande agora
+    """
+    Dependency Master: Valida tanto Tokens do Home Assistant quanto JWTs nativos.
+    Isso permite que qualquer endpoint (incluindo MCP) funcione com ambos.
+    """
+    from core.ha_auth_service import is_running_as_ha_addon, validate_ha_token, resolve_ha_user_to_budgetia
+
+    # 1. Tenta Home Assistant (se for Add-on)
+    is_addon = is_running_as_ha_addon()
+    if is_addon:
+        # Nota: validate_ha_token agora emite logs como INFO
+        ha_user = await validate_ha_token(token)
+        if ha_user:
+            budgetia_username = resolve_ha_user_to_budgetia(ha_user.ha_username)
+            if budgetia_username:
+                logger.info(f"Auth: Usuário HA '{ha_user.ha_username}' autenticado como '{budgetia_username}'")
+                return UserConfigService(username=budgetia_username)
+    
+    # 2. Fallback para JWT padrão do BudgetIA
     payload = decode_access_token(token)
     
     if payload is None:
-         logger.warning("Payload é None (Token inválido ou expirado)")
-         # Tenta debug da string do token se possível
- 
+         logger.warning("Auth: Payload JWT inválido ou assinatura não coincide.")
          raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Credenciais inválidas ou expiradas",
@@ -85,80 +99,20 @@ def get_user_config_service(
     
     username: str = payload.get("sub")
     if username is None:
-        logger.warning("Claim 'sub' ausente no payload")
+        logger.warning("Auth: Claim 'sub' ausente no JWT")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token inválido: sub ausente",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Debug para confirmar quem está chamando
-    logger.debug(f"Acesso AUTENTICADO para user='{username}'")
-    
-    # SECURITY CHECK: Verify if user is still active in DB (not blocked/deleted)
+    # Verifica se usuário existe
     from interfaces.api.utils.security import get_user
     user_data = get_user(username)
     if not user_data:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, 
-            detail="Usuário não encontrado."
-        )
+        raise HTTPException(status_code=401, detail="Usuário não encontrado.")
     
-    if user_data.get("disabled", False):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Conta bloqueada pelo administrador."
-        )
-
     return UserConfigService(username=username)
-
-
-async def get_mcp_user(
-    request: Request,
-) -> UserConfigService:
-    """
-    Dependency especial para o MCP que suporta Dual-Auth:
-    1. Tenta validar como Token de Longa Duração do HA (se for Add-on).
-    2. Fallback para JWT padrão do BudgetIA.
-    """
-    from core.ha_auth_service import is_running_as_ha_addon, validate_ha_token, resolve_ha_user_to_budgetia
-    
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token de autenticação ausente ou malformatado",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    token = auth_header.split(" ")[1]
-
-    # 1. Tenta Home Assistant (se for Add-on)
-    is_addon = is_running_as_ha_addon()
-    logger.debug(f"MCP Auth: Tentando validar token. IsAddon={is_addon}")
-
-    if is_addon:
-        ha_user = await validate_ha_token(token)
-        if ha_user:
-            budgetia_username = resolve_ha_user_to_budgetia(ha_user.ha_username)
-            if budgetia_username:
-                logger.info(f"MCP Auth: Usuário HA '{ha_user.ha_username}' autenticado como '{budgetia_username}'")
-                return UserConfigService(username=budgetia_username)
-            else:
-                logger.warning(f"MCP Auth: Token HA válido mas não mapeado para usuário BudgetIA: {ha_user.ha_username}")
-        else:
-            logger.debug("MCP Auth: Falha na validação do token via HA Core (validate_ha_token retornou None)")
-
-    # 2. Fallback para JWT padrão
-    try:
-        logger.debug("MCP Auth: Iniciando fallback para validação JWT nativa")
-        return get_user_config_service(token=token)
-    except HTTPException as he:
-        logger.error(f"MCP Auth: Erro na validação JWT: {he.detail}")
-        raise
-    except Exception as e:
-        logger.error(f"MCP Auth: Erro inesperado no fallback JWT: {e}")
-        raise HTTPException(status_code=401, detail=f"Falha na autenticação: {str(e)}")
 
 
 def get_planilha_manager(

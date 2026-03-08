@@ -7,8 +7,7 @@ from interfaces.api.dependencies import (
     get_planilha_manager,
     get_llm_orchestrator,
     get_memory_service,
-    get_memory_service,
-    get_mcp_user
+    get_user_config_service
 )
 from interfaces.mcp.server import BudgetIAMCPServer
 from core.logger import get_logger
@@ -25,7 +24,7 @@ async def sse(
     plan_manager=Depends(get_planilha_manager),
     llm_orchestrator=Depends(get_llm_orchestrator),
     memory_service=Depends(get_memory_service),
-    config_service=Depends(get_mcp_user)
+    config_service=Depends(get_user_config_service)
 ):
     """
     Endpoint para conexão SSE do protocolo MCP.
@@ -78,7 +77,7 @@ async def sse(
 @router.post("/messages")
 async def messages(
     scope: Scope, receive: Receive, send: Send,
-    config_service=Depends(get_mcp_user)
+    config_service=Depends(get_user_config_service)
 ):
     """
     Endpoint para o cliente MCP enviar mensagens (POST) após conectar o SSE.
