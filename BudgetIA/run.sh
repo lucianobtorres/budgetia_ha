@@ -20,7 +20,10 @@ if [ -f "$OPTIONS_PATH" ]; then
     if [ ! -z "$val" ]; then export GROQ_MODEL="$val"; fi
 
     val=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('gemini_api_key', ''))")
-    if [ ! -z "$val" ]; then export GEMINI_API_KEY="$val"; fi
+    if [ ! -z "$val" ]; then 
+        export GEMINI_API_KEY="$val"
+        export GOOGLE_API_KEY="$val"
+    fi
 
     val=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('google_oauth_client_id', ''))")
     if [ ! -z "$val" ]; then export GOOGLE_OAUTH_CLIENT_ID="$val"; fi

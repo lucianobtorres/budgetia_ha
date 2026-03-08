@@ -109,34 +109,50 @@ async def mcp_rpc(
         body = await request.json()
         logger.debug(f"MCP RPC: Recebida requisição de '{user_id}': {body.get('method')}")
         
-        # O mcp-python-sdk não tem um 'handle_single_request' oficial fácil de usar fora de streams,
-        # mas podemos simular um stream de memória para obter a resposta.
-        from anyio import create_memory_object_stream
-        
-        read_send, read_recv = create_memory_object_stream(1)
-        write_send, write_recv = create_memory_object_stream(1)
-        
-        # Injeta o request no stream de leitura
-        import json
-        await read_send.send(json.dumps(body))
-        
-        # Executa o servidor em modo "one-shot"
-        # Nota: Isso é um pouco hacky, mas funciona para transformar um SDK orientado a stream em request-reply
+        from mcp.shared.memory import create_memory_client_session
+        from mcp.types import JSONRPCMessage, JSONRPCRequest, JSONRPCResponse, JSONRPCNotification
         import anyio
-        async with anyio.create_task_group() as tg:
-            tg.start_soon(mcp_app.server.run, read_recv, write_send, mcp_app.server.create_initialization_options())
-            
-            # Aguarda a resposta no stream de escrita
-            # O primeiro JSON costuma ser o 'initialize' result ou erro, mas aqui o cliente envia o body direto
-            # Se o corpo for um request direto, o SDK vai responder.
-            raw_response = await write_recv.receive()
-            tg.cancel_scope.cancel()
-            
-        return json.loads(raw_response)
         
+        # O MCP SDK espera um fluxo de objetos JSONRPCMessage.
+        # Como o HTTP é stateless, fazemos um "kickstart" da sessão enviando:
+        # 1. Initialize Request
+        # 2. Initialized Notification
+        # 3. A requisição real do usuário (body)
+        
+        async with create_memory_client_session(mcp_app.server) as session:
+            # 1. Handshake Inicial
+            await session.initialize()
+            
+            # 2. Converte o body do usuário em um objeto de request do MCP
+            # Nota: O body vindo do script já está no formato JSON-RPC
+            request_id = body.get("id", "1")
+            method = body.get("method")
+            params = body.get("params", {})
+            
+            # Executa a chamada conforme o método
+            if method == "tools/list":
+                result = await session.list_tools()
+                return {"jsonrpc": "2.0", "result": result.model_dump(), "id": request_id}
+            elif method == "tools/call":
+                tool_name = params.get("name")
+                tool_args = params.get("arguments", {})
+                result = await session.call_tool(tool_name, tool_args)
+                return {"jsonrpc": "2.0", "result": result.model_dump(), "id": request_id}
+            else:
+                # Fallback para outros métodos genéricos via low-level request
+                from mcp.types import JSONRPCRequest
+                resp = await session.send_request(JSONRPCRequest(
+                    method=method,
+                    params=params,
+                    id=request_id
+                ))
+                return {"jsonrpc": "2.0", "result": resp, "id": request_id}
+                
     except Exception as e:
         logger.error(f"MCP RPC: Erro ao processar requisição HTTP: {e}")
-        return {"jsonrpc": "2.0", "error": {"code": -32603, "message": str(e)}, "id": None}
+        import traceback
+        logger.debug(traceback.format_exc())
+        return {"jsonrpc": "2.0", "error": {"code": -32603, "message": str(e)}, "id": body.get("id") if 'body' in locals() else None}
 
 @router.post("/messages")
 async def messages(
