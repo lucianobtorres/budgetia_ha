@@ -134,7 +134,10 @@ async def get_mcp_user(
     token = auth_header.split(" ")[1]
 
     # 1. Tenta Home Assistant (se for Add-on)
-    if is_running_as_ha_addon():
+    is_addon = is_running_as_ha_addon()
+    logger.debug(f"MCP Auth: Tentando validar token. IsAddon={is_addon}")
+
+    if is_addon:
         ha_user = await validate_ha_token(token)
         if ha_user:
             budgetia_username = resolve_ha_user_to_budgetia(ha_user.ha_username)
@@ -143,17 +146,19 @@ async def get_mcp_user(
                 return UserConfigService(username=budgetia_username)
             else:
                 logger.warning(f"MCP Auth: Token HA válido mas não mapeado para usuário BudgetIA: {ha_user.ha_username}")
-                # Não falha aqui, pode ser um JWT do BudgetIA sendo passado no ambiente HA
+        else:
+            logger.debug("MCP Auth: Falha na validação do token via HA Core (validate_ha_token retornou None)")
 
     # 2. Fallback para JWT padrão
     try:
-        # Reutilizamos a lógica do get_user_config_service passando o token extraído
+        logger.debug("MCP Auth: Iniciando fallback para validação JWT nativa")
         return get_user_config_service(token=token)
-    except HTTPException:
+    except HTTPException as he:
+        logger.error(f"MCP Auth: Erro na validação JWT: {he.detail}")
         raise
     except Exception as e:
-        logger.error(f"MCP Auth: Erro inesperado na validação JWT: {e}")
-        raise HTTPException(status_code=401, detail="Falha na autenticação")
+        logger.error(f"MCP Auth: Erro inesperado no fallback JWT: {e}")
+        raise HTTPException(status_code=401, detail=f"Falha na autenticação: {str(e)}")
 
 
 def get_planilha_manager(

@@ -64,19 +64,17 @@ async def validate_ha_token(bearer_token: str) -> Optional[HAUserInfo]:
 
         if response.status_code == 200:
             logger.info("HAAuth: Token HA validado com sucesso via API Core.")
-            # Como o token é de longa duração, ele não nos dá o username diretamente no payload
-            # Retornamos um objeto genérico que será mapeado para o admin/user padrão
             return HAUserInfo(
                 ha_username="ha_authenticated_user",
                 display_name="HA User",
                 is_admin=True,
             )
         else:
-            logger.debug(f"HAAuth: Falha na validação do token HA. Status Core: {response.status_code}")
+            logger.error(f"HAAuth: O Core do HA retornou status {response.status_code} para este token. (Não autenticado)")
             return None
 
     except httpx.RequestError as e:
-        logger.error(f"HAAuth: Erro ao contactar Supervisor/HA Core: {e}")
+        logger.error(f"HAAuth: Erro crítico ao contactar Supervisor/HA Core: {e}")
         return None
 
 
