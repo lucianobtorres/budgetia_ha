@@ -7,20 +7,47 @@ echo "🟢 Iniciando BudgetIA Add-on (Monorepo Mode)..."
 OPTIONS_PATH="/data/options.json"
 if [ -f "$OPTIONS_PATH" ]; then
     echo "⚙️  Carregando opções..."
-    export LOG_LEVEL=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('log_level', 'info'))")
-    export OPENAI_API_KEY=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('openai_api_key', ''))")
-    export GROQ_API_KEY=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('groq_api_key', ''))")
-    export GROQ_MODEL=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('groq_model', ''))")
-    export GEMINI_API_KEY=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('gemini_api_key', ''))")
-    export GOOGLE_OAUTH_CLIENT_ID=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('google_oauth_client_id', ''))")
-    export GOOGLE_OAUTH_CLIENT_SECRET=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('google_oauth_client_secret', ''))")
-    export GOOGLE_OAUTH_REDIRECT_URI=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('google_oauth_redirect_uri', ''))")
-    export VAPID_PRIVATE_KEY=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('vapid_private_key', ''))")
-    export VAPID_PUBLIC_KEY=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('vapid_public_key', ''))")
-    export VAPID_CLAIM_EMAIL=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('vapid_claim_email', ''))")
-    export SECRET_KEY=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('secret_key', ''))")
-    export UPSTASH_REDIS_URL=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('upstash_redis_url', ''))")
-    export PLANILHA_PATH=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('planilha_path', ''))")
+    val=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('log_level', ''))")
+    if [ ! -z "$val" ]; then export LOG_LEVEL="$val"; fi
+
+    val=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('openai_api_key', ''))")
+    if [ ! -z "$val" ]; then export OPENAI_API_KEY="$val"; fi
+
+    val=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('groq_api_key', ''))")
+    if [ ! -z "$val" ]; then export GROQ_API_KEY="$val"; fi
+
+    val=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('groq_model', ''))")
+    if [ ! -z "$val" ]; then export GROQ_MODEL="$val"; fi
+
+    val=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('gemini_api_key', ''))")
+    if [ ! -z "$val" ]; then export GEMINI_API_KEY="$val"; fi
+
+    val=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('google_oauth_client_id', ''))")
+    if [ ! -z "$val" ]; then export GOOGLE_OAUTH_CLIENT_ID="$val"; fi
+
+    val=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('google_oauth_client_secret', ''))")
+    if [ ! -z "$val" ]; then export GOOGLE_OAUTH_CLIENT_SECRET="$val"; fi
+
+    val=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('google_oauth_redirect_uri', ''))")
+    if [ ! -z "$val" ]; then export GOOGLE_OAUTH_REDIRECT_URI="$val"; fi
+
+    val=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('vapid_private_key', ''))")
+    if [ ! -z "$val" ]; then export VAPID_PRIVATE_KEY="$val"; fi
+
+    val=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('vapid_public_key', ''))")
+    if [ ! -z "$val" ]; then export VAPID_PUBLIC_KEY="$val"; fi
+
+    val=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('vapid_claim_email', ''))")
+    if [ ! -z "$val" ]; then export VAPID_CLAIM_EMAIL="$val"; fi
+
+    val=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('secret_key', ''))")
+    if [ ! -z "$val" ]; then export SECRET_KEY="$val"; fi
+
+    val=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('upstash_redis_url', ''))")
+    if [ ! -z "$val" ]; then export UPSTASH_REDIS_URL="$val"; fi
+
+    val=$(python3 -c "import json; print(json.load(open('$OPTIONS_PATH')).get('planilha_path', ''))")
+    if [ ! -z "$val" ]; then export PLANILHA_PATH="$val"; fi
 
     # Tratamento da Conta de Serviço (JSON Payload)
     # Se o usuário colou o JSON na config, salvamos em arquivo e exportamos o caminho.

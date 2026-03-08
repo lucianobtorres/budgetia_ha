@@ -1,6 +1,6 @@
 [project]
 name = "budgetia"
-version = "1.0.59"
+version = "1.0.60"
 description = ""
 authors = [{ name = "Luciano Borges", email = "lucianobtorres@gmail.com" }]
 readme = "README.md"

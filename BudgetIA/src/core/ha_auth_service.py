@@ -45,41 +45,38 @@ async def validate_ha_token(bearer_token: str) -> Optional[HAUserInfo]:
         logger.warning("HAAuth: SUPERVISOR_TOKEN não encontrado no ambiente.")
         return None
 
-    # URL do proxy do Supervisor para o Core do HA. 
-    # Tentamos /api/config que é um endpoint padrão que exige autenticação.
-    ha_core_url = "http://supervisor/core/api/config"
+    # Estratégia Principal: Chamar o Core DIRETAMENTE via IP interno do Docker HA
+    # Isso evita que o proxy do Supervisor interceptre o header Authorization.
+    direct_core_url = "http://172.30.32.1:8123/api/config"
+    supervisor_proxy_url = "http://supervisor/core/api/config"
 
-    logger.debug(f"HAAuth: Solicitando validação para endpoint: {ha_core_url}")
+    logger.debug(f"HAAuth: Tentando validação via IP Direto: {direct_core_url}")
     
     try:
         async with httpx.AsyncClient() as client:
-            # Em alguns ambientes do Supervisor, pode ser necessário passar o token do supervisor
-            # no header X-Supervisor-Token mesmo para chamadas proxy do Core.
-            headers = {
-                "Authorization": f"Bearer {bearer_token}",
-                "X-Supervisor-Token": SUPERVISOR_TOKEN
-            }
+            # Header padrão para o Core
+            headers = {"Authorization": f"Bearer {bearer_token}"}
             
-            response = await client.get(
-                ha_core_url,
-                headers=headers,
-                timeout=10.0,
-            )
+            # 1. Tenta IP Direto
+            try:
+                response = await client.get(direct_core_url, headers=headers, timeout=5.0)
+                if response.status_code == 200:
+                    logger.info("HAAuth: Sucesso via IP Direto (172.30.32.1).")
+                    return HAUserInfo(ha_username="ha_authenticated_user", display_name="HA User", is_admin=True)
+                logger.debug(f"HAAuth: IP Direto falhou ({response.status_code}). Tentando Proxy Supervisor...")
+            except Exception as e:
+                logger.debug(f"HAAuth: Erro no IP Direto ({e}). Tentando Proxy Supervisor...")
+
+            # 2. Fallback: Proxy do Supervisor (requer X-Supervisor-Token)
+            headers["X-Supervisor-Token"] = SUPERVISOR_TOKEN
+            response = await client.get(supervisor_proxy_url, headers=headers, timeout=5.0)
 
         if response.status_code == 200:
-            logger.info("HAAuth: Token HA validado com sucesso via /api/config.")
-            # Opcional: extrair nome real do usuário se o HA retornar no JSON de config (raro nesse endpoint)
-            return HAUserInfo(
-                ha_username="ha_authenticated_user",
-                display_name="HA User",
-                is_admin=True,
-            )
+            logger.info("HAAuth: Sucesso via Proxy Supervisor.")
+            return HAUserInfo(ha_username="ha_authenticated_user", display_name="HA User", is_admin=True)
         else:
-            logger.error(f"HAAuth: Falha na validação. Core retornou {response.status_code}")
-            # Log de depuração do corpo para entender o erro (ex: 401 Unauthorized)
-            try:
-                error_detail = response.text[:200]
-                logger.debug(f"HAAuth: Resposta do Core: {error_detail}")
+            logger.error(f"HAAuth: Todas as tentativas falharam. Status final: {response.status_code}")
+            try: logger.debug(f"HAAuth: Resposta erro: {response.text[:200]}")
             except: pass
             return None
 

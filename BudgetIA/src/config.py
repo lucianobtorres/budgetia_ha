@@ -34,7 +34,13 @@ GOOGLE_OAUTH_REDIRECT_URI = os.getenv("GOOGLE_OAUTH_REDIRECT_URI", "http://local
 
 # --- CONFIGURAÇÃO DE SEGURANÇA (JWT) ---
 # Usar um segredo forte em produção!
-SECRET_KEY = os.getenv("SECRET_KEY", "super_secret_dev_key_change_in_prod_12345")
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    logger.debug("Config: SECRET_KEY não encontrada no env. Usando fallback de desenvolvimento.")
+    SECRET_KEY = "super_secret_dev_key_change_in_prod_12345"
+else:
+    logger.debug(f"Config: SECRET_KEY carregada do env. Comprimento: {len(SECRET_KEY)} | Prefixo: {SECRET_KEY[:4]}***")
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 Dias para dev (PWA persistência)
 
