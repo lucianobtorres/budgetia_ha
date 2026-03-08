@@ -109,45 +109,66 @@ async def mcp_rpc(
         body = await request.json()
         logger.debug(f"MCP RPC: Recebida requisição de '{user_id}': {body.get('method')}")
         
-        from mcp.shared.memory import create_memory_client_session
-        from mcp.types import JSONRPCMessage, JSONRPCRequest, JSONRPCResponse, JSONRPCNotification
+        from mcp import ClientSession
+        from anyio import create_memory_object_stream
         import anyio
         
-        # O MCP SDK espera um fluxo de objetos JSONRPCMessage.
-        # Como o HTTP é stateless, fazemos um "kickstart" da sessão enviando:
-        # 1. Initialize Request
-        # 2. Initialized Notification
-        # 3. A requisição real do usuário (body)
+        # Cria canais de comunicação em memória
+        # servidor -> cliente
+        server_send, client_recv = create_memory_object_stream(10)
+        # cliente -> servidor
+        client_send, server_recv = create_memory_object_stream(10)
         
-        async with create_memory_client_session(mcp_app.server) as session:
-            # 1. Handshake Inicial
-            await session.initialize()
+        request_id = body.get("id", "1")
+        method = body.get("method")
+        params = body.get("params", {})
+        
+        async with anyio.create_task_group() as tg:
+            # 1. Roda o servidor MCP no background consumindo do stream 'server_recv'
+            tg.start_soon(
+                mcp_app.server.run, 
+                server_recv, 
+                server_send, 
+                mcp_app.server.create_initialization_options()
+            )
             
-            # 2. Converte o body do usuário em um objeto de request do MCP
-            # Nota: O body vindo do script já está no formato JSON-RPC
-            request_id = body.get("id", "1")
-            method = body.get("method")
-            params = body.get("params", {})
-            
-            # Executa a chamada conforme o método
-            if method == "tools/list":
-                result = await session.list_tools()
-                return {"jsonrpc": "2.0", "result": result.model_dump(), "id": request_id}
-            elif method == "tools/call":
-                tool_name = params.get("name")
-                tool_args = params.get("arguments", {})
-                result = await session.call_tool(tool_name, tool_args)
-                return {"jsonrpc": "2.0", "result": result.model_dump(), "id": request_id}
-            else:
-                # Fallback para outros métodos genéricos via low-level request
-                from mcp.types import JSONRPCRequest
-                resp = await session.send_request(JSONRPCRequest(
-                    method=method,
-                    params=params,
-                    id=request_id
-                ))
-                return {"jsonrpc": "2.0", "result": resp, "id": request_id}
+            # 2. Cria a sessão do cliente para mediar o handshake e a chamada
+            async with ClientSession(client_recv, client_send) as session:
+                # 2.1 Handshake (initialize/initialized)
+                await session.initialize()
                 
+                # 2.2 Executa a chamada conforme o método
+                # NOTA: O SDK em versões recentes pode preferir métodos específicos ou send_request genérico
+                try:
+                    if method == "tools/list":
+                        result = await session.list_tools()
+                        final_response = {"jsonrpc": "2.0", "result": result.model_dump(), "id": request_id}
+                    elif method == "tools/call":
+                        tool_name = params.get("name")
+                        tool_args = params.get("arguments", {})
+                        result = await session.call_tool(tool_name, tool_args)
+                        final_response = {"jsonrpc": "2.0", "result": result.model_dump(), "id": request_id}
+                    else:
+                        # Fallback genérico para outros métodos
+                        from mcp.types import JSONRPCRequest
+                        resp = await session.send_request(JSONRPCRequest(
+                            method=method,
+                            params=params,
+                            id=request_id
+                        ))
+                        # Se resp for um objeto Pydantic, convertemos
+                        if hasattr(resp, "model_dump"):
+                            resp = resp.model_dump()
+                        final_response = {"jsonrpc": "2.0", "result": resp, "id": request_id}
+                except Exception as call_e:
+                    logger.error(f"MCP RPC: Erro na chamada do método '{method}': {call_e}")
+                    final_response = {"jsonrpc": "2.0", "error": {"code": -32603, "message": str(call_e)}, "id": request_id}
+                finally:
+                    # Cancela o grupo de tarefas para encerrar o servidor MCP
+                    tg.cancel_scope.cancel()
+            
+        return final_response
+        
     except Exception as e:
         logger.error(f"MCP RPC: Erro ao processar requisição HTTP: {e}")
         import traceback
