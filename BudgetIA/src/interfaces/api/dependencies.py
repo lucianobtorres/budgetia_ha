@@ -78,15 +78,21 @@ async def get_user_config_service(
     # 1. Tenta Home Assistant (se for Add-on)
     is_addon = is_running_as_ha_addon()
     if is_addon:
-        # Nota: validate_ha_token agora emite logs como INFO
         ha_user = await validate_ha_token(token)
         if ha_user:
             budgetia_username = resolve_ha_user_to_budgetia(ha_user.ha_username)
             if budgetia_username:
                 logger.info(f"Auth: Usuário HA '{ha_user.ha_username}' autenticado como '{budgetia_username}'")
                 return UserConfigService(username=budgetia_username)
+        else:
+            logger.debug("Auth: Token HA rejeitado pelo Core. Tentando fallback JWT...")
     
     # 2. Fallback para JWT padrão do BudgetIA
+    # Debug da SECRET_KEY para ajudar a identificar discrepâncias
+    import config
+    k_prev = config.SECRET_KEY[:4] + "***" if config.SECRET_KEY else "Missing"
+    logger.debug(f"Auth: Validando JWT. KeyPrefix={k_prev} | Hash={hash(config.SECRET_KEY)}")
+
     payload = decode_access_token(token)
     
     if payload is None:

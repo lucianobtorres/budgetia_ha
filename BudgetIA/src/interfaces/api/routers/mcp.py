@@ -74,6 +74,70 @@ async def sse(
     # Hand-off correto para o protocolo ASGI
     await handle_mcp_session(scope, receive, send)
 
+@router.post("/rpc")
+async def mcp_rpc(
+    request: Request,
+    plan_manager=Depends(get_planilha_manager),
+    llm_orchestrator=Depends(get_llm_orchestrator),
+    memory_service=Depends(get_memory_service),
+    config_service=Depends(get_user_config_service)
+):
+    """
+    Endpoint RPC via HTTP (POST). 
+    Permite executar ferramentas MCP em uma única requisição (stateless),
+    evitando problemas de proxy com SSE.
+    """
+    user_id = config_service.username
+    
+    # Prepara dependências
+    deps = {
+        "data_context": plan_manager._context,
+        "transaction_repo": plan_manager.transaction_repo,
+        "budget_repo": plan_manager.budget_repo,
+        "debt_repo": plan_manager.debt_repo,
+        "profile_repo": plan_manager.profile_repo,
+        "insight_repo": plan_manager.insight_repo,
+        "memory_service": memory_service,
+        "config_service": config_service,
+        "llm_orchestrator": llm_orchestrator
+    }
+
+    mcp_app = BudgetIAMCPServer(deps)
+    
+    # Processa o corpo JSON-RPC
+    try:
+        body = await request.json()
+        logger.debug(f"MCP RPC: Recebida requisição de '{user_id}': {body.get('method')}")
+        
+        # O mcp-python-sdk não tem um 'handle_single_request' oficial fácil de usar fora de streams,
+        # mas podemos simular um stream de memória para obter a resposta.
+        from anyio import create_memory_object_stream
+        
+        read_send, read_recv = create_memory_object_stream(1)
+        write_send, write_recv = create_memory_object_stream(1)
+        
+        # Injeta o request no stream de leitura
+        import json
+        await read_send.send(json.dumps(body))
+        
+        # Executa o servidor em modo "one-shot"
+        # Nota: Isso é um pouco hacky, mas funciona para transformar um SDK orientado a stream em request-reply
+        import anyio
+        async with anyio.create_task_group() as tg:
+            tg.start_soon(mcp_app.server.run, read_recv, write_send, mcp_app.server.create_initialization_options())
+            
+            # Aguarda a resposta no stream de escrita
+            # O primeiro JSON costuma ser o 'initialize' result ou erro, mas aqui o cliente envia o body direto
+            # Se o corpo for um request direto, o SDK vai responder.
+            raw_response = await write_recv.receive()
+            tg.cancel_scope.cancel()
+            
+        return json.loads(raw_response)
+        
+    except Exception as e:
+        logger.error(f"MCP RPC: Erro ao processar requisição HTTP: {e}")
+        return {"jsonrpc": "2.0", "error": {"code": -32603, "message": str(e)}, "id": None}
+
 @router.post("/messages")
 async def messages(
     scope: Scope, receive: Receive, send: Send,
