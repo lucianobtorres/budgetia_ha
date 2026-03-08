@@ -41,43 +41,42 @@ async def validate_ha_token(bearer_token: str) -> Optional[HAUserInfo]:
     """
     Verifica se um Bearer token é um token válido do Home Assistant.
 
-    Chama o endpoint de autenticação do Supervisor (`http://supervisor/auth`)
-    com o token do usuário no header `Authorization`.
-
-    Returns:
-        HAUserInfo se válido, None caso contrário.
+    Utiliza o proxy do Supervisor para chamar a API do HA Core (/core/api/).
+    Se retornar 200, o token é válido.
     """
     if not SUPERVISOR_TOKEN:
         logger.warning("HAAuth: SUPERVISOR_TOKEN não configurado. Impossível validar token do HA.")
         return None
 
+    # URL do proxy do Supervisor para o Core do HA
+    ha_core_url = "http://supervisor/core/api/"
+
     try:
         async with httpx.AsyncClient() as client:
+            # Validamos o token chamando o endpoint base da API do HA
             response = await client.get(
-                SUPERVISOR_AUTH_URL,
+                ha_core_url,
                 headers={
-                    # O Supervisor usa o seu próprio token para autenticar a chamada
-                    "Authorization": f"Bearer {SUPERVISOR_TOKEN}",
-                    # O token do usuário final é passado nesse header customizado
-                    "X-Supervisor-Token": bearer_token,
+                    "Authorization": f"Bearer {bearer_token}",
                 },
                 timeout=5.0,
             )
 
         if response.status_code == 200:
-            data = response.json()
-            logger.info(f"HAAuth: Token HA validado para usuário '{data.get('username')}'")
+            logger.info("HAAuth: Token HA validado com sucesso via API Core.")
+            # Como o token é de longa duração, ele não nos dá o username diretamente no payload
+            # Retornamos um objeto genérico que será mapeado para o admin/user padrão
             return HAUserInfo(
-                ha_username=data.get("username", "ha_user"),
-                display_name=data.get("name", "HA User"),
-                is_admin=data.get("is_admin", False),
+                ha_username="ha_authenticated_user",
+                display_name="HA User",
+                is_admin=True,
             )
         else:
-            logger.debug(f"HAAuth: Token HA inválido ou expirado. Status: {response.status_code}")
+            logger.debug(f"HAAuth: Falha na validação do token HA. Status Core: {response.status_code}")
             return None
 
     except httpx.RequestError as e:
-        logger.error(f"HAAuth: Erro ao contactar Supervisor: {e}")
+        logger.error(f"HAAuth: Erro ao contactar Supervisor/HA Core: {e}")
         return None
 
 
