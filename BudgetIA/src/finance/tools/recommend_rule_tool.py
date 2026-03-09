@@ -32,7 +32,7 @@ class RecomendarRegraIdealTool(BaseTool):  # type: ignore[misc]
         logger.info(f"Ferramenta '{self.name}' chamada: Sugerindo Regra de Ouro.")
 
         # --- DIP: Chama a função injetada ---
-        df_perfil = self.visualizar_dados(aba_nome=self.aba_perfil)
+        df_perfil = self.visualizar_dados(sheet_name=self.aba_perfil)
 
         if df_perfil.empty or "Campo" not in df_perfil.columns:
             return "AVISO: Não foi possível encontrar o perfil do usuário. Por favor, peça para ele preencher a 'Renda Mensal Média' e 'Principal Objetivo' na aba de Perfil ou pelo chat."

@@ -31,7 +31,7 @@ class VisualizarDividasTool(BaseTool):  # type: ignore[misc]
         logger.info(f"Ferramenta '{self.name}' foi chamada.")
 
         # --- DIP: Chama a função injetada ---
-        df = self.visualizar_dados(aba_nome=NomesAbas.DIVIDAS)
+        df = self.visualizar_dados(sheet_name=NomesAbas.DIVIDAS)
         if df.empty:
             return "A aba de dívidas está vazia. Nenhuma dívida encontrada."
 

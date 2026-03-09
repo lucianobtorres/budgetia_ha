@@ -41,7 +41,7 @@ class VerificarStatusOrcamentoTool(BaseTool):  # type: ignore[misc]
             self.recalculate_budgets()
 
             # 2. Visualiza os dados atualizados
-            orcamentos_df = self.visualizar_dados(aba_nome=NomesAbas.ORCAMENTOS)
+            orcamentos_df = self.visualizar_dados(sheet_name=NomesAbas.ORCAMENTOS)
             # --- Fim das chamadas ---
 
             if orcamentos_df.empty:

@@ -34,7 +34,7 @@ class AnalisarDividaTool(BaseTool):  # type: ignore[misc]
         )
 
         # --- DIP: Chama a função injetada ---
-        df = self.visualizar_dados(aba_nome=NomesAbas.DIVIDAS)
+        df = self.visualizar_dados(sheet_name=NomesAbas.DIVIDAS)
         if df.empty:
             return (
                 "A aba de dívidas está vazia. Nenhuma dívida encontrada para análise."
