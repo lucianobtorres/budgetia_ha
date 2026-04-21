@@ -15,7 +15,7 @@ FROM python:3.12-slim
 
 # Add-on Labels
 # Use a specific version label that matches config.yaml
-LABEL      io.hass.version="1.0.63" \
+LABEL      io.hass.version = "1.0.64" \
 io.hass.type="addon" io.hass.arch="armhf|aarch64|i386|amd64"
 
 # Environment variables
