@@ -1,6 +1,6 @@
 [project]
 name = "budgetia"
-version = "1.0.65"
+version = "1.0.66"
 description = ""
 authors = [{ name = "Luciano Borges", email = "lucianobtorres@gmail.com" }]
 readme = "README.md"
@@ -47,7 +47,7 @@ dependencies = [
 
 [tool.poetry]
 name = "budgetia"
-version = "1.0.65"
+version = "1.0.66"
 description = "Assistente Financeiro Pessoal"
 authors = ["Luciano Borges <lucianobtorres@gmail.com>"]
 packages = [
