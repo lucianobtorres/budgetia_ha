@@ -102,7 +102,7 @@ class LLMModels:
     # Defaults do Sistema
     # Defaults do Sistema (Podem ser sobrescritos por ENV)
     DEFAULT_GROQ = os.getenv("GROQ_MODEL", "llama-3.1-70b-versatile")
-    DEFAULT_GEMINI = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+    DEFAULT_GEMINI = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
     DEFAULT_OPENAI = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 
