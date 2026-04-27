@@ -10,7 +10,7 @@ RUN npm run build
 FROM python:3.12-slim
 
 # Add-on Metadata
-LABEL io.hass.version="1.0.67" \
+LABEL io.hass.version="1.0.68" \
       io.hass.type="addon" \
       io.hass.arch="armhf|aarch64|i386|amd64"
 

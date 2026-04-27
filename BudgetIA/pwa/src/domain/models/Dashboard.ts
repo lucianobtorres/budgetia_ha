@@ -7,4 +7,5 @@ export interface FinancialSummary {
 export interface CategoryExpense {
     name: string;
     value: number;
+    [key: string]: string | number;
 }

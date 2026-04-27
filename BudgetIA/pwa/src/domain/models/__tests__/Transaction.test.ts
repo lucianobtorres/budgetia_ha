@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createTransactionFromSchema } from '../Transaction';
-import type { TransactionSchema } from '../../../../types/api';
+import type { TransactionSchema } from '../../../types/api';
 
 describe('Transaction Model Mappers', () => {
     it('should map API schema to Domain entity correctly', () => {

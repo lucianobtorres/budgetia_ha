@@ -63,7 +63,7 @@ export default function Chat({ className, variant = 'full', onAction }: ChatProp
             const botMsg: Message = { 
                 role: 'assistant', 
                 content: data.response,
-                steps: data.intermediate_steps 
+                steps: data.intermediate_steps as Message['steps']
             };
             setMessages(prev => [...prev, botMsg]);
             
