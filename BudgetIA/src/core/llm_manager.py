@@ -3,9 +3,10 @@ from typing import Any
 
 from dotenv import load_dotenv
 
+from core.logger import get_logger
+
 # Importa a interface e as implementações concretas
 from .llm_providers.base_provider import LLMProvider
-from core.logger import get_logger
 
 logger = get_logger("LLMOrchestrator")
 
@@ -77,7 +78,9 @@ class LLMOrchestrator:
                 )
                 return llm
             except Exception as e:
-                logger.error(f"Falha ao carregar LLM do provedor '{provider.name}': {e}")
+                logger.error(
+                    f"Falha ao carregar LLM do provedor '{provider.name}': {e}"
+                )
 
         raise RuntimeError("Nenhum provedor de LLM pôde ser carregado.")
 
@@ -102,16 +105,20 @@ class LLMOrchestrator:
         Procura nos provedores configurados (primário + fallback) por um que suporte visão.
         """
         providers_to_try = [self.primary_provider] + self.fallback_providers
-        
+
         for provider in providers_to_try:
             if provider.supports_vision and provider.api_key:
                 try:
                     logger.info(f"Selecionando provedor Vision: {provider.name}")
                     return provider.get_llm(temperature=temperature)
                 except Exception as e:
-                    logger.warning(f"Falha ao instanciar LLM Vision do provedor '{provider.name}': {e}")
-        
-        raise RuntimeError("Nenhum provedor de LLM com suporte a Visão (OCR) está disponível ou configurado.")
+                    logger.warning(
+                        f"Falha ao instanciar LLM Vision do provedor '{provider.name}': {e}"
+                    )
+
+        raise RuntimeError(
+            "Nenhum provedor de LLM com suporte a Visão (OCR) está disponível ou configurado."
+        )
 
     @property
     def is_vision_available(self) -> bool:

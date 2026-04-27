@@ -1,10 +1,10 @@
 import json
-from datetime import datetime
-import pandas as pd
+
 from core.llm_manager import LLMOrchestrator
 from core.logger import get_logger
 
 logger = get_logger("TransactionClassifier")
+
 
 class TransactionClassifier:
     """
@@ -15,7 +15,9 @@ class TransactionClassifier:
     def __init__(self, llm_orchestrator: LLMOrchestrator):
         self.llm = llm_orchestrator
 
-    def classify_transactions(self, transactions: list[dict], valid_categories: list[str]) -> dict[str, str]:
+    def classify_transactions(
+        self, transactions: list[dict], valid_categories: list[str]
+    ) -> dict[str, str]:
         """
         Recebe uma lista de transações e retorna um dicionário {id_transacao: nova_categoria}.
         Apenas retorna transações onde a confiança é alta.
@@ -24,11 +26,13 @@ class TransactionClassifier:
             return {}
 
         # Prepara o prompt
-        tx_list_str = "\n".join([
-            f"- ID: {t.get('id', 'N/A')} | Desc: {t.get('descricao', 'N/A')} | Valor: {t.get('valor', 'N/A')}" 
-            for t in transactions
-        ])
-        
+        tx_list_str = "\n".join(
+            [
+                f"- ID: {t.get('id', 'N/A')} | Desc: {t.get('descricao', 'N/A')} | Valor: {t.get('valor', 'N/A')}"
+                for t in transactions
+            ]
+        )
+
         valid_cats_str = ", ".join(valid_categories)
 
         prompt = f"""
@@ -58,19 +62,24 @@ class TransactionClassifier:
         try:
             # Chama LLM
             response = self.llm.get_configured_llm().invoke(prompt).content
-            
+
             # Limpa markdown se houver
             clean_json = response.replace("```json", "").replace("```", "").strip()
             data = json.loads(clean_json)
-            
+
             # Filtra resultados
             result = {}
             for item in data.get("classifications", []):
-                if item.get("confidence") == "high" and item.get("category") in valid_categories:
+                if (
+                    item.get("confidence") == "high"
+                    and item.get("category") in valid_categories
+                ):
                     # Garante que o ID existe na lista original
                     result[str(item["id"])] = item["category"]
-            
-            logger.info(f"Classificadas {len(result)} de {len(transactions)} transações com alta confiança.")
+
+            logger.info(
+                f"Classificadas {len(result)} de {len(transactions)} transações com alta confiança."
+            )
             return result
 
         except Exception as e:

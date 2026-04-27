@@ -1,5 +1,6 @@
 # Em: src/finance/storage/excel_storage_handler.py
 import os
+import time
 from datetime import datetime
 
 import pandas as pd
@@ -11,25 +12,22 @@ from config import (
     ColunasOrcamentos,
     ColunasTransacoes,
 )
-
 from core.logger import get_logger
 
 logger = get_logger("ExcelStorage")
 
 # --- 1. IMPORTAR A INTERFACE CORRIGIDA ---
-from finance.storage.base_storage_handler import BaseStorageHandler
-from finance.strategies.base_strategy import BaseMappingStrategy
+from finance.storage.base_storage_handler import BaseStorageHandler  # noqa: E402
+from finance.strategies.base_strategy import BaseMappingStrategy  # noqa: E402
 
 
 # --- 2. FAZER A CLASSE HERDAR DA INTERFACE ---
-class ExcelStorageHandler(BaseStorageHandler): # type: ignore[misc]
+class ExcelStorageHandler(BaseStorageHandler):  # type: ignore[misc]
     """Classe especialista em ler e escrever DataFrames para um arquivo Excel."""
 
     def __init__(self, file_path: str) -> None:
         # --- LOG ADICIONADO ---
-        logger.debug(
-            f"__init__ chamado com file_path: '{file_path}'"
-        )
+        logger.debug(f"__init__ chamado com file_path: '{file_path}'")
         # --- FIM DO LOG ---
 
         self.file_path = file_path
@@ -59,6 +57,7 @@ class ExcelStorageHandler(BaseStorageHandler): # type: ignore[misc]
         Carrega as abas da planilha usando a Estratégia de Mapeamento fornecida.
         Removemos toda a lógica 'if mapeamento:' daqui.
         """
+        start_load = time.time()
 
         # --- LOG INICIAL ---
         logger.debug(f"Verificando arquivo: {self.file_path}")
@@ -146,6 +145,7 @@ class ExcelStorageHandler(BaseStorageHandler): # type: ignore[misc]
                 for sheet_name, columns in layout_config.items():
                     dataframes[sheet_name] = pd.DataFrame(columns=columns)
 
+        logger.info(f"⏱️ Excel.load_sheets total: {time.time() - start_load:.2f}s")
         self.is_new_file = is_new_file
         return dataframes, is_new_file
 
@@ -156,17 +156,19 @@ class ExcelStorageHandler(BaseStorageHandler): # type: ignore[misc]
         """
         # Create a copy to avoid mutating the original DF in memory
         clean_df = df.copy()
-        
+
         # Select object/string columns only
-        string_cols = clean_df.select_dtypes(include=['object']).columns
-        
+        string_cols = clean_df.select_dtypes(include=["object"]).columns
+
         for col in string_cols:
             # Vectorized sanitization for string columns efficiently
             # We use a lambda but applied only to string values
             clean_df[col] = clean_df[col].apply(
-                lambda x: f"'{x}" if isinstance(x, str) and x.startswith(("=", "+", "-", "@")) else x
+                lambda x: f"'{x}"
+                if isinstance(x, str) and x.startswith(("=", "+", "-", "@"))
+                else x
             )
-            
+
         return clean_df
 
     def save_sheets(
@@ -179,6 +181,7 @@ class ExcelStorageHandler(BaseStorageHandler): # type: ignore[misc]
         Salva os DataFrames em um arquivo Excel, usando a Estratégia
         para "traduzir de volta" os dados para o formato do usuário.
         """
+        start_save = time.time()
         try:
             with pd.ExcelWriter(self.file_path, engine="xlsxwriter") as writer:
                 for internal_sheet_name, df_interno in dataframes.items():
@@ -223,6 +226,7 @@ class ExcelStorageHandler(BaseStorageHandler): # type: ignore[misc]
                         )
 
             logger.info(f"Planilha salva com sucesso em {self.file_path}")
+            logger.info(f"⏱️ Excel.save_sheets total: {time.time() - start_save:.2f}s")
 
         except Exception as e:
             logger.critical(f"ERRO CRÍTICO ao salvar a planilha: {e}")

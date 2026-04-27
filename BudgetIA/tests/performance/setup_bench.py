@@ -1,13 +1,14 @@
-import sys
 import os
 import shutil
+import sys
 
 # Add src to path
 sys.path.append(os.path.abspath("src"))
 
-from interfaces.api.utils.security import create_user
 from core.user_config_service import UserConfigService
+from interfaces.api.utils.security import create_user
 from tests.criar_planilha_teste import main as generate_sheet
+
 
 def setup():
     username = "bench_user"
@@ -47,6 +48,7 @@ def setup():
             print("Failed to configure user.")
     except Exception as e:
         print(f"Configuration failed: {e}")
+
 
 if __name__ == "__main__":
     setup()

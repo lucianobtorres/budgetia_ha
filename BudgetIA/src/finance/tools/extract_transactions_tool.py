@@ -2,9 +2,8 @@
 from pydantic import BaseModel
 
 from core.base_tool import BaseTool
-from finance.schemas import ExtrairTransacoesDoTextoInput
-
 from core.logger import get_logger
+from finance.schemas import ExtrairTransacoesDoTextoInput
 
 logger = get_logger("Tool_ExtractTrans")
 

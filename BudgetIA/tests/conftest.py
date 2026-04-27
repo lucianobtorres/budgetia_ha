@@ -30,7 +30,9 @@ if str(SRC_DIR) not in sys.path:
 
 # Agora, o Python saberá onde encontrar a pasta 'src'
 # e tanto 'import src.core...' quanto 'import config...' funcionarão.
-print(f"--- DEBUG conftest.py: Adicionado '{PROJECT_ROOT}' e '{SRC_DIR}' ao sys.path ---")
+print(
+    f"--- DEBUG conftest.py: Adicionado '{PROJECT_ROOT}' e '{SRC_DIR}' ao sys.path ---"
+)
 
 TEST_ENCRYPTION_KEY = Fernet.generate_key()
 
@@ -45,11 +47,11 @@ def mock_storage_handler() -> MagicMock:
 
     # --- CORREÇÃO: Retornar DFs vazios, mas inicializados ---
     import pandas as pd
+
     from config import LAYOUT_PLANILHA
 
     mock_dfs = {
-        aba: pd.DataFrame(columns=colunas)
-        for aba, colunas in LAYOUT_PLANILHA.items()
+        aba: pd.DataFrame(columns=colunas) for aba, colunas in LAYOUT_PLANILHA.items()
     }
 
     # Define valores de retorno padrão para o 'load_sheets'
@@ -71,9 +73,13 @@ def plan_manager_para_ferramentas(
 
     # Pula o 'recalculate_budgets'
     # Pula o 'recalculate_budgets' e evita Redis real
-    with patch.object(PlanilhaManager, "recalculate_budgets", return_value=None), \
-         patch("finance.factory.RedisCacheService") as mock_redis_service:
-        
+    with (
+        patch(
+            "finance.domain.services.budget_service.BudgetDomainService.recalculate_budgets",
+            return_value=None,
+        ),
+        patch("finance.factory.RedisCacheService") as mock_redis_service,
+    ):
         # Configura o mock do Redis para evitar erros
         mock_instance = mock_redis_service.return_value
         mock_instance.get_entry.return_value = (None, None)
@@ -82,6 +88,7 @@ def plan_manager_para_ferramentas(
         plan_manager = FinancialSystemFactory.create_manager(
             storage_handler=mock_storage_handler,
             config_service=mock_config_service,
+            llm_orchestrator=MagicMock(),
         )
     return plan_manager
 

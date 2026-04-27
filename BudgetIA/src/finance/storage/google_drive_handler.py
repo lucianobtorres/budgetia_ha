@@ -4,19 +4,19 @@ import re
 
 import pandas as pd
 from google.oauth2.service_account import Credentials
-from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError
-from googleapiclient.http import (
+from googleapiclient.discovery import build  # noqa: E402
+from googleapiclient.errors import HttpError  # noqa: E402
+from googleapiclient.http import (  # noqa: E402
     MediaIoBaseDownload,  # Para o Download (load_sheets)
     MediaIoBaseUpload,  # <--- CORREÇÃO: Usar esta para Upload
 )
 
-import config
-from core.logger import get_logger
+import config  # noqa: E402
+from core.logger import get_logger  # noqa: E402
 
 logger = get_logger("GDriveHandler")
-from finance.storage.base_storage_handler import BaseStorageHandler
-from finance.strategies.base_strategy import BaseMappingStrategy
+from finance.storage.base_storage_handler import BaseStorageHandler  # noqa: E402
+from finance.strategies.base_strategy import BaseMappingStrategy  # noqa: E402
 
 # Define o caminho para a chave de serviço (reutilizando a mesma)
 CREDENTIALS_PATH = config.GSPREAD_CREDENTIALS_PATH
@@ -27,7 +27,7 @@ CREDENTIALS_PATH = config.GSPREAD_CREDENTIALS_PATH
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 
 
-class GoogleDriveFileHandler(BaseStorageHandler): # type: ignore[misc]
+class GoogleDriveFileHandler(BaseStorageHandler):  # type: ignore[misc]
     """
     Implementação do BaseStorageHandler para arquivos Excel (.xlsx)
     armazenados diretamente no Google Drive.
@@ -45,7 +45,9 @@ class GoogleDriveFileHandler(BaseStorageHandler): # type: ignore[misc]
         try:
             # --- CORREÇÃO DA AUTENTICAÇÃO ---
             # 1. Carrega as credenciais diretamente da biblioteca google.oauth2
-            creds: Credentials = Credentials.from_service_account_file(CREDENTIALS_PATH, scopes=SCOPES) # type: ignore[no-untyped-call]
+            creds: Credentials = Credentials.from_service_account_file(
+                CREDENTIALS_PATH, scopes=SCOPES
+            )  # type: ignore[no-untyped-call]
 
             # 2. Constrói o serviço passando o objeto 'creds' (que o 'build' entende)
             self.drive_service = build("drive", "v3", credentials=creds)
@@ -54,15 +56,11 @@ class GoogleDriveFileHandler(BaseStorageHandler): # type: ignore[misc]
             # Verifica se o arquivo existe (apenas para definir self._is_new_file)
             self.drive_service.files().get(fileId=self.file_id, fields="id").execute()
             self._is_new_file = False
-            logger.debug(
-                f"Serviço do Drive v3 construído. File ID: {self.file_id}"
-            )
+            logger.debug(f"Serviço do Drive v3 construído. File ID: {self.file_id}")
 
         except HttpError as e:
             if e.resp.status == 404:
-                logger.error(
-                    f"Arquivo NÃO encontrado no Drive: {self.file_id}"
-                )
+                logger.error(f"Arquivo NÃO encontrado no Drive: {self.file_id}")
                 raise ValueError(
                     f"Arquivo não encontrado ou sem permissão no Google Drive: {self.file_id}"
                 )
@@ -124,9 +122,7 @@ class GoogleDriveFileHandler(BaseStorageHandler): # type: ignore[misc]
                 status, done = downloader.next_chunk()
                 logger.debug(f"Download: {int(status.progress() * 100)}%.")
 
-            logger.debug(
-                "Download concluído. Lendo Excel em memória..."
-            )
+            logger.debug("Download concluído. Lendo Excel em memória...")
             file_buffer.seek(0)
 
             # Lê o arquivo Excel (em memória) com pandas
@@ -183,9 +179,7 @@ class GoogleDriveFileHandler(BaseStorageHandler): # type: ignore[misc]
         """
         Salva os DataFrames de volta no arquivo .xlsx no Google Drive.
         """
-        logger.debug(
-            f"Preparando para salvar (upload) arquivo: {self.file_id}"
-        )
+        logger.debug(f"Preparando para salvar (upload) arquivo: {self.file_id}")
 
         try:
             # Cria um buffer de bytes em memória
@@ -234,9 +228,7 @@ class GoogleDriveFileHandler(BaseStorageHandler): # type: ignore[misc]
                 .execute()
             )
 
-            logger.info(
-                f"Arquivo '{updated_file.get('name')}' atualizado no Drive!"
-            )
+            logger.info(f"Arquivo '{updated_file.get('name')}' atualizado no Drive!")
 
         except Exception as e:
             logger.error(f"Erro ao salvar (upload) o arquivo para o Google Drive: {e}")
@@ -274,7 +266,7 @@ class GoogleDriveFileHandler(BaseStorageHandler): # type: ignore[misc]
             )
 
             # Retorna a string ISO 8601 (ex: "2025-11-17T18:00:00.000Z")
-            return file_metadata.get("modifiedTime") # type: ignore[no-any-return]
+            return file_metadata.get("modifiedTime")  # type: ignore[no-any-return]
         except Exception as e:
             logger.warning(f"Não foi possível obter modifiedTime do GDrive: {e}")
             return None

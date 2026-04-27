@@ -1,85 +1,103 @@
-from typing import Any
-import pandas as pd
-from fastapi import APIRouter, Depends, HTTPException, Body
-from interfaces.api.dependencies import get_planilha_manager
+import traceback
+
+from fastapi import APIRouter, Depends, HTTPException
+
+from core.logger import get_logger
 from finance.planilha_manager import PlanilhaManager
-from config import NomesAbas, ColunasOrcamentos
+from interfaces.api.dependencies import get_planilha_manager
+from interfaces.api.schemas.budgets import BudgetCreate, BudgetSchema
+
+logger = get_logger("BudgetsRouter")
 
 router = APIRouter(prefix="/budgets", tags=["Orçamentos"])
 
-@router.get("/")
-def listar_orcamentos(
-    manager: PlanilhaManager = Depends(get_planilha_manager)
-) -> list[dict[str, Any]]:
+
+@router.get("/", response_model=list[BudgetSchema])
+def listar_orcamentos(manager: PlanilhaManager = Depends(get_planilha_manager)):
     """
     Retorna a lista completa de orçamentos para edição.
     """
     try:
-        df = manager.visualizar_dados(NomesAbas.ORCAMENTOS)
-        
-        if ColunasOrcamentos.ID in df.columns:
-             df = df.copy() # Evita SettingWithCopy warning
-             df[ColunasOrcamentos.ID] = pd.to_numeric(df[ColunasOrcamentos.ID], errors='coerce').fillna(0).astype(int)
+        budgets = manager.list_budgets_use_case.execute()
 
-        return df.to_dict(orient="records") # type: ignore[no-any-return]
+        # Mapeia de Domain Budget para BudgetSchema da API
+        # O Pydantic resolve os aliases se passarmos os nomes das propriedades da entidade
+        return [
+            BudgetSchema(
+                id=b.id,
+                categoria=b.categoria,
+                valor_limite=b.limite,
+                valor_gasto_atual=b.gasto_atual,
+                porcentagem_gasta=b.percentual_gasto,
+                periodo=b.periodo,
+                status=b.status,
+                observacoes=b.observacoes,
+            )
+            for b in budgets
+        ]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/")
+
+@router.post("/", response_model=dict[str, str])
 def add_orcamento(
-    categoria: str = Body(...),
-    valor_limite: float = Body(...),
-    periodo: str = Body("Mensal"),
-    observacoes: str = Body(""),
-    manager: PlanilhaManager = Depends(get_planilha_manager)
-) -> dict[str, str]:
+    budget: BudgetCreate, manager: PlanilhaManager = Depends(get_planilha_manager)
+):
     try:
         with manager.lock_file(timeout_seconds=30):
             manager.refresh_data()
             # Usa o método correto do manager
-            msg = manager.adicionar_ou_atualizar_orcamento(categoria, valor_limite, periodo, observacoes)
+            msg = manager.adicionar_ou_atualizar_orcamento(
+                budget.categoria,
+                budget.valor_limite,
+                budget.periodo,
+                budget.observacoes,
+            )
             manager.save()
         return {"message": msg}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.put("/{budget_id}")
+
+@router.put("/{budget_id}", response_model=dict[str, str])
 def update_orcamento_item(
     budget_id: int,
-    categoria: str = Body(...),
-    valor_limite: float = Body(...),
-    periodo: str = Body("Mensal"),
-    observacoes: str = Body(""),
-    manager: PlanilhaManager = Depends(get_planilha_manager)
-) -> dict[str, str]:
+    budget: BudgetCreate,
+    manager: PlanilhaManager = Depends(get_planilha_manager),
+):
     try:
         with manager.lock_file(timeout_seconds=30):
             manager.refresh_data()
+            # Usa nomes de campo Pydantic (não colunas Excel) para compatibilidade
+            # com UpdateBudgetUseCase que faz model_dump() + update() + Budget(**data)
             dados = {
-                ColunasOrcamentos.CATEGORIA: categoria,
-                ColunasOrcamentos.LIMITE: valor_limite,
-                ColunasOrcamentos.PERIODO: periodo,
-                ColunasOrcamentos.OBS: observacoes
+                "categoria": budget.categoria,
+                "limite": budget.valor_limite,
+                "periodo": budget.periodo,
+                "observacoes": budget.observacoes,
             }
-            success = manager.update_budget(budget_id, dados)
+            success = manager.atualizar_orcamento(budget_id, dados)
             if not success:
-                 raise HTTPException(status_code=404, detail="Orçamento não encontrado")
+                raise HTTPException(status_code=404, detail="Orçamento não encontrado")
             manager.save()
         return {"message": "Orçamento atualizado."}
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(
+            f"Erro ao atualizar orçamento {budget_id}:\n{traceback.format_exc()}"
+        )
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.delete("/{budget_id}")
 def delete_orcamento_item(
-    budget_id: int,
-    manager: PlanilhaManager = Depends(get_planilha_manager)
+    budget_id: int, manager: PlanilhaManager = Depends(get_planilha_manager)
 ) -> dict[str, str]:
     try:
         with manager.lock_file(timeout_seconds=30):
             manager.refresh_data()
-            success = manager.delete_budget(budget_id)
+            success = manager.excluir_orcamento(budget_id)
             if not success:
                 raise HTTPException(status_code=404, detail="Orçamento não encontrado")
             manager.save()

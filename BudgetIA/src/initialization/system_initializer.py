@@ -12,11 +12,11 @@ from core.user_config_service import UserConfigService
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import config
-from infrastructure.agents.factory import AgentFactory
+from core.logger import get_logger
 from finance.factory import FinancialSystemFactory
 from finance.planilha_manager import PlanilhaManager
 from finance.storage.storage_factory import StorageHandlerFactory
-from core.logger import get_logger
+from infrastructure.agents.factory import AgentFactory
 
 logger = get_logger("SystemInit")
 
@@ -45,9 +45,7 @@ def initialize_financial_system(
         plan_manager = FinancialSystemFactory.create_manager(
             storage_handler=storage_handler, config_service=config_service
         )
-        logger.debug(
-            f"PlanilhaManager criado: {type(plan_manager)}"
-        )
+        logger.debug(f"PlanilhaManager criado: {type(plan_manager)}")
 
         is_new_file = plan_manager.is_new_file
         dados_de_exemplo_foram_adicionados = False

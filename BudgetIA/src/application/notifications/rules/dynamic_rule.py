@@ -1,13 +1,13 @@
-
 from typing import Any, Literal
 
 import pandas as pd
+
+from application.notifications.models.notification_message import NotificationPriority
 from application.notifications.models.rule_result import RuleResult
 from application.notifications.rules.base_rule import IFinancialRule
-from application.notifications.models.notification_message import NotificationPriority
 
 
-class DynamicThresholdRule(IFinancialRule): # type: ignore[misc]
+class DynamicThresholdRule(IFinancialRule):  # type: ignore[misc]
     """
     Regra dinâmica configurável pelo usuário para monitorar gastos.
     Ex: "Avise se eu gastar mais de 500 em Jogos este mês".
@@ -44,37 +44,35 @@ class DynamicThresholdRule(IFinancialRule): # type: ignore[misc]
         # Assumindo que o DF tem coluna 'Categoria' e 'Valor' e 'Data'
         # Ajustar nomes de colunas conforme padrão do projeto (ColunasTransacoes?)
         # Vou usar nomes literais por enquanto e depois ajustamos se necessário, mas o ideal seria importar config.
-        
+
         # Copia para não alterar original
         df = transactions_df.copy()
-        
+
         # Normaliza categoria
         mask_cat = df["Categoria"].astype(str).str.lower() == self.category.lower()
         if not mask_cat.any():
             return RuleResult(triggered=False)
-            
+
         filtered_df = df[mask_cat]
 
         # Filtrar por período (Mês atual vs Semana atual)
         # Assumindo coluna 'Data' como datetime
         if not pd.api.types.is_datetime64_any_dtype(filtered_df["Data"]):
-             filtered_df["Data"] = pd.to_datetime(filtered_df["Data"], errors='coerce')
+            filtered_df["Data"] = pd.to_datetime(filtered_df["Data"], errors="coerce")
 
         now = pd.Timestamp.now()
-        
+
         if self.period == "monthly":
-            mask_period = (
-                (filtered_df["Data"].dt.month == now.month) & 
-                (filtered_df["Data"].dt.year == now.year)
+            mask_period = (filtered_df["Data"].dt.month == now.month) & (
+                filtered_df["Data"].dt.year == now.year
             )
         elif self.period == "weekly":
             # Semana atual ISO
             mask_period = (
-                (filtered_df["Data"].dt.isocalendar().week == now.isocalendar().week) &
-                (filtered_df["Data"].dt.isocalendar().year == now.isocalendar().year)
-            )
+                filtered_df["Data"].dt.isocalendar().week == now.isocalendar().week
+            ) & (filtered_df["Data"].dt.isocalendar().year == now.isocalendar().year)
         else:
-            mask_period = pd.Series([True] * len(filtered_df)) # type: ignore[unreachable]
+            mask_period = pd.Series([True] * len(filtered_df))  # type: ignore[unreachable]
 
         current_total = filtered_df[mask_period]["Valor"].sum()
 
@@ -84,7 +82,7 @@ class DynamicThresholdRule(IFinancialRule): # type: ignore[misc]
                 f"🚨 Alerta de Gasto: Você excedeu o limite de R$ {self.threshold:.2f} "
                 f"em '{self.category}' ({self.period}). Total: R$ {current_total:.2f}."
             )
-            
+
             return RuleResult(
                 triggered=True,
                 message_template=msg,
@@ -92,9 +90,9 @@ class DynamicThresholdRule(IFinancialRule): # type: ignore[misc]
                     "category": self.category,
                     "limit": self.threshold,
                     "current": current_total,
-                    "diff": diff
+                    "diff": diff,
                 },
-                priority=NotificationPriority.HIGH
+                priority=NotificationPriority.HIGH,
             )
 
         return RuleResult(triggered=False)
@@ -107,7 +105,7 @@ class DynamicThresholdRule(IFinancialRule): # type: ignore[misc]
             "category": self.category,
             "threshold": self.threshold,
             "period": self.period,
-            "custom_message": self.custom_message
+            "custom_message": self.custom_message,
         }
 
     @classmethod
@@ -117,5 +115,5 @@ class DynamicThresholdRule(IFinancialRule): # type: ignore[misc]
             category=data["category"],
             threshold=data["threshold"],
             period=data.get("period", "monthly"),
-            custom_message=data.get("custom_message")
+            custom_message=data.get("custom_message"),
         )

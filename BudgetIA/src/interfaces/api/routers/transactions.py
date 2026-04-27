@@ -1,142 +1,141 @@
 from typing import Any
+
 import pandas as pd
-from fastapi import APIRouter, Depends, HTTPException, Body
-from interfaces.api.dependencies import get_planilha_manager
-from finance.planilha_manager import PlanilhaManager
-from finance.schemas import AddTransactionInput
-from config import NomesAbas, ColunasTransacoes
+from fastapi import APIRouter, Body, Depends, HTTPException
+
+from config import ColunasTransacoes, NomesAbas
 from core.logger import get_logger
+from finance.planilha_manager import PlanilhaManager
+from interfaces.api.dependencies import get_planilha_manager
+from interfaces.api.schemas.transactions import (
+    TransactionCreate,
+    TransactionSchema,
+    TransactionUpdate,
+)
 
 logger = get_logger("TransactionsRouter")
 
 router = APIRouter(prefix="/transactions", tags=["Transações"])
 
-@router.get("/")
+
+@router.get("/", response_model=list[TransactionSchema])
 def listar_transacoes(
     limit: int = 100,
     month: int | None = None,
     year: int | None = None,
-    manager: PlanilhaManager = Depends(get_planilha_manager)
-) -> list[dict[str, Any]]:
+    manager: PlanilhaManager = Depends(get_planilha_manager),
+):
     """
     Retorna a lista de transações da planilha.
     Suporta filtragem por mês e ano.
-    Se filtrado, retorna todas as transações do período (limitado a 1000 por segurança).
-    Se não filtrado, retorna as 'limit' últimas.
     """
     try:
-        # Pega o DataFrame da aba 'Transações'
-        df = manager.visualizar_dados(NomesAbas.TRANSACOES)
-        if df is None or df.empty:
-            return []
-        
-        # Garante datetime para filtragem e ordenação
-        if ColunasTransacoes.DATA in df.columns:
-            # dayfirst=True assume DD/MM/YYYY
-            df[ColunasTransacoes.DATA] = pd.to_datetime(df[ColunasTransacoes.DATA], dayfirst=True, errors='coerce')
-        
-        # Filtro de Mês/Ano
-        if month is not None and year is not None:
-            # Remove NaT antes de filtrar (ou apenas ignora)
-            mask = (df[ColunasTransacoes.DATA].dt.month == month) & (df[ColunasTransacoes.DATA].dt.year == year)
-            df = df.loc[mask]
-            # Se filtrou por mês, queremos ver tudo (aumento o limit se não foi forçado alto)
-            if limit == 100: # Se for o default
-                limit = 1000
+        transactions = manager.list_transactions_use_case.execute(
+            month=month, year=year, limit=limit
+        )
 
-        # Converte NaT/NaN para None ou string para evitar erro de JSON
-        # Para colunas de objeto, preenche "". Para data, volta pra string.
-        df_display = df.copy()
-        
-        # Formata data para string ISO ou DD/MM/YYYY para o frontend? 
-        # Frontend geralmente gosta de ISO. Mas o excel usa DD/MM/YYYY.
-        # Vamos converter datetime para string YYYY-MM-DD para facilitar sort no JS
-        if ColunasTransacoes.DATA in df_display.columns:
-             df_display[ColunasTransacoes.DATA] = df_display[ColunasTransacoes.DATA].dt.strftime('%Y-%m-%d').replace('NaT', '')
-            
-        df_display = df_display.fillna("")
-
-        # Garante que ID está presente e é int (se existir)
-        if ColunasTransacoes.ID in df_display.columns:
-             df_display[ColunasTransacoes.ID] = pd.to_numeric(df_display[ColunasTransacoes.ID], errors='coerce').fillna(0).astype(int)
-
-        # Ordenação: Mais recente primeiro
-        if ColunasTransacoes.DATA in df_display.columns:
-             df_display = df_display.sort_values(by=ColunasTransacoes.DATA, ascending=False)
-
-        # Converte para dict (records) para JSON
-        registros: list[dict[str, Any]] = df_display.head(limit).to_dict(orient="records")
-        return registros
+        # Mapeia Entidade -> Schema
+        # Nota: TransactionSchema espera strings para data e outros campos
+        return [
+            TransactionSchema(
+                id=t.id,
+                data=t.data.strftime("%Y-%m-%d"),
+                tipo=t.tipo,
+                categoria=t.categoria,
+                descricao=t.descricao,
+                valor=t.valor,
+                status=t.status,
+            )
+            for t in transactions
+        ]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/", response_model=dict[str, Any])
+def adicionar_transacao(
+    transaction: TransactionCreate,
+    manager: PlanilhaManager = Depends(get_planilha_manager),
+):
+    """
+    Adiciona uma nova transação à planilha.
+    Usa o Caso de Uso DDD.
+    """
+    from finance.domain.models.transaction import Transaction
+
+    try:
+        with manager.lock_file(timeout_seconds=60):
+            manager.atualizar_dados()
+
+            new_tx = Transaction(
+                data=transaction.data,
+                tipo=transaction.tipo,
+                categoria=transaction.categoria,
+                descricao=str(transaction.descricao),
+                valor=transaction.valor,
+                status=transaction.status,
+            )
+
+            manager.add_transaction_use_case.execute(new_tx)
+            manager.salvar()
+            return {"message": "Transação adicionada com sucesso."}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao salvar transação: {e}")
+
 
 @router.put("/{transaction_id}")
 def atualizar_transacao(
     transaction_id: int,
-    transaction: AddTransactionInput,
-    manager: PlanilhaManager = Depends(get_planilha_manager)
-) -> dict[str, Any]:
+    transaction: TransactionUpdate,
+    manager: PlanilhaManager = Depends(get_planilha_manager),
+):
+    from finance.domain.models.transaction import Transaction
+
     try:
         with manager.lock_file(timeout_seconds=60):
-            manager.refresh_data()
-            df = manager.visualizar_dados(NomesAbas.TRANSACOES)
-            if df is None or df.empty:
-                raise HTTPException(status_code=404, detail="Nenhuma transação encontrada.")
-        
-            # Ensure ID column is int for comparison
-            if ColunasTransacoes.ID in df.columns:
-                # We assume IDs are generally clean integers, but safety first
-                df[ColunasTransacoes.ID] = pd.to_numeric(df[ColunasTransacoes.ID], errors='coerce').fillna(0).astype(int)
-        
-            # Find index
-            mask = df[ColunasTransacoes.ID] == transaction_id
-            if not mask.any():
-                raise HTTPException(status_code=404, detail="Transação não encontrada.")
-            
-            idx = df.index[mask][0]
-        
-            # Update row
-            # Convert date string to datetime if needed, or keep as is if manager handles it. 
-            # PlanilhaManager usually expects datetime or compatible.
-            df.at[idx, ColunasTransacoes.DATA] = pd.to_datetime(transaction.data)
-            df.at[idx, ColunasTransacoes.TIPO] = transaction.tipo
-            df.at[idx, ColunasTransacoes.CATEGORIA] = transaction.categoria
-            df.at[idx, ColunasTransacoes.DESCRICAO] = str(transaction.descricao)
-            df.at[idx, ColunasTransacoes.VALOR] = float(transaction.valor)
-            df.at[idx, ColunasTransacoes.STATUS] = transaction.status
-        
-            manager.update_dataframe(NomesAbas.TRANSACOES, df)
-            manager.recalculate_budgets() # Important to update budgets!
-            manager.save()
-        
-        return {"message": "Transação atualizada com sucesso.", "data": transaction}
-    except HTTPException:
-        raise
+            manager.atualizar_dados()
+
+            updated_tx = Transaction(
+                id=transaction_id,
+                data=transaction.data,
+                tipo=transaction.tipo,
+                categoria=transaction.categoria,
+                descricao=str(transaction.descricao),
+                valor=transaction.valor,
+                status=transaction.status,
+            )
+
+            manager.update_transaction_use_case.execute(updated_tx)
+            manager.salvar()
+
+        return {"message": "Transação atualizada com sucesso."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao atualizar: {e}")
 
+
 @router.delete("/{transaction_id}")
 def delete_item(
-    transaction_id: int,
-    manager: PlanilhaManager = Depends(get_planilha_manager)
+    transaction_id: int, manager: PlanilhaManager = Depends(get_planilha_manager)
 ) -> dict[str, str]:
     try:
         with manager.lock_file(timeout_seconds=60):
-            manager.refresh_data()
-            success = manager.delete_transaction(transaction_id)
+            manager.atualizar_dados()
+            success = manager.delete_transaction_use_case.execute(transaction_id)
             if not success:
                 raise HTTPException(status_code=404, detail="Transação não encontrada")
-            manager.save()
+            manager.salvar()
         return {"message": "Transação removida."}
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.put("/bulk")
 def update_transactions_bulk(
     transactions: list[dict[str, Any]] = Body(...),
-    manager: PlanilhaManager = Depends(get_planilha_manager)
+    manager: PlanilhaManager = Depends(get_planilha_manager),
 ) -> dict[str, str]:
     """
     Atualiza TODAS as transações reescrevendo a aba.
@@ -145,68 +144,35 @@ def update_transactions_bulk(
     try:
         if not transactions:
             return {"message": "Nenhuma alteração enviada."}
-            
-        with manager.lock_file(timeout_seconds=120): # Bulk pode demorar
-            manager.refresh_data()
+
+        with manager.lock_file(timeout_seconds=120):  # Bulk pode demorar
+            manager.atualizar_dados()
             # Converte lista de dicts de volta para DataFrame
             df_new = pd.DataFrame(transactions)
-            
+
             # GARANTE que a coluna de Data seja datetime, pois o JSON envia string
             if ColunasTransacoes.DATA in df_new.columns:
                 df_new[ColunasTransacoes.DATA] = pd.to_datetime(
-                    df_new[ColunasTransacoes.DATA], errors='coerce'
+                    df_new[ColunasTransacoes.DATA], errors="coerce"
                 )
 
             # Atualiza via manager
             manager.update_dataframe(NomesAbas.TRANSACOES, df_new)
-            manager.recalculate_budgets()
-            manager.save()
-        
+            manager.recalcular_orcamentos()
+            manager.salvar()
+
         return {"message": f"{len(transactions)} transações atualizadas com sucesso."}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao atualizar transações: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Erro ao atualizar transações: {e}"
+        )
 
-@router.post("/")
-def adicionar_transacao(
-    transaction: AddTransactionInput,
-    manager: PlanilhaManager = Depends(get_planilha_manager)
-) -> dict[str, Any]:
-    """
-    Adiciona uma nova transação à planilha.
-    Usa o mesmo Schema que a IA usa.
-    """
-    try:
-        with manager.lock_file(timeout_seconds=60):
-            # Atomic: Refresh -> Add -> Save
-            manager.refresh_data()
-            manager.adicionar_registro(
-                data=transaction.data,
-                tipo=transaction.tipo,
-                categoria=transaction.categoria,
-                descricao=str(transaction.descricao),
-                valor=transaction.valor,
-                status=transaction.status,
-                parcelas=transaction.parcelas # NEW
-            )
-            # Save is automatic inside adicionar_registro? NO.
-            # Manager.adicionar_registro calls repo.add which updates DF. 
-            # It DOES NOT call save().
-            # Wait, looking at the ORIGINAL code below:
-            # manager.adicionar_registro(...)
-            # return ...
-            # THERE WAS NO manager.save() call in the original code? 
-            # Let me check the original file again.
-            
-            manager.save() # Ensure save is called
-            
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao salvar transação: {e}")
 
-@router.post("/batch")
+@router.post("/batch", response_model=dict[str, Any])
 def adicionar_transacoes_em_lote(
-    transactions: list[AddTransactionInput],
-    manager: PlanilhaManager = Depends(get_planilha_manager)
-) -> dict[str, Any]:
+    transactions: list[TransactionCreate],
+    manager: PlanilhaManager = Depends(get_planilha_manager),
+):
     """
     Adiciona múltiplas transações de uma vez.
     Eficiente para importações, pois salva apenas uma vez no final.
@@ -216,35 +182,37 @@ def adicionar_transacoes_em_lote(
             return {"message": "Nenhuma transação enviada."}
 
         with manager.lock_file(timeout_seconds=60):
-            manager.refresh_data()
-            
+            manager.atualizar_dados()
+
             # 1. Auto-Register New Categories
             existing_cols = manager.category_repo.get_all_category_names()
             # Normalize for comparison
             existing_norm = {c.lower() for c in existing_cols}
-            
-            new_categories_map = {} # name -> type
-            
+
+            new_categories_map = {}  # name -> type
+
             for tx in transactions:
                 cat = tx.categoria
                 if not cat or cat == "A Classificar" or cat == "Outros":
                     continue
-                    
+
                 if cat.lower() not in existing_norm:
                     # New category found!
                     # Infer type based on transaction type (majority vote or first occurrence)
                     if cat not in new_categories_map:
-                         new_categories_map[cat] = tx.tipo
-            
+                        new_categories_map[cat] = tx.tipo
+
             # Register them
             for cat_name, cat_type in new_categories_map.items():
                 manager.category_repo.add_category(
                     nome=cat_name,
-                    tipo=cat_type, # Receita or Despesa
-                    icone="HelpCircle", # Generic icon
-                    tags="Importado"
+                    tipo=cat_type,  # Receita or Despesa
+                    icone="HelpCircle",  # Generic icon
+                    tags="Importado",
                 )
-                logger.info(f"Categoria '{cat_name}' criada automaticamente via importação.")
+                logger.info(
+                    f"Categoria '{cat_name}' criada automaticamente via importação."
+                )
 
             # 2. Add Transactions (Batch)
             # Converte objetos pydantic para dict
@@ -256,14 +224,14 @@ def adicionar_transacoes_em_lote(
                     "descricao": str(tx.descricao),
                     "valor": tx.valor,
                     "status": tx.status,
-                    "parcelas": tx.parcelas
+                    "parcelas": tx.parcelas,
                 }
                 for tx in transactions
             ]
-            
+
             count = manager.adicionar_registros_lote(tx_dicts)
             # Manager saves automatically inside batch method
-            
+
         return {"message": f"{count} transações importadas com sucesso."}
     except Exception as e:
         logger.error(f"Erro no batch upload: {e}", exc_info=True)

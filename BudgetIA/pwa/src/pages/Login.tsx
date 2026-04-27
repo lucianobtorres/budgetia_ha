@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { Lock, Sparkles, TrendingUp, ShieldCheck } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Sparkles, ShieldCheck } from 'lucide-react';
 import { LoginForm } from '../components/auth/LoginForm';
 import { RegisterForm } from '../components/auth/RegisterForm';
 
@@ -9,7 +9,6 @@ interface LoginProps {
 }
 export default function Login({ onLogin }: LoginProps) {
     const [isRegistering, setIsRegistering] = useState(false);
-    const navigate = useNavigate();
 
     return (
         <div className="flex min-h-screen w-full bg-gray-950">
@@ -91,7 +90,7 @@ export default function Login({ onLogin }: LoginProps) {
                     </div>
 
                     <div className="lg:bg-transparent lg:border-none p-0">
-                        {isRegistering ? <RegisterForm onLogin={onLogin} /> : <LoginForm onLogin={onLogin} />}
+                        {isRegistering ? <RegisterForm /> : <LoginForm onLogin={onLogin} />}
                     </div>
 
                     <div className="text-center">

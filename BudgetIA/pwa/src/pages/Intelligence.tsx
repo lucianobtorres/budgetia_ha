@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Brain, Eye, Wrench, ShieldAlert, Settings } from 'lucide-react';
+import { Brain, Eye, Wrench, ShieldAlert, Settings, Loader2, Sparkles } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { SegmentedControl } from '../components/ui/SegmentedControl';
 import { GradientBanner } from '../components/ui/GradientBanner';
@@ -12,6 +12,11 @@ import { RulesTab } from '../components/profile/RulesTab';
 export default function Intelligence() {
     const [activeTab, setActiveTab] = useState<'observers' | 'rules' | 'memory' | 'tools'>('observers');
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+    interface ObserverConfig {
+        keywords_count?: number;
+        days_lookback?: number;
+    }
     
     // Everything now comes from a single hook
     const { 
@@ -50,7 +55,7 @@ export default function Intelligence() {
                 <SegmentedControl 
                     options={tabs.map(t => ({ id: t.id, label: t.label, icon: t.icon, activeColor: t.color }))}
                     value={activeTab}
-                    onChange={(val) => setActiveTab(val as any)}
+                    onChange={(val) => setActiveTab(val as typeof activeTab)}
                 />
             </div>
 
@@ -78,47 +83,50 @@ export default function Intelligence() {
                                     />
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        {observers.map((obs) => (
-                                            <div key={obs.id} className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-5 hover:border-blue-500/30 transition-colors group">
-                                                <div className="flex justify-between items-start mb-3">
-                                                    <div className="p-2 bg-blue-500/20 rounded-lg group-hover:bg-blue-500/30 transition-colors">
-                                                        <Eye className="w-5 h-5 text-blue-400" />
+                                        {observers.map((obs) => {
+                                            const config = obs.config as ObserverConfig;
+                                            return (
+                                                <div key={obs.id} className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-5 hover:border-blue-500/30 transition-colors group">
+                                                    <div className="flex justify-between items-start mb-3">
+                                                        <div className="p-2 bg-blue-500/20 rounded-lg group-hover:bg-blue-500/30 transition-colors">
+                                                            <Eye className="w-5 h-5 text-blue-400" />
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            {obs.id === 'subscription_auditor' && (
+                                                                <button 
+                                                                    onClick={() => setIsSettingsOpen(true)}
+                                                                    className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+                                                                    title="Configurar"
+                                                                >
+                                                                    <Settings className="w-4 h-4" />
+                                                                </button>
+                                                            )}
+                                                            <span className={`px-2 py-1 rounded text-xs font-medium ${obs.is_active ? 'bg-emerald-500/20 text-emerald-400' : 'bg-gray-700 text-gray-400'}`}>
+                                                                {obs.is_active ? 'ATIVO' : 'INATIVO'}
+                                                            </span>
+                                                        </div>
                                                     </div>
-                                                    <div className="flex items-center gap-2">
-                                                        {obs.id === 'subscription_auditor' && (
-                                                            <button 
-                                                                onClick={() => setIsSettingsOpen(true)}
-                                                                className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
-                                                                title="Configurar"
-                                                            >
-                                                                <Settings className="w-4 h-4" />
-                                                            </button>
+                                                    <h3 className="font-semibold text-lg text-white mb-1">
+                                                        {obs.name}
+                                                    </h3>
+                                                    <p className="text-sm text-gray-400 mb-4 h-10 line-clamp-2">{obs.description}</p>
+                                                    
+                                                    {/* Config Summary Badge */}
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {config?.keywords_count !== undefined && (
+                                                            <span className="text-xs bg-gray-700/50 text-gray-300 px-2 py-1 rounded border border-gray-600">
+                                                                Monitora {config.keywords_count} itens
+                                                            </span>
                                                         )}
-                                                        <span className={`px-2 py-1 rounded text-xs font-medium ${obs.is_active ? 'bg-emerald-500/20 text-emerald-400' : 'bg-gray-700 text-gray-400'}`}>
-                                                            {obs.is_active ? 'ATIVO' : 'INATIVO'}
-                                                        </span>
+                                                        {config?.days_lookback !== undefined && (
+                                                            <span className="text-xs bg-gray-700/50 text-gray-300 px-2 py-1 rounded border border-gray-600">
+                                                                Análise: {config.days_lookback} dias
+                                                            </span>
+                                                        )}
                                                     </div>
                                                 </div>
-                                                <h3 className="font-semibold text-lg text-white mb-1">
-                                                    {obs.name}
-                                                </h3>
-                                                <p className="text-sm text-gray-400 mb-4 h-10 line-clamp-2">{obs.description}</p>
-                                                
-                                                {/* Config Summary Badge */}
-                                                <div className="flex flex-wrap gap-2">
-                                                    {obs.config.keywords_count !== undefined && (
-                                                        <span className="text-xs bg-gray-700/50 text-gray-300 px-2 py-1 rounded border border-gray-600">
-                                                            Monitora {obs.config.keywords_count} itens
-                                                        </span>
-                                                    )}
-                                                    {obs.config.days_lookback !== undefined && (
-                                                        <span className="text-xs bg-gray-700/50 text-gray-300 px-2 py-1 rounded border border-gray-600">
-                                                            Análise: {obs.config.days_lookback} dias
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             )}
@@ -152,9 +160,9 @@ export default function Intelligence() {
                                         >
                                             <div className="flex-none p-3 bg-pink-500/10 rounded-xl group-hover:bg-pink-500/20 transition-colors">
                                                 {isCleaning ? (
-                                                    <i className="lucide-loader-2 w-6 h-6 text-pink-400 animate-spin" />
+                                                    <Loader2 className="w-6 h-6 text-pink-400 animate-spin" />
                                                 ) : (
-                                                    <i className="lucide-sparkles w-6 h-6 text-pink-400" />
+                                                    <Sparkles className="w-6 h-6 text-pink-400" />
                                                 )}
                                             </div>
                                             <div className="flex-1 min-w-0">

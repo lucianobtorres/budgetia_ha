@@ -1,11 +1,11 @@
 # src/finance/tools/add_transaction_tool.py
 import datetime
-from typing import Callable, Any  # Importar Callable
+from collections.abc import Callable  # Importar Callable
+from typing import Any
 
 from core.base_tool import BaseTool
-from finance.schemas import AddTransactionInput
-
 from core.logger import get_logger
+from finance.schemas import AddTransactionInput
 
 logger = get_logger("Tool_AddTransaction")
 

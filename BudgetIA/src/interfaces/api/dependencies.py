@@ -1,19 +1,19 @@
-from fastapi import Depends, Header, HTTPException, status, Request
+from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from interfaces.api.utils.jwt import decode_access_token
 
-from infrastructure.agents.factory import AgentFactory
 from core.agent_runner_interface import AgentRunner
 from core.llm_manager import LLMOrchestrator
-from core.user_config_service import UserConfigService
-from finance.factory import FinancialSystemFactory
-from finance.planilha_manager import PlanilhaManager
-from finance.storage.excel_storage_handler import ExcelStorageHandler
 from core.logger import get_logger
+from core.user_config_service import UserConfigService  # noqa: E402
+from finance.factory import FinancialSystemFactory  # noqa: E402
+from finance.planilha_manager import PlanilhaManager  # noqa: E402
+from infrastructure.agents.factory import AgentFactory  # noqa: E402
+from interfaces.api.utils.jwt import decode_access_token  # noqa: E402
 
 logger = get_logger("API_Deps")
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
+
 
 def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
     """Retorna o payload do token (usuário atual)"""
@@ -31,22 +31,23 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
             detail="Token inválido: sub ausente",
             headers={"WWW-Authenticate": "Bearer"},
         )
-        
+
     # Load full user data to get trial_ends_at, role, etc.
     from interfaces.api.utils.security import get_user
+
     user_data = get_user(username)
-    
+
     if not user_data:
         # Token valid but user deleted?
-         raise HTTPException(
+        raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Usuário não encontrado",
             headers={"WWW-Authenticate": "Bearer"},
         )
-        
+
     # Inject username back if missing in the file object for consistency, though it's the key
-    user_data['username'] = username
-    
+    user_data["username"] = username
+
     if user_data.get("disabled", False):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -56,10 +57,11 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
 
     return user_data
 
+
 # --- CACHE DE SISTEMAS FINANCEIROS ---
 # Mapeia user_id -> PlanilhaManager
 # Isso garante que não abrimos múltiplos handlers para a mesma planilha
-import threading
+import threading  # noqa: E402
 
 _managers_cache: dict[str, PlanilhaManager] = {}
 _managers_lock = threading.Lock()
@@ -73,7 +75,11 @@ async def get_user_config_service(
     Dependency Master: Valida tanto Tokens do Home Assistant quanto JWTs nativos.
     Isso permite que qualquer endpoint (incluindo MCP) funcione com ambos.
     """
-    from core.ha_auth_service import is_running_as_ha_addon, validate_ha_token, resolve_ha_user_to_budgetia
+    from core.ha_auth_service import (
+        is_running_as_ha_addon,
+        resolve_ha_user_to_budgetia,
+        validate_ha_token,
+    )
 
     # 1. Tenta Home Assistant (se for Add-on)
     is_addon = is_running_as_ha_addon()
@@ -82,27 +88,32 @@ async def get_user_config_service(
         if ha_user:
             budgetia_username = resolve_ha_user_to_budgetia(ha_user.ha_username)
             if budgetia_username:
-                logger.info(f"Auth: Usuário HA '{ha_user.ha_username}' autenticado como '{budgetia_username}'")
+                logger.info(
+                    f"Auth: Usuário HA '{ha_user.ha_username}' autenticado como '{budgetia_username}'"
+                )
                 return UserConfigService(username=budgetia_username)
         else:
             logger.debug("Auth: Token HA rejeitado pelo Core. Tentando fallback JWT...")
-    
+
     # 2. Fallback para JWT padrão do BudgetIA
     # Debug da SECRET_KEY para ajudar a identificar discrepâncias
     import config
+
     k_prev = config.SECRET_KEY[:4] + "***" if config.SECRET_KEY else "Missing"
-    logger.debug(f"Auth: Validando JWT. KeyPrefix={k_prev} | Hash={hash(config.SECRET_KEY)}")
+    logger.debug(
+        f"Auth: Validando JWT. KeyPrefix={k_prev} | Hash={hash(config.SECRET_KEY)}"
+    )
 
     payload = decode_access_token(token)
-    
+
     if payload is None:
-         logger.warning("Auth: Payload JWT inválido ou assinatura não coincide.")
-         raise HTTPException(
+        logger.warning("Auth: Payload JWT inválido ou assinatura não coincide.")
+        raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Credenciais inválidas ou expiradas",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     username: str = payload.get("sub")
     if username is None:
         logger.warning("Auth: Claim 'sub' ausente no JWT")
@@ -114,10 +125,11 @@ async def get_user_config_service(
 
     # Verifica se usuário existe
     from interfaces.api.utils.security import get_user
+
     user_data = get_user(username)
     if not user_data:
         raise HTTPException(status_code=401, detail="Usuário não encontrado.")
-    
+
     return UserConfigService(username=username)
 
 
@@ -149,11 +161,12 @@ def get_planilha_manager(
         # Verifica novamente dentro do lock
         if cache_key in _managers_cache:
             return _managers_cache[cache_key]
-        
+
         logger.warning(f"CACHE MISS para {cache_key}. Criando novo Manager...")
-        
+
         # 3. Obtém credenciais de usuário (se houver) para acesso ao GSheets
         from core.google_auth_service import GoogleAuthService
+
         auth_service = GoogleAuthService(config_service)
         user_credentials = auth_service.get_user_credentials()
 
@@ -164,8 +177,12 @@ def get_planilha_manager(
         from finance.storage.storage_factory import StorageHandlerFactory
 
         try:
-            storage_handler = StorageHandlerFactory.create_handler(path_str, credentials=user_credentials)
-            logger.info(f"Handler de Storage criado: {type(storage_handler).__name__} para {path_str}")
+            storage_handler = StorageHandlerFactory.create_handler(
+                path_str, credentials=user_credentials
+            )
+            logger.info(
+                f"Handler de Storage criado: {type(storage_handler).__name__} para {path_str}"
+            )
         except ValueError as e:
             logger.error(f"Falha ao criar handler de storage: {e}")
             raise HTTPException(
@@ -173,8 +190,11 @@ def get_planilha_manager(
             )
 
         # 4. Usa a Factory existente para montar tudo (Repositories, Services, Context)
+        llm_orchestrator = get_llm_orchestrator(config_service)
         manager = FinancialSystemFactory.create_manager(
-            storage_handler=storage_handler, config_service=config_service
+            storage_handler=storage_handler,
+            config_service=config_service,
+            llm_orchestrator=llm_orchestrator,
         )
 
         # Debug:
@@ -184,9 +204,9 @@ def get_planilha_manager(
         return manager
 
 
-import config
-from core.llm_enums import LLMProviderType
-from core.llm_factory import LLMProviderFactory
+import config  # noqa: E402
+from core.llm_enums import LLMProviderType  # noqa: E402
+from core.llm_factory import LLMProviderFactory  # noqa: E402
 
 # --- CACHE GLOBAL SIMPLIFICADO (Para MVP RAM) ---
 _global_llm_orchestrator: LLMOrchestrator | None = None
@@ -198,7 +218,7 @@ def get_llm_orchestrator(
 ) -> LLMOrchestrator:
     """Retorna o orquestrador de LLM (Singleton no processo). Thread-safe."""
     global _global_llm_orchestrator
-    
+
     # Double-checked locking
     if _global_llm_orchestrator is not None:
         return _global_llm_orchestrator
@@ -207,9 +227,7 @@ def get_llm_orchestrator(
         if _global_llm_orchestrator is None:
             # Inicializa se não existir
             provider_name = config.LLM_PROVIDER
-            logger.info(
-                f"Inicializando LLMOrchestrator com Provider='{provider_name}'"
-            )
+            logger.info(f"Inicializando LLMOrchestrator com Provider='{provider_name}'")
             try:
                 primary_provider = None
                 fallback_providers = []
@@ -236,25 +254,33 @@ def get_llm_orchestrator(
                     # Fallback: Groq (se tiver chave)
                     try:
                         fallback_providers.append(
-                             LLMProviderFactory.create_provider(
+                            LLMProviderFactory.create_provider(
                                 LLMProviderType.GROQ,
                                 default_model=config.LLMModels.DEFAULT_GROQ,
                             )
                         )
                     except Exception:
-                        logger.warning("Falha ao configurar Groq como fallback (possivelmente sem chave).")
+                        logger.warning(
+                            "Falha ao configurar Groq como fallback (possivelmente sem chave)."
+                        )
 
                 elif provider_name == config.LLMProviders.OPENAI:
-                     # TODO: Implementar OpenAI Provider na Factory se usarmos
-                     # Por enquanto, fallback para Gemini
-                     logger.warning("OpenAI Provider selecionado mas init pendente. Usando Gemini.")
-                     primary_provider = LLMProviderFactory.create_provider(
-                        LLMProviderType.GEMINI,
-                        default_model=config.LLMModels.DEFAULT_GEMINI,
+                    primary_provider = LLMProviderFactory.create_provider(
+                        LLMProviderType.OPENAI,
+                        default_model=config.LLMModels.DEFAULT_OPENAI,
+                    )
+                    # Fallback: Gemini (ou Groq se quiser)
+                    fallback_providers.append(
+                        LLMProviderFactory.create_provider(
+                            LLMProviderType.GEMINI,
+                            default_model=config.LLMModels.DEFAULT_GEMINI,
+                        )
                     )
                 else:
                     # Default safety net
-                    logger.warning(f"Provider '{provider_name}' desconhecido. Usando Gemini Default.")
+                    logger.warning(
+                        f"Provider '{provider_name}' desconhecido. Usando Gemini Default."
+                    )
                     primary_provider = LLMProviderFactory.create_provider(
                         LLMProviderType.GEMINI,
                         default_model=config.LLMModels.DEFAULT_GEMINI,
@@ -315,13 +341,15 @@ def get_agent_runner(
         raise HTTPException(status_code=500, detail=f"Erro interno: {e}")
 
 
-from application.notifications.rule_repository import RuleRepository
-from application.services.notification_service import NotificationService
-from application.services.presence_service import PresenceService
-from application.services.push_notification_service import PushNotificationService
+from application.notifications.rule_repository import RuleRepository  # noqa: E402
+from application.services.notification_service import NotificationService  # noqa: E402
+from application.services.presence_service import PresenceService  # noqa: E402
+from application.services.push_notification_service import (  # noqa: E402
+    PushNotificationService,  # noqa: E402
+)
 
 # ...
-from core.memory.memory_service import MemoryService
+from core.memory.memory_service import MemoryService  # noqa: E402
 
 
 def get_push_notification_service(
@@ -363,7 +391,7 @@ def get_rule_repository(
     return RuleRepository(user_dir)
 
 
-from initialization.onboarding.orchestrator import OnboardingOrchestrator
+from initialization.onboarding.orchestrator import OnboardingOrchestrator  # noqa: E402
 
 # --- CACHE DE ONBOARDING ---
 _onboarding_cache: dict[str, OnboardingOrchestrator] = {}
@@ -377,9 +405,7 @@ def get_onboarding_orchestrator(
     user_id = config_service.username
 
     if user_id not in _onboarding_cache:
-        logger.info(
-            f"Criando Novo Onboarding Orchestrator para user='{user_id}'"
-        )
+        logger.info(f"Criando Novo Onboarding Orchestrator para user='{user_id}'")
         orchestrator = OnboardingOrchestrator(config_service, llm_orchestrator)
         _onboarding_cache[user_id] = orchestrator
 
@@ -387,15 +413,21 @@ def get_onboarding_orchestrator(
 
 
 # --- EMAIL ---
-from core.email_service import EmailService
+from core.email_service import EmailService  # noqa: E402
+
 
 def get_email_service() -> EmailService:
     return EmailService()
 
+
 # --- SUBSCRIPTION ---
-from core.subscription.providers import SubscriptionProvider, StripeSubscriptionProvider, MockSubscriptionProvider
-from core.subscription.entitlements import EntitlementService
-import config
+from core.subscription.entitlements import EntitlementService  # noqa: E402
+from core.subscription.providers import (  # noqa: E402
+    MockSubscriptionProvider,
+    StripeSubscriptionProvider,
+    SubscriptionProvider,
+)
+
 
 def get_subscription_provider() -> SubscriptionProvider:
     # Se estiver em modo SAAS e tiver chave stripe, usa Stripe
@@ -403,7 +435,8 @@ def get_subscription_provider() -> SubscriptionProvider:
         return StripeSubscriptionProvider()
     return MockSubscriptionProvider()
 
+
 def get_entitlement_service(
-    provider: SubscriptionProvider = Depends(get_subscription_provider)
+    provider: SubscriptionProvider = Depends(get_subscription_provider),
 ) -> EntitlementService:
     return EntitlementService(provider)

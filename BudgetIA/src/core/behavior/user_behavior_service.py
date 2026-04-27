@@ -1,19 +1,19 @@
 import json
-import os
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import config
 from core.logger import get_logger
 
 logger = get_logger("UserBehavior")
 
+
 class UserBehaviorService:
     """
     Gerencia a persistência do comportamento do usuário (Telemetria & Hábitos).
     ARQUIVO: data/users/{username}/behavior.json
-    
+
     Diferente do UserConfigService, este arquivo armazena dados
     que podem ser reconstruídos ou descartados sem perda crítica de acesso,
     mas que são essenciais para a inteligência adaptativa (Jarvis).
@@ -30,17 +30,19 @@ class UserBehaviorService:
     def _ensure_dir_exists(self) -> None:
         self.user_dir.mkdir(parents=True, exist_ok=True)
 
-    def _load_data(self) -> Dict[str, Any]:
+    def _load_data(self) -> dict[str, Any]:
         if not self.behavior_file.exists():
             return {}
         try:
-            with open(self.behavior_file, "r", encoding="utf-8") as f:
+            with open(self.behavior_file, encoding="utf-8") as f:
                 return json.load(f)
         except (json.JSONDecodeError, OSError):
-            logger.warning(f"behavior.json corrompido para {self.username}. Reiniciando.")
+            logger.warning(
+                f"behavior.json corrompido para {self.username}. Reiniciando."
+            )
             return {}
 
-    def _save_data(self, data: Dict[str, Any]) -> None:
+    def _save_data(self, data: dict[str, Any]) -> None:
         try:
             with open(self.behavior_file, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=4, ensure_ascii=False)
@@ -49,16 +51,18 @@ class UserBehaviorService:
 
     # --- Telemetria de Ações ---
 
-    def log_action(self, action_type: str, metadata: Optional[Dict[str, Any]] = None) -> None:
+    def log_action(
+        self, action_type: str, metadata: dict[str, Any] | None = None
+    ) -> None:
         """
         Registra uma ação realizada pelo usuário (ex: 'view_dashboard', 'add_transaction').
         """
         data = self._load_data()
-        
+
         # 1. Atualizar contadores
         if "action_counts" not in data:
             data["action_counts"] = {}
-        
+
         current_count = data["action_counts"].get(action_type, 0)
         data["action_counts"][action_type] = current_count + 1
 
@@ -69,9 +73,11 @@ class UserBehaviorService:
         # Ex: "hourly_activity": { "09": 5, "20": 42 }
         if "hourly_activity" not in data:
             data["hourly_activity"] = {}
-        
+
         current_hour = str(datetime.now().hour)
-        data["hourly_activity"][current_hour] = data["hourly_activity"].get(current_hour, 0) + 1
+        data["hourly_activity"][current_hour] = (
+            data["hourly_activity"].get(current_hour, 0) + 1
+        )
 
         self._save_data(data)
 
@@ -83,34 +89,34 @@ class UserBehaviorService:
         feedback_type: 'ignored' | 'dismissed' | 'clicked' | 'positive'
         """
         data = self._load_data()
-        
+
         if "rule_feedback" not in data:
             data["rule_feedback"] = {}
-        
+
         if rule_name not in data["rule_feedback"]:
             data["rule_feedback"][rule_name] = {
                 "ignored_count": 0,
                 "dismissed_count": 0,
                 "clicked_count": 0,
-                "consecutive_ignores": 0
+                "consecutive_ignores": 0,
             }
 
         stats = data["rule_feedback"][rule_name]
-        
-        if feedback_type == 'ignored':
+
+        if feedback_type == "ignored":
             stats["ignored_count"] += 1
             stats["consecutive_ignores"] += 1
-        elif feedback_type == 'dismissed':
+        elif feedback_type == "dismissed":
             stats["dismissed_count"] += 1
             # Dimissed é uma ação ativa, zera ignores consecutivos?
             # Depende: se ele dispensa sem ler, é ruim. Se ele dispensa pq já sabe, é ok.
             # Vamos manter conservative: não zera, mas conta separado.
-        elif feedback_type in ['clicked', 'positive']:
+        elif feedback_type in ["clicked", "positive"]:
             stats["clicked_count"] += 1
-            stats["consecutive_ignores"] = 0 # Sucesso! Resetamos o contador de "chato"
-        
+            stats["consecutive_ignores"] = 0  # Sucesso! Resetamos o contador de "chato"
+
         stats["last_trigger"] = datetime.now().isoformat()
-        
+
         data["rule_feedback"][rule_name] = stats
         self._save_data(data)
 
@@ -120,18 +126,20 @@ class UserBehaviorService:
         """
         data = self._load_data()
         feedback = data.get("rule_feedback", {}).get(rule_name, {})
-        
+
         consecutive_ignores = feedback.get("consecutive_ignores", 0)
-        
+
         if consecutive_ignores >= threshold:
-            logger.info(f"SMART RULE: Silenciando '{rule_name}' (Ignorada {consecutive_ignores}x seguidas).")
+            logger.info(
+                f"SMART RULE: Silenciando '{rule_name}' (Ignorada {consecutive_ignores}x seguidas)."
+            )
             return True
-            
+
         return False
 
     # --- Estado dos Tours (Onboarding) ---
 
-    def get_seen_tours(self) -> List[str]:
+    def get_seen_tours(self) -> list[str]:
         """Retorna lista de IDs de tours já completados pelo usuário."""
         data = self._load_data()
         return data.get("tours_seen", [])
@@ -139,10 +147,10 @@ class UserBehaviorService:
     def mark_tour_seen(self, tour_id: str) -> None:
         """Marca um tour como visto."""
         data = self._load_data()
-        
+
         if "tours_seen" not in data:
             data["tours_seen"] = []
-            
+
         if tour_id not in data["tours_seen"]:
             data["tours_seen"].append(tour_id)
             self._save_data(data)

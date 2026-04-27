@@ -9,9 +9,9 @@ Contexto:
 - Fora do ambiente HA (ex: desenvolvimento local), essa validação não está
   disponível, então o sistema cai no JWT padrão.
 """
+
 import os
 from dataclasses import dataclass
-from typing import Optional
 
 import httpx
 
@@ -32,12 +32,13 @@ def is_running_as_ha_addon() -> bool:
 @dataclass
 class HAUserInfo:
     """Informações do usuário retornadas pelo Supervisor."""
+
     ha_username: str
     display_name: str
     is_admin: bool
 
 
-async def validate_ha_token(bearer_token: str) -> Optional[HAUserInfo]:
+async def validate_ha_token(bearer_token: str) -> HAUserInfo | None:
     """
     Verifica se um Bearer token é um token válido do Home Assistant.
     """
@@ -51,44 +52,66 @@ async def validate_ha_token(bearer_token: str) -> Optional[HAUserInfo]:
     supervisor_proxy_url = "http://supervisor/core/api/config"
 
     logger.debug(f"HAAuth: Tentando validação via IP Direto: {direct_core_url}")
-    
+
     try:
         async with httpx.AsyncClient() as client:
             # Header padrão para o Core
             headers = {"Authorization": f"Bearer {bearer_token}"}
-            
+
             # 1. Tenta IP Direto
             try:
-                response = await client.get(direct_core_url, headers=headers, timeout=5.0)
+                response = await client.get(
+                    direct_core_url, headers=headers, timeout=5.0
+                )
                 if response.status_code == 200:
                     logger.info("HAAuth: Sucesso via IP Direto (172.30.32.1).")
-                    return HAUserInfo(ha_username="ha_authenticated_user", display_name="HA User", is_admin=True)
-                logger.debug(f"HAAuth: IP Direto falhou ({response.status_code}). Tentando Proxy Supervisor...")
+                    return HAUserInfo(
+                        ha_username="ha_authenticated_user",
+                        display_name="HA User",
+                        is_admin=True,
+                    )
+                logger.debug(
+                    f"HAAuth: IP Direto falhou ({response.status_code}). Tentando Proxy Supervisor..."
+                )
             except Exception as e:
-                logger.debug(f"HAAuth: Erro no IP Direto ({e}). Tentando Proxy Supervisor...")
+                logger.debug(
+                    f"HAAuth: Erro no IP Direto ({e}). Tentando Proxy Supervisor..."
+                )
 
             # 2. Fallback: Proxy do Supervisor (requer X-Supervisor-Token)
             headers["X-Supervisor-Token"] = SUPERVISOR_TOKEN
-            response = await client.get(supervisor_proxy_url, headers=headers, timeout=5.0)
+            response = await client.get(
+                supervisor_proxy_url, headers=headers, timeout=5.0
+            )
 
         if response.status_code == 200:
             logger.info("HAAuth: Sucesso via Proxy Supervisor.")
-            return HAUserInfo(ha_username="ha_authenticated_user", display_name="HA User", is_admin=True)
+            return HAUserInfo(
+                ha_username="ha_authenticated_user",
+                display_name="HA User",
+                is_admin=True,
+            )
         else:
-            logger.error(f"HAAuth: Todas as tentativas falharam. Status final: {response.status_code}")
-            try: logger.debug(f"HAAuth: Resposta erro: {response.text[:200]}")
-            except: pass
+            logger.error(
+                f"HAAuth: Todas as tentativas falharam. Status final: {response.status_code}"
+            )
+            try:
+                logger.debug(f"HAAuth: Resposta erro: {response.text[:200]}")  # noqa: E701
+            except Exception:
+                pass  # noqa: E701
             return None
 
     except httpx.TimeoutException:
         logger.error("HAAuth: Timeout ao contactar Supervisor/HA Core.")
         return None
     except Exception as e:
-        logger.error(f"HAAuth: Erro inesperado na validação HA: {type(e).__name__}: {e}")
+        logger.error(
+            f"HAAuth: Erro inesperado na validação HA: {type(e).__name__}: {e}"
+        )
         return None
 
 
-def resolve_ha_user_to_budgetia(ha_username: str) -> Optional[str]:
+def resolve_ha_user_to_budgetia(ha_username: str) -> str | None:
     """
     Tenta mapear o nome de usuário do HA para um usuário do BudgetIA.
 
@@ -109,26 +132,39 @@ def resolve_ha_user_to_budgetia(ha_username: str) -> Optional[str]:
     # Estratégia 1: Campo explícito ha_username
     for username, info in users.items():
         if info.get("ha_username") == ha_username:
-            logger.info(f"HAAuth: Mapeamento explícito HA '{ha_username}' -> BudgetIA '{username}'")
+            logger.info(
+                f"HAAuth: Mapeamento explícito HA '{ha_username}' -> BudgetIA '{username}'"
+            )
             return username
 
     # Estratégia 2: username ou email coincide
     for username, info in users.items():
-        if username == ha_username or info.get("email", "").split("@")[0] == ha_username:
-            logger.info(f"HAAuth: Mapeamento por nome/email HA '{ha_username}' -> BudgetIA '{username}'")
+        if (
+            username == ha_username
+            or info.get("email", "").split("@")[0] == ha_username
+        ):
+            logger.info(
+                f"HAAuth: Mapeamento por nome/email HA '{ha_username}' -> BudgetIA '{username}'"
+            )
             return username
 
     # Estratégia 3: Sistema single-user - retorna o único usuário (admin de preferência)
     if len(users) == 1:
         only_user = list(users.keys())[0]
-        logger.info(f"HAAuth: Sistema single-user. HA '{ha_username}' -> BudgetIA '{only_user}'")
+        logger.info(
+            f"HAAuth: Sistema single-user. HA '{ha_username}' -> BudgetIA '{only_user}'"
+        )
         return only_user
 
     # Estratégia 4: Retorna o primeiro admin encontrado como fallback
     for username, info in users.items():
         if info.get("role") == "admin":
-            logger.warning(f"HAAuth: Fallback para admin '{username}' para HA user '{ha_username}'")
+            logger.warning(
+                f"HAAuth: Fallback para admin '{username}' para HA user '{ha_username}'"
+            )
             return username
 
-    logger.warning(f"HAAuth: Não foi possível mapear '{ha_username}' para nenhum usuário do BudgetIA.")
+    logger.warning(
+        f"HAAuth: Não foi possível mapear '{ha_username}' para nenhum usuário do BudgetIA."
+    )
     return None

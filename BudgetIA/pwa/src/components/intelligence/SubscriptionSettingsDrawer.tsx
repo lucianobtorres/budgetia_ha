@@ -20,16 +20,11 @@ export function SubscriptionSettingsDrawer({ isOpen, onClose }: SubscriptionSett
     // Sync local state with loaded data
     useEffect(() => {
         if (subscriptionKeywords) {
-            // Only update if content is different to avoid infinite loops
             if (JSON.stringify(subscriptionKeywords) !== JSON.stringify(keywords)) {
                 setKeywords(subscriptionKeywords);
             }
         }
-    }, [subscriptionKeywords]); // Removed keywords from dependency to break loop logic if it existed, though logical check handles it.
-    // Actually, keywords dependency would be bad if we setKeywords inside.
-    // But `setKeywords` updates `keywords`, causing re-render.
-    // If `subscriptionKeywords` reference is stable, this runs once. 
-    // If unstable, it runs every render. The stringify check prevents setKeywords call.
+    }, [subscriptionKeywords, keywords]);
 
     const handleAddKeyword = () => {
         if (!newKeyword.trim()) return;
@@ -54,8 +49,8 @@ export function SubscriptionSettingsDrawer({ isOpen, onClose }: SubscriptionSett
         try {
             await updateSubscriptionKeywords(keywords);
             onClose();
-        } catch (error) {
-            console.error(error);
+        } catch (err: unknown) {
+            console.error(err);
             // Error handling is centralized in api.ts/hook
         } finally {
             setIsSaving(false);

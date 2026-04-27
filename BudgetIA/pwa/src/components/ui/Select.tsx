@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState } from 'react';
 import { cn } from '../../utils/cn';
 import { ChevronDown, Check } from 'lucide-react';
 import { useOutsideClick } from '../../hooks/useOutsideClick';
@@ -8,9 +8,13 @@ export interface SelectOption {
     value: string;
 }
 
+export interface SelectChangeEvent {
+    target: { value: string; name?: string };
+}
+
 export interface SelectProps {
     value?: string;
-    onChange?: (e: { target: { value: string } }) => void; // Mocking event structure for ease of migration
+    onChange?: (e: SelectChangeEvent) => void;
     options?: SelectOption[];
     placeholder?: string;
     icon?: React.ElementType;
@@ -18,7 +22,7 @@ export interface SelectProps {
     containerClassName?: string;
     className?: string;
     disabled?: boolean;
-    children?: React.ReactNode; // For backwards compatibility parsing (advanced)
+    children?: React.ReactNode;
 }
 
 export function Select({ 
@@ -36,29 +40,24 @@ export function Select({
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
     
-    // Attempt to parse children if options aren't provided (Migration Helper)
-    const [derivedOptions, setDerivedOptions] = useState<SelectOption[]>(options);
+    const derivedOptions = React.useMemo(() => {
+        if (options.length > 0) return options;
+        if (!children) return [];
 
-    useEffect(() => {
-        if (options.length > 0) {
-            setDerivedOptions(options);
-        } else if (children) {
-            // Simple parsing of children <option> tags
-            const opts: SelectOption[] = [];
-            React.Children.forEach(children, (child) => {
-                if (React.isValidElement(child) && child.type === 'option') {
-                     const props = child.props as any;
-                     opts.push({ 
-                         label: props.children as string, 
-                         value: props.value as string 
-                     });
-                }
-            });
-            setDerivedOptions(opts);
-        }
+        const opts: SelectOption[] = [];
+        React.Children.forEach(children, (child) => {
+            if (React.isValidElement(child) && child.type === 'option') {
+                 const props = child.props as { children: string; value: string };
+                 opts.push({ 
+                     label: props.children, 
+                     value: props.value 
+                 });
+            }
+        });
+        return opts;
     }, [children, options]);
 
-    useOutsideClick(containerRef as any, () => setIsOpen(false));
+    useOutsideClick(containerRef, () => setIsOpen(false));
 
     const selectedOption = derivedOptions.find(opt => opt.value === value);
 

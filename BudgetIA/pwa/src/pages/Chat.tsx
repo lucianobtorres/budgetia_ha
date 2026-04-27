@@ -1,21 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { Bot, Loader2 } from 'lucide-react';
-import { MessageBubble } from '../components/chat/MessageBubble';
+import { MessageBubble, type MessageProps as Message } from '../components/chat/MessageBubble';
 import { ChatInput } from '../components/chat/ChatInput';
 import { fetchAPI } from '../services/api';
 import { cn } from '../utils/cn';
 import { toast } from 'sonner';
-
-interface Message {
-    role: 'user' | 'assistant';
-    content: string;
-    steps?: {
-        tool: string;
-        tool_input: any;
-        log: string;
-        observation: string;
-    }[];
-}
 
 interface ChatProps {
     className?: string;
@@ -66,7 +55,7 @@ export default function Chat({ className, variant = 'full', onAction }: ChatProp
         setLoading(true);
 
         try {
-            const data = await fetchAPI('/chat/message', {
+            const data = await fetchAPI<{ response: string; intermediate_steps?: unknown[] }>('/chat/message', {
                 method: 'POST',
                 body: JSON.stringify({ message: userMsg.content }),
             });
@@ -123,7 +112,7 @@ export default function Chat({ className, variant = 'full', onAction }: ChatProp
                 {messages.map((msg, idx) => (
                     <div key={idx}>
                          {/* Adapter for MessageBubble since we defined MessageProps slightly differently in local state before */}
-                        <MessageBubble message={msg as any} /> 
+                        <MessageBubble message={msg} /> 
                     </div>
                 ))}
                 {loading && (

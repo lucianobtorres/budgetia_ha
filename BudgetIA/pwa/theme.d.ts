@@ -1,1 +1,1 @@
-export declare const themeColors: any;
+export declare const themeColors: Record<string, string>;

@@ -4,12 +4,12 @@ from typing import Any
 
 import pandas as pd
 
-import config
-from core.logger import get_logger
+import config  # noqa: E402
+from core.logger import get_logger  # noqa: E402
 
 logger = get_logger("DefaultStrategy")
 
-from .base_strategy import BaseMappingStrategy
+from .base_strategy import BaseMappingStrategy  # noqa: E402
 
 
 class DefaultStrategy(BaseMappingStrategy):

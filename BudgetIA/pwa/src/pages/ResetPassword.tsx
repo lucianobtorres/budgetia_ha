@@ -3,7 +3,7 @@ import { AuthService } from '../services/auth';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Lock, CheckCircle, AlertTriangle } from 'lucide-react';
-import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -44,8 +44,9 @@ export default function ResetPassword() {
       await AuthService.resetPassword(token, password);
       setSuccess(true);
       setTimeout(() => navigate('/login'), 3000);
-    } catch (err: any) {
-      setError(err.message || "Erro ao redefinir senha.");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Erro ao redefinir senha.";
+      setError(message);
     } finally {
       setLoading(false);
     }

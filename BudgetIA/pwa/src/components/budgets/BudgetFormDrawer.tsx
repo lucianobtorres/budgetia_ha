@@ -32,6 +32,7 @@ export default function BudgetModal({ isOpen, onClose, onSave, initialData, isLo
 
     useEffect(() => {
         if (initialData) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setFormData(initialData);
         } else {
              setFormData({

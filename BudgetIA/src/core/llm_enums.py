@@ -8,5 +8,5 @@ class LLMProviderType(str, Enum):
 
     GEMINI = "gemini"
     GROQ = "groq"
-    # OPENAI = "openai" # Futuro
+    OPENAI = "openai"
     # CLAUDE = "claude" # Futuro

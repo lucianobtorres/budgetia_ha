@@ -2,13 +2,15 @@
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-from .base_provider import LLMProvider
 from core.logger import get_logger
+
+from .base_provider import LLMProvider
 
 logger = get_logger("GeminiProvider")
 
 
-import config
+import config  # noqa: E402
+
 
 class GeminiProvider(LLMProvider):
     @property
@@ -34,10 +36,10 @@ class GeminiProvider(LLMProvider):
         logger.info(f"Instanciando Gemini LLM: Modelo='{model}', Temp={temp}")
 
         llm = ChatGoogleGenerativeAI(
-            model=model, 
-            temperature=temp, 
+            model=model,
+            temperature=temp,
             google_api_key=self.api_key,
-            max_retries=1 # Fail fast on Quota Exceeded
+            max_retries=1,  # Fail fast on Quota Exceeded
         )
 
         return llm

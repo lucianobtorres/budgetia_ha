@@ -1,5 +1,3 @@
-# src/bot.py
-import logging
 import os
 import sys
 
@@ -12,41 +10,27 @@ from telegram.ext import (
     filters,
 )
 
-import config
-from core.user_config_service import UserConfigService
-
-
-# 1. Encontra o diretório onde este arquivo está (src/bot)
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# 2. Encontra o diretório 'src' (um nível acima)
-SRC_DIR = os.path.dirname(CURRENT_DIR)
-
-# 3. Encontra a raiz do projeto (um nível acima do 'src')
-PROJECT_ROOT = os.path.dirname(SRC_DIR)
-
-# 3. Adiciona a RAIZ do projeto ao sys.path.
-# Isso permite imports como 'from src.core import ...'
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
-
-# 4. Adiciona o PRÓPRIO 'src' ao sys.path.
-# Isso permite imports como 'from core import ...' (embora o 'from src.core' seja mais explícito)
-if SRC_DIR not in sys.path:
-    sys.path.insert(0, SRC_DIR)
-
-
-
-# Configura o logging
 from core.logger import get_logger
+from core.user_config_service import UserConfigService
+from interfaces.web_app.api_client import BudgetAPIClient
 
 # Configura o logging
 logger = get_logger("Bot")
 
-BOT_USERNAME = "jsmith"
+# 1. Encontra o diretório onde este arquivo está (src/bot)
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+# 2. Encontra o diretório 'src' (um nível acima)
+SRC_DIR = os.path.dirname(CURRENT_DIR)
+# 3. Encontra a raiz do projeto (um nível acima do 'src')
+PROJECT_ROOT = os.path.dirname(SRC_DIR)
 
-# --- 4. Inicializa o CLiente da API ---
-from interfaces.web_app.api_client import BudgetAPIClient
+# 3. Adiciona a RAIZ do projeto ao sys.path.
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+if SRC_DIR not in sys.path:
+    sys.path.insert(0, SRC_DIR)
+
+BOT_USERNAME = "jsmith"
 
 logger.info("INICIALIZANDO BOT DO TELEGRAM (MODO API CLI)")
 
@@ -58,23 +42,47 @@ if not TELEGRAM_TOKEN:
 # URL da API (pode vir de env)
 API_URL = os.getenv("API_URL", "http://127.0.0.1:8000")
 
+
+def wait_for_api(url: str, timeout: int = 60) -> bool:
+    """Aguarda a API ficar disponível."""
+    import time
+
+    import requests
+
+    start_time = time.time()
+    logger.info(f"Aguardando API em {url} ficar pronta...")
+    while time.time() - start_time < timeout:
+        try:
+            response = requests.get(f"{url}/api/health")
+            if response.status_code == 200:
+                logger.info("✅ API detectada e pronta!")
+                return True
+        except:  # noqa: E722
+            pass
+        time.sleep(2)
+    logger.error("❌ Timeout aguardando API.")
+    return False
+
+
 def load_api_client() -> tuple[BudgetAPIClient | None, UserConfigService | None]:
     try:
         logger.info(f"Conectando à API em {API_URL} como '{BOT_USERNAME}'...")
-        
+
         # Instancia o cliente da API
         # O Client já cuida dos headers de autenticação simples (X-User-ID)
         client = BudgetAPIClient(base_url=API_URL, user_id=BOT_USERNAME)
-        
+
         # Teste de conexão (Health Check)
         if not client.is_healthy():
-             logger.warning("AVISO: Não foi possível conectar à API durante a inicialização.")
+            logger.warning(
+                "AVISO: Não foi possível conectar à API durante a inicialização."
+            )
         else:
-             logger.info("Conexão com a API estabelecida com sucesso.")
+            logger.info("Conexão com a API estabelecida com sucesso.")
 
         # Carrega config service APENAS para salvar o chat_id localmente (Scheduler)
         config_service = UserConfigService(BOT_USERNAME)
-        
+
         return client, config_service
 
     except Exception as e:
@@ -100,7 +108,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
 
     chat_id = update.message.chat_id
-    
+
     # Salva o ID para o Scheduler (localmente, pois o scheduler roda local)
     if config_service:
         config_service.save_comunicacao_field("telegram_chat_id", chat_id)
@@ -131,6 +139,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 def main() -> None:
     """Função principal para rodar o bot."""
+    # Aguarda API antes de tentar carregar o cliente
+    if not wait_for_api(API_URL):
+        logger.warning(
+            "Prosseguindo sem confirmação da API (tentativas de conexão podem falhar)."
+        )
+
+    global api_client, config_service
+    api_client, config_service = load_api_client()
+
     if not api_client or not config_service:
         logger.critical("Serviços globais não puderam ser carregados. Encerrando bot.")
         return

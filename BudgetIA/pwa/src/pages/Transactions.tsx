@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
-import { useTransactions, useDeleteTransaction, useCreateTransaction, useUpdateTransaction, type Transaction } from "../hooks/useTransactions";
-import { useTour } from "../context/TourContext";
+import { useState, useEffect, useRef } from "react";
+import { useTransactions, useDeleteTransaction, useCreateTransaction, useUpdateTransaction } from "../hooks/useTransactions";
+import type { Transaction } from "../domain/models/Transaction";
+import { usePageTour } from "../hooks/usePageTour";
 import { useCategoryColorMap } from "../hooks/useCategoryColorMap";
 import { TransactionCard } from "../components/transactions/TransactionCard";
 import TransactionModal from "../components/transactions/TransactionFormDrawer";
@@ -11,18 +12,18 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { Select } from "../components/ui/Select";
+import type { SelectChangeEvent } from "../components/ui/Select";
 import { EmptyState } from "../components/ui/EmptyState";
 import { OCRModal } from "../components/ocr/OCRModal";
 
-import { usePageTour } from "../hooks/usePageTour";
-import { useDrawer } from "../context/DrawerContext";
+import { useDrawer } from "../hooks/useDrawer";
 import { ImportDrawer } from "../components/transactions/ImportDrawer";
 import { LoadingOverlay } from "../components/ui/LoadingOverlay";
 import { fetchAPI } from "../services/api";
+import type { TransactionCreate } from "../types/api";
 
 export default function Transactions() {
     const { openDrawer } = useDrawer();
-    const { startTour } = useTour();
     const location = useLocation();
 
     // Current date for default filter
@@ -32,7 +33,7 @@ export default function Transactions() {
     const [searchTerm, setSearchTerm] = useState("");
 
     // Initial Category from navigation state
-    const [categoryFilter, setCategoryFilter] = useState(location.state?.initialCategory || 'all');
+    const [categoryFilter, setCategoryFilter] = useState<string>(location.state?.initialCategory || 'all');
     
     // Standardized Tour Hook
     usePageTour('transactions_walkthrough');
@@ -60,7 +61,7 @@ export default function Transactions() {
     const [isImportOpen, setIsImportOpen] = useState(false);
     const [isOCROpen, setIsOCROpen] = useState(false);
     const [editingTx, setEditingTx] = useState<Transaction | null>(null);
-    const [ocrData, setOcrData] = useState<any>(null);
+    const [ocrData, setOcrData] = useState<TransactionCreate | null>(null);
     const [ocrAvailable, setOcrAvailable] = useState(false); // Check availability
     
     // Check OCR Availability
@@ -70,32 +71,37 @@ export default function Transactions() {
             .catch(() => setOcrAvailable(false));
     }, []);
 
-    const uniqueCategories = Array.from(new Set(transactions?.map(t => t.Categoria) || [])).sort();
+    const uniqueCategories = Array.from(new Set(transactions?.map(t => t.category) || [])).sort();
 
     // Smart Navigation Handler
+    const navHandledRef = useRef(false);
     useEffect(() => {
         const initialCategory = location.state?.initialCategory;
-        if (initialCategory) {
-            setCategoryFilter(initialCategory);
+        if (!navHandledRef.current && initialCategory) {
+            if (initialCategory !== categoryFilter) {
+                // eslint-disable-next-line react-hooks/set-state-in-effect
+                setCategoryFilter(initialCategory);
+            }
             
             // If category is not in current view (e.g. filtered by month), switch to 'all'
             if (transactions && filterValue !== 'all') {
-                const hasCategory = transactions.some(t => t.Categoria === initialCategory);
+                const hasCategory = transactions.some(t => t.category === initialCategory);
                 if (!hasCategory) {
                     setFilterValue('all');
                 }
             }
+            navHandledRef.current = true;
         }
-    }, [location.state, transactions, filterValue]); // Re-run when transactions load to verify
+    }, [location.state, transactions, filterValue, categoryFilter]);
 
     const filteredTransactions = transactions?.filter(t => {
-        const matchesSearch = t.Descricao.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                              t.Categoria.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesCategory = categoryFilter === 'all' || t.Categoria === categoryFilter;
+        const matchesSearch = t.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                              t.category.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesCategory = categoryFilter === 'all' || t.category === categoryFilter;
         return matchesSearch && matchesCategory;
     });
 
-    const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement> | { target: { value: string } }) => {
+    const handleFilterChange = (e: SelectChangeEvent) => {
         setFilterValue(e.target.value);
     };
 
@@ -109,22 +115,22 @@ export default function Transactions() {
         openDrawer('CATEGORY_EXPENSES', { highlightCategory: category });
     };
 
-    const handleSave = async (data: any) => {
+    const handleSave = async (data: TransactionCreate) => {
         try {
             if (editingTx) {
-                 await updateTransaction({ id: editingTx["ID Transacao"], data });
+                 await updateTransaction({ id: editingTx.id, data });
             } else {
                  await createTransaction(data);
             }
             setIsModalOpen(false);
             setEditingTx(null);
             setOcrData(null);
-        } catch (error) {
-            console.error("Erro ao salvar:", error);
+        } catch (err: unknown) {
+            console.error("Erro ao salvar:", err);
         }
     };
 
-    const handleOCRSuccess = (data: any) => {
+    const handleOCRSuccess = (data: TransactionCreate) => {
         setOcrData(data);
         setEditingTx(null); // Ensure we are not in edit mode
         setIsOCROpen(false); // Close OCR modal
@@ -142,12 +148,12 @@ export default function Transactions() {
     });
 
     const initialFormData = editingTx ? {
-        data: editingTx.Data,
-        descricao: editingTx.Descricao,
-        valor: editingTx.Valor,
-        tipo: editingTx["Tipo (Receita/Despesa)"],
-        categoria: editingTx.Categoria,
-        status: editingTx.Status
+        data: editingTx.date,
+        descricao: editingTx.description,
+        valor: editingTx.value,
+        tipo: editingTx.type,
+        categoria: editingTx.category,
+        status: editingTx.status
     } : ocrData; // Use OCR data if available
 
     return (
@@ -202,7 +208,7 @@ export default function Transactions() {
                             <Select 
                                 icon={Filter}
                                 value={filterValue}
-                                onChange={(e) => handleFilterChange(e as any)}
+                                onChange={handleFilterChange}
                                 variant="glass"
                                 options={[
                                     { label: "Todo o Período", value: "all" },
@@ -258,9 +264,9 @@ export default function Transactions() {
                         {filteredTransactions && filteredTransactions.length > 0 ? (
                             filteredTransactions.map(t => (
                                 <TransactionCard 
-                                    key={t["ID Transacao"]} 
+                                    key={t.id} 
                                     transaction={t} 
-                                    categoryColor={getCategoryColor(t.Categoria)}
+                                    categoryColor={getCategoryColor(t.category)}
                                     onDelete={(id) => {
                                         if (window.confirm("Tem certeza que deseja excluir esta transação?")) {
                                             deleteTransaction(id);
@@ -285,6 +291,7 @@ export default function Transactions() {
             </div>
 
             <TransactionModal 
+                key={`modal-${editingTx?.id || 'new'}-${ocrData?.descricao || ''}`}
                 isOpen={isModalOpen}
                 onClose={() => { setIsModalOpen(false); setOcrData(null); }}
                 onSave={handleSave}

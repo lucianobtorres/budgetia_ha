@@ -1,22 +1,19 @@
-
 # src/app/notifications/orchestrator.py
 from typing import Any
 
-import config
 from application.notifications.channels.base_channel import INotificationChannel
 from application.notifications.channels.in_app_channel import InAppChannel
 from application.notifications.rules.base_rule import IFinancialRule
 from application.services.notification_service import NotificationService
 from application.services.presence_service import PresenceService
+from application.services.push_notification_service import PushNotificationService
+from core.behavior.user_behavior_service import UserBehaviorService
+from core.logger import get_logger
 from core.user_config_service import UserConfigService
 from finance.planilha_manager import PlanilhaManager
 
-
-from core.behavior.user_behavior_service import UserBehaviorService
-from application.services.push_notification_service import PushNotificationService
-from core.logger import get_logger
-
 logger = get_logger("NotificationOrchestrator")
+
 
 class ProactiveNotificationOrchestrator:
     """
@@ -39,11 +36,13 @@ class ProactiveNotificationOrchestrator:
         self.channels_map = {ch.channel_name: ch for ch in channels}
         if "in_app" not in self.channels_map:
             self.channels_map["in_app"] = InAppChannel()
-            
+
         self.config_service = config_service
         self.notification_service = NotificationService(config_service, push_service)
         self.presence_service = PresenceService()
-        self.behavior_service = UserBehaviorService(config_service.username) # Instancia a memória
+        self.behavior_service = UserBehaviorService(
+            config_service.username
+        )  # Instancia a memória
 
     def _select_channels(
         self, user_config: dict[str, Any]
@@ -62,7 +61,7 @@ class ProactiveNotificationOrchestrator:
 
         # 2. Canais Externos
         external_channels = ["whatsapp", "telegram", "sms", "email"]
-        
+
         for ch_name in external_channels:
             channel = self.channels_map.get(ch_name)
             if channel and channel.is_configured_for_user(user_config):
@@ -79,20 +78,18 @@ class ProactiveNotificationOrchestrator:
             "rules_checked": 0,
             "rules_triggered": 0,
             "failures": [],
-            "rules_silenced": 0 
+            "rules_silenced": 0,
         }
 
         try:
             # 1. Carregar dados
             transactions_df = plan_manager.visualizar_dados("Visão Geral e Transações")
             budgets_df = plan_manager.visualizar_dados("Meus Orçamentos")
-            
+
             # Carrega configuração para passar às regras
             user_config = self.config_service.load_config()
-            
-            user_profile: dict[str, Any] = {
-                "config": user_config
-            }
+
+            user_profile: dict[str, Any] = {"config": user_config}
 
         except Exception as e:
             logger.error(f"Falha ao carregar dados: {e}")
@@ -102,19 +99,21 @@ class ProactiveNotificationOrchestrator:
         # 2. Config & Seleção de Canais
         user_config = self.config_service.load_config()
         targets = self._select_channels(user_config)
-        
+
         if not targets:
             logger.warning("Nenhum canal (nem In-App?) disponível.")
-        
+
         # 3. Executar Regras
         for rule in self.rules:
             stats["rules_checked"] += 1
 
             # --- JARVIS CHECK: A regra deve ser silenciada? ---
             if self.behavior_service.should_silence_rule(rule.rule_name, threshold=3):
-                logger.info(f"Regra '{rule.rule_name}' SILENCIADA pelo Jarvis (ignorada frequentemente).")
+                logger.info(
+                    f"Regra '{rule.rule_name}' SILENCIADA pelo Jarvis (ignorada frequentemente)."
+                )
                 stats["rules_silenced"] += 1
-                continue # Pula esta regra
+                continue  # Pula esta regra
 
             logger.info(f"Executando regra '{rule.rule_name}'...")
 
@@ -124,28 +123,36 @@ class ProactiveNotificationOrchestrator:
                 if result.triggered:
                     stats["rules_triggered"] += 1
                     message = result.to_message()
-                    
+
                     # Salva no Notification Center (DB Local)
-                    notification_id = self.notification_service.add_notification(
-                        message=message.text, 
+                    self.notification_service.add_notification(
+                        message=message.text,
                         category=message.category,
-                        priority=message.priority.value if hasattr(message.priority, 'value') else "medium"
+                        priority=message.priority.value
+                        if hasattr(message.priority, "value")
+                        else "medium",
                     )
 
                     # --- JARVIS LOG: Registra que a regra foi disparada (aguardando feedback) ---
                     # O ID da notificação pode ser usado no futuro para linkar o feedback
-                    
+
                     # BROADCAST para todos os canais alvo
                     for channel, recipient in targets:
                         try:
                             success = await channel.send(recipient, message)
                             if success:
                                 stats["notifications_sent"] += 1
-                                logger.info(f"Enviado para {recipient} via {channel.channel_name}.")
+                                logger.info(
+                                    f"Enviado para {recipient} via {channel.channel_name}."
+                                )
                             else:
-                                stats["failures"].append(f"{rule.rule_name}:{channel.channel_name}:failed")
+                                stats["failures"].append(
+                                    f"{rule.rule_name}:{channel.channel_name}:failed"
+                                )
                         except Exception as ex:
-                            stats["failures"].append(f"{rule.rule_name}:{channel.channel_name}:error")
+                            stats["failures"].append(
+                                f"{rule.rule_name}:{channel.channel_name}:error"
+                            )
                             logger.error(f"Erro Envio {channel.channel_name}: {ex}")
 
                 else:

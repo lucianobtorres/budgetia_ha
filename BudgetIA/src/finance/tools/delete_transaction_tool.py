@@ -1,25 +1,34 @@
-from typing import Type, Callable, Any
+from collections.abc import Callable
+from typing import Any
+
 from pydantic import BaseModel, Field
+
 from core.base_tool import BaseTool
-from finance.repositories.transaction_repository import TransactionRepository
 from core.logger import get_logger
+from finance.domain.repositories.transaction_repository import ITransactionRepository
 
 logger = get_logger("Tool_DelTrans")
 
+
 class DeleteTransactionSchema(BaseModel):
-    transaction_id: int = Field(..., description="ID numérico da transação a ser excluída.")
+    transaction_id: int = Field(
+        ..., description="ID numérico da transação a ser excluída."
+    )
+
 
 class DeleteTransactionTool(BaseTool):
     name = "delete_transaction"
-    description = "Exclui PERMANENTEMENTE uma transação da planilha financeira usando seu ID."
-    args_schema: Type[BaseModel] = DeleteTransactionSchema
+    description = (
+        "Exclui PERMANENTEMENTE uma transação da planilha financeira usando seu ID."
+    )
+    args_schema: type[BaseModel] = DeleteTransactionSchema
 
     # --- Injeção de Dependências ---
     def __init__(
-        self, 
-        transaction_repo: TransactionRepository,
+        self,
+        transaction_repo: ITransactionRepository,
         save_func: Callable[[], None],
-        recalculate_budgets_func: Callable[[], Any]
+        recalculate_budgets_func: Callable[[], Any],
     ):
         self.transaction_repo = transaction_repo
         self.save = save_func
@@ -30,10 +39,12 @@ class DeleteTransactionTool(BaseTool):
         try:
             success = self.transaction_repo.delete_transaction(transaction_id)
             if success:
-                self.save() # Salva no disco/nuvem
-                self.recalculate_budgets() # Atualiza orçamentos (gastos podem ter diminuído)
+                self.save()  # Salva no disco/nuvem
+                self.recalculate_budgets()  # Atualiza orçamentos (gastos podem ter diminuído)
                 return f"Transação {transaction_id} excluída com sucesso."
-                
-            return f"Não foi possível encontrar uma transação com o ID {transaction_id}."
+
+            return (
+                f"Não foi possível encontrar uma transação com o ID {transaction_id}."
+            )
         except Exception as e:
             return f"Erro ao excluir transação: {str(e)}"

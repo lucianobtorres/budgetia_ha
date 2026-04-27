@@ -2,7 +2,8 @@ import React, { useState } from "react";
 import { Plus, Trash2, Tag, Edit2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { useCategories, useCreateCategory, useDeleteCategory, useUpdateCategory, type CreateCategoryPayload, type Category } from "../../services/categoryService";
+import { useCategories, useCreateCategory, useDeleteCategory, useUpdateCategory } from "../../hooks/useCategories";
+import type { Category } from "../../domain/models/Category";
 import { GlassCard } from "../ui/GlassCard";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
@@ -68,7 +69,7 @@ export const CategoriesTab: React.FC = () => {
             return;
         }
 
-        const payload: CreateCategoryPayload = {
+        const payload = {
             name: formData.name.trim(),
             type: formData.type,
             tags: formData.tags.trim(),
@@ -89,7 +90,7 @@ export const CategoriesTab: React.FC = () => {
                 toast.success(`Categoria '${formData.name}' criada!`);
             }
             handleCloseDrawer();
-        } catch (error) {
+        } catch {
             // Error handling done in service/query
         }
     };
@@ -99,7 +100,9 @@ export const CategoriesTab: React.FC = () => {
         try {
             await deleteMutation.mutateAsync(name);
             toast.success(`Categoria '${name}' removida.`);
-        } catch (error) { }
+        } catch {
+            // Error handled
+        }
     };
 
     // Filter out internal tags for display
@@ -210,7 +213,7 @@ export const CategoriesTab: React.FC = () => {
                         <label className="text-sm font-medium ml-1">Tipo</label>
                         <Select
                             value={formData.type}
-                            onChange={(e: any) => setFormData({...formData, type: e.target.value})}
+                            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({...formData, type: e.target.value})}
                             options={[
                                 { label: "Despesa", value: "Despesa" },
                                 { label: "Receita", value: "Receita" }

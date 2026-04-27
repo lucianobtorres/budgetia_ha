@@ -1,16 +1,21 @@
 from fastapi import APIRouter, Depends
-from interfaces.api.dependencies import get_planilha_manager
+
 from finance.planilha_manager import PlanilhaManager
+from interfaces.api.dependencies import get_planilha_manager
 
 router = APIRouter(tags=["Health"])
+
 
 @router.get("/health")
 def health_check() -> dict[str, str]:
     """Verifica se a API está online."""
     return {"status": "ok", "app": "BudgetIA API"}
 
+
 @router.get("/readiness")
-def readiness_check(manager: PlanilhaManager = Depends(get_planilha_manager)) -> dict[str, str]:
+def readiness_check(
+    manager: PlanilhaManager = Depends(get_planilha_manager),
+) -> dict[str, str]:
     """
     Verifica se a API consegue conectar com a Planilha/Banco.
     Se o manager falhar em carregar, o dependency injection vai falhar antes.

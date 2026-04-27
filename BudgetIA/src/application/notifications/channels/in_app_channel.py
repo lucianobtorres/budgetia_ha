@@ -8,7 +8,7 @@ from core.logger import get_logger
 logger = get_logger("InAppChannel")
 
 
-class InAppChannel(INotificationChannel): # type: ignore[misc]
+class InAppChannel(INotificationChannel):  # type: ignore[misc]
     """
     Canal de Notificação Web (In-App).
     Envia mensagens para a fila de 'Toasts' que o frontend consome via Polling.
@@ -26,13 +26,13 @@ class InAppChannel(INotificationChannel): # type: ignore[misc]
         return True
 
     def get_recipient_id(self, user_config: dict[str, Any]) -> str | None:
-        # O ID do destinatário é o próprio username, que será passado no send() 
+        # O ID do destinatário é o próprio username, que será passado no send()
         # ou precisamos garantir que o orchestrator passe o user_id correto.
         # O Orchestrator passa 'recipient_id' baseado no retorno daqui.
         # Mas o user_config pode não ter o ID explícito se for arquivo local.
         # Vamos assumir que quem chama sabe o user_id, mas a interface pede para extrair do config.
         # Hack: O orchestrator já tem o config_service.username, mas o método pede do dict.
-        # Vamos retornar "current_user" e resolver no send? 
+        # Vamos retornar "current_user" e resolver no send?
         # Não, o Orchestrator chama `get_recipient_id` e passa para `send`.
         # Precisamos que o Orchestrator passe o username.
         # O UserConfigService não salva o username dentro do json (geralmente).
@@ -40,7 +40,7 @@ class InAppChannel(INotificationChannel): # type: ignore[misc]
         # e confiar que o InAppChannel via PresenceService vai usar o contexto correto?
         # Não, o PresenceService precisa do user_id.
         # O Orchestrator precisa passar o user_id real.
-        return "user_ref" # Placeholder, o send vai ignorar isso se tiver acesso ao contexto?
+        return "user_ref"  # Placeholder, o send vai ignorar isso se tiver acesso ao contexto?
         # Espere, o send(recipient_id, message) RECEBE o id.
         # Como pegamos o username DO ARQUIVO user_config.json? Não tem.
         # O Orchestrator tem `self.config_service`.
@@ -55,7 +55,7 @@ class InAppChannel(INotificationChannel): # type: ignore[misc]
             # Fallback se a lógica acima falhar
             logger.error("Username não fornecido corretamente.")
             return False
-            
+
         try:
             self.presence_service.push_toast(user_id=recipient_id, message=message.text)
             return True

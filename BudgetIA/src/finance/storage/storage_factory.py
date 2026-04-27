@@ -1,5 +1,3 @@
-from typing import Optional
-
 from finance.storage.base_storage_handler import BaseStorageHandler
 from finance.storage.excel_storage_handler import ExcelStorageHandler
 from finance.storage.google_drive_handler import GoogleDriveFileHandler
@@ -47,7 +45,9 @@ class StorageHandlerFactory:
         return StorageType.LOCAL_EXCEL
 
     @classmethod
-    def create_handler(cls, path: str, credentials: Optional[object] = None) -> BaseStorageHandler:
+    def create_handler(
+        cls, path: str, credentials: object | None = None
+    ) -> BaseStorageHandler:
         """
         Cria o handler apropriado baseado no path fornecido.
 
@@ -62,9 +62,7 @@ class StorageHandlerFactory:
             ValueError: Se o tipo de storage não for suportado ou registrado.
         """
         storage_type: StorageType = cls._detect_storage_type(path)
-        handler_class: Optional[type[BaseStorageHandler]] = cls._REGISTRY.get(
-            storage_type
-        )
+        handler_class: type[BaseStorageHandler] | None = cls._REGISTRY.get(storage_type)
 
         if not handler_class:
             raise ValueError(
@@ -78,7 +76,7 @@ class StorageHandlerFactory:
             return handler_class(file_url=path)
         elif storage_type == StorageType.GOOGLE_SHEETS:
             # Injeta as credenciais se for GSheets
-            return handler_class(spreadsheet_url_or_key=path, credentials=credentials) # type: ignore[call-arg]
+            return handler_class(spreadsheet_url_or_key=path, credentials=credentials)  # type: ignore[call-arg]
         else:
             raise ValueError(f"Handler para tipo '{storage_type}' não implementado.")
 

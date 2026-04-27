@@ -14,12 +14,26 @@ export interface GoogleFile {
     icon?: string;
 }
 
+interface GoogleFileSchema {
+    id: string;
+    name: string;
+    webViewLink: string;
+    iconLink?: string;
+}
+
+interface OnboardingChatResponse {
+    message?: string;
+    ui_options?: string[];
+    google_files_list?: GoogleFileSchema[];
+    state?: string;
+}
+
 interface OnboardingStateData {
     state: string;
     progress: number;
     ui_options: string[];
     initial_message: string | null;
-    google_files_list?: any[];
+    google_files_list?: GoogleFileSchema[];
 }
 
 export function useOnboarding() {
@@ -30,7 +44,7 @@ export function useOnboarding() {
     const [googleFiles, setGoogleFiles] = useState<GoogleFile[] | null>(null);
 
     // Helper to process backend response
-    const handleApiResponse = useCallback((data: any) => {
+    const handleApiResponse = useCallback((data: OnboardingChatResponse) => {
         // 1. Add message (clean tags)
         if (data.message) {
              const cleanText = data.message.replace(/\[UI_ACTION:.*?\]/g, "").trim();
@@ -41,13 +55,12 @@ export function useOnboarding() {
 
         // 2. Update Options
         if (data.ui_options) {
-            console.log("Onboarding UI Options:", data.ui_options);
             setUiOptions(data.ui_options);
         }
 
         // 3. Check for Google Files
         if (data.google_files_list && data.google_files_list.length > 0) {
-            const mappedFiles = data.google_files_list.map((f: any) => ({
+            const mappedFiles = data.google_files_list.map((f: GoogleFileSchema) => ({
                 id: f.id,
                 name: f.name,
                 url: f.webViewLink, 
@@ -83,7 +96,7 @@ export function useOnboarding() {
             }
         };
         checkState();
-    }, []); // eslint-disable-line
+    }, [navigate]); // eslint-disable-line
 
     const sendMessage = async (text: string) => {
         if (!text.trim()) return;
@@ -93,12 +106,12 @@ export function useOnboarding() {
         setLoading(true);
 
         try {
-            const data = await fetchAPI('/onboarding/chat', {
+            const data = await fetchAPI<OnboardingChatResponse>('/onboarding/chat', {
                 method: 'POST',
                 body: JSON.stringify({ text })
             });
             handleApiResponse(data);
-        } catch (error) {
+        } catch {
             setMessages(prev => [...prev, { sender: "agent", text: "Erro ao comunicar com o servidor." }]);
         } finally {
             setLoading(false);
@@ -113,19 +126,16 @@ export function useOnboarding() {
         try {
             setMessages(prev => [...prev, { sender: "user", text: `Enviando arquivo: ${file.name}...` }]);
             
-            // fetchAPI handles JSON, but for FormData we might need standard fetch or adjust helper?
-            // fetchAPI usually sets Content-Type: application/json. 
-            // Let's use standard fetch for upload to let browser set boundary.
              const userId = localStorage.getItem('budgetia_user_id') || "";
              const res = await fetch('/api/onboarding/upload', {
                 method: 'POST',
-                headers: { 'X-User-ID': userId }, // No Content-Type, browser sets it
+                headers: { 'X-User-ID': userId }, 
                 body: formData
             });
-            const data = await res.json();
+            const data: OnboardingChatResponse = await res.json();
             handleApiResponse(data);
 
-        } catch (error) {
+        } catch {
              setMessages(prev => [...prev, { sender: "agent", text: "Falha no upload." }]);
         } finally {
             setLoading(false);
@@ -135,7 +145,7 @@ export function useOnboarding() {
     const startGoogleAuth = async () => {
         try {
             const redirectUri = encodeURIComponent(`${window.location.origin}/google-callback`);
-            const data = await fetchAPI(`/onboarding/google-auth-url?redirect_uri=${redirectUri}`);
+            const data = await fetchAPI<{ url?: string }>(`/onboarding/google-auth-url?redirect_uri=${redirectUri}`);
             
             if (data.url) {
                 window.location.href = data.url;
@@ -150,7 +160,7 @@ export function useOnboarding() {
     const sendGoogleAuthCode = async (code: string) => {
         setLoading(true);
         try {
-            const data = await fetchAPI('/onboarding/google-auth', {
+            const data = await fetchAPI<OnboardingChatResponse>('/onboarding/google-auth', {
                 method: 'POST',
                 body: JSON.stringify({ 
                     code,
@@ -158,7 +168,7 @@ export function useOnboarding() {
                 })
             });
             handleApiResponse(data);
-        } catch (error) {
+        } catch {
             setMessages(prev => [...prev, { sender: "agent", text: "Erro ao autenticar com Google." }]);
         } finally {
             setLoading(false);

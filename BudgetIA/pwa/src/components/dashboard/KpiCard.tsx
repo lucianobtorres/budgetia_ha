@@ -1,10 +1,11 @@
+import React from 'react';
 import { cn } from '../../utils/cn';
 
 interface KpiCardProps {
     id?: string;
     title: string;
     value: number;
-    icon: any; // Lucide Icon type is generic
+    icon: React.ElementType;
     color: string;
     compact?: boolean;
 }

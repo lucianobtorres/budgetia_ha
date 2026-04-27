@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from initialization.onboarding.analyzers import FinancialStrategy
 from initialization.onboarding.orchestrator import (
     OnboardingOrchestrator,
     OnboardingState,
@@ -48,9 +49,6 @@ def mock_profile_analyzer():
     analyzer = MagicMock()
     analyzer.analyze.return_value = MagicMock(financial_literacy="iniciante")
     return analyzer
-
-
-from initialization.onboarding.analyzers import FinancialStrategy
 
 
 @pytest.fixture
@@ -271,7 +269,7 @@ def test_profile_completion_skips_strategy(orchestrator, mock_config_service):
     # Se precisar de side_effect para variar por input, pode usar, mas aqui queremos testar o fluxo
     # assumindo que o classificador funcionou.
 
-    response = orchestrator.process_user_input("vamos começar")
+    orchestrator.process_user_input("vamos começar")
 
     # Verificações
     # Deve ir direto para COMPLETE
@@ -308,7 +306,7 @@ def test_profile_completion_context_heuristic(orchestrator, mock_config_service)
     orchestrator.intent_classifier.classify.side_effect = None
     orchestrator.intent_classifier.classify.return_value = UserIntent.INTERVIEW_COMPLETE
 
-    response = orchestrator.process_user_input("sim")
+    orchestrator.process_user_input("sim")
 
     # Verificações
     assert orchestrator.get_current_state() == OnboardingState.COMPLETE

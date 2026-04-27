@@ -124,13 +124,17 @@ class StrategySuggester:
                     "Objetivos Financeiros": 0.20,
                 },
             )
+
+
 class UserIntent(Enum):
     POSITIVE_CONFIRMATION = "positive_confirmation"
     NEGATIVE_REFUSAL = "negative_refusal"
     SKIP = "skip"
     QUESTION = "question"
     NEUTRAL_INFO = "neutral_info"
-    INTERVIEW_COMPLETE = "interview_complete"  # User signals they're done with questions
+    INTERVIEW_COMPLETE = (
+        "interview_complete"  # User signals they're done with questions
+    )
     UNCLEAR = "unclear"
 
 
@@ -150,37 +154,100 @@ class IntentClassifier:
         """
         # Atalhos para performance e custo (casos óbvios)
         text_lower = user_text.lower().strip()
-        if text_lower in ["pular", "pular perfil", "pular etapa", "pular / finalizar", "finalizar"]:
+        if text_lower in [
+            "pular",
+            "pular perfil",
+            "pular etapa",
+            "pular / finalizar",
+            "finalizar",
+        ]:
             return UserIntent.SKIP
         if text_lower in ["não", "nao", "não, obrigado", "nao, obrigado"]:
             return UserIntent.NEGATIVE_REFUSAL
-        if text_lower in ["sim", "claro", "com certeza", "ok", "pode ser", "aceitar sugestão", "aceitar sugestao", "aceitar", "usar esta", "tudo certo", "tudo certo!", "confirmar", "prosseguir"]:
+        if text_lower in [
+            "sim",
+            "claro",
+            "com certeza",
+            "ok",
+            "pode ser",
+            "aceitar sugestão",
+            "aceitar sugestao",
+            "aceitar",
+            "usar esta",
+            "tudo certo",
+            "tudo certo!",
+            "confirmar",
+            "prosseguir",
+        ]:
             return UserIntent.POSITIVE_CONFIRMATION
-        
-        if text_lower in ["preciso de ajuda", "ajuda", "socorro", "não entendi", "duvida", "dúvida", "tenho uma dúvida"]:
+
+        if text_lower in [
+            "preciso de ajuda",
+            "ajuda",
+            "socorro",
+            "não entendi",
+            "duvida",
+            "dúvida",
+            "tenho uma dúvida",
+        ]:
             return UserIntent.QUESTION
 
         # Sinais de conclusão de entrevista (Hardcoded para garantir funcionamento)
-        if text_lower in ["pronto", "terminei", "acabei", "é só isso", "e so isso", "entendi tudo", "já respondi", "ja respondi", "vamos começar", "vamos comecar", "começar", "comecar", "iniciar", "ir para o sistema"]:
+        if text_lower in [
+            "pronto",
+            "terminei",
+            "acabei",
+            "é só isso",
+            "e so isso",
+            "entendi tudo",
+            "já respondi",
+            "ja respondi",
+            "vamos começar",
+            "vamos comecar",
+            "começar",
+            "comecar",
+            "iniciar",
+            "ir para o sistema",
+        ]:
             return UserIntent.INTERVIEW_COMPLETE
 
         # Heurística de contexto: Se o agente sugeriu finalizar/começar e o usuário concordou
         if last_agent_message:
             last_msg_lower = last_agent_message.lower()
-            if any(term in last_msg_lower for term in ["vamos começar", "iniciar", "finalizar", "ir para o sistema", "dashboard", "pronto para", "tudo certo"]):
-                 if text_lower in ["sim", "ok", "claro", "pode ser", "vamos", "bora", "tá bom", "ta bom"]:
-                     return UserIntent.INTERVIEW_COMPLETE
+            if any(
+                term in last_msg_lower
+                for term in [
+                    "vamos começar",
+                    "iniciar",
+                    "finalizar",
+                    "ir para o sistema",
+                    "dashboard",
+                    "pronto para",
+                    "tudo certo",
+                ]
+            ):
+                if text_lower in [
+                    "sim",
+                    "ok",
+                    "claro",
+                    "pode ser",
+                    "vamos",
+                    "bora",
+                    "tá bom",
+                    "ta bom",
+                ]:
+                    return UserIntent.INTERVIEW_COMPLETE
 
         prompt = f"""
         Atue como um classificador de intenção para um chat de onboarding financeiro.
-        
+
         Contexto:
         - Estado Atual: {current_state_name}
         - Última msg do Agente: "{last_agent_message}"
         - Msg do Usuário: "{user_text}"
-        
+
         Classifique a intenção do usuário em UMA das seguintes categorias:
-        
+
         1. positive_confirmation: O usuário concorda, aceita, quer continuar, diz "sim", "ok", "bora", "começar", "aceito".
            IMPORTANTE: Se o estado for WELCOME e o usuário disser "vamos começar", "iniciar", é positive_confirmation.
         2. negative_refusal: O usuário recusa, diz "não", "não quero", "agora não", "deixa pra lá".
@@ -189,7 +256,7 @@ class IntentClassifier:
         5. neutral_info: O usuário está apenas respondendo uma pergunta do perfil (ex: "gasto muito", "sou iniciante") ou conversando normalmente sem confirmar/negar nada explicitamente.
         6. interview_complete: O usuário sinaliza que terminou a entrevista, está satisfeito, indica "pronto", "entendi", "obrigado e pronto", "é isso", "tudo certo, podemos avançar", demonstra conclusão natural da conversa.
            IMPORTANTE: Se o estado for OPTIONAL_PROFILE e o usuário disser "vamos começar", "ir para o sistema", "iniciar", é interview_complete.
-        
+
         Retorne APENAS o nome da categoria (ex: positive_confirmation). Nada mais.
         """
 
@@ -210,7 +277,7 @@ class IntentClassifier:
                 return UserIntent.INTERVIEW_COMPLETE
             if "neutral" in content:
                 return UserIntent.NEUTRAL_INFO
-            
+
             return UserIntent.UNCLEAR
 
         except Exception as e:

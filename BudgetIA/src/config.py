@@ -11,7 +11,9 @@ logger = get_logger("Config")
 
 # Carrega as variáveis de ambiente do arquivo .env
 # MUDANÇA: Aponta explicitamente para o .env na raiz para evitar erros de CWD
-DOTENV_PATH = os.path.join(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")), ".env")
+DOTENV_PATH = os.path.join(
+    os.path.abspath(os.path.join(os.path.dirname(__file__), "..")), ".env"
+)
 load_dotenv(DOTENV_PATH)
 
 # --- 1. Configurações de Caminhos (Paths) ---
@@ -30,16 +32,28 @@ GOOGLE_OAUTH_CLIENT_ID = os.getenv("GOOGLE_OAUTH_CLIENT_ID")
 GOOGLE_OAUTH_CLIENT_SECRET = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET")
 
 # O URI de redirecionamento que você configurou no Google Console
-GOOGLE_OAUTH_REDIRECT_URI = os.getenv("GOOGLE_OAUTH_REDIRECT_URI", "http://localhost:8501")
+GOOGLE_OAUTH_REDIRECT_URI = os.getenv(
+    "GOOGLE_OAUTH_REDIRECT_URI", "http://localhost:8501"
+)
+
+# --- CHAVES DE API DE IA ---
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")  # Usada pelo Gemini
+GEMINI_API_KEY_PAID = os.getenv("GEMINI_API_KEY_PAID")  # Fallback Pago
 
 # --- CONFIGURAÇÃO DE SEGURANÇA (JWT) ---
 # Usar um segredo forte em produção!
 SECRET_KEY = os.getenv("SECRET_KEY")
 if not SECRET_KEY:
-    logger.debug("Config: SECRET_KEY não encontrada no env. Usando fallback de desenvolvimento.")
+    logger.debug(
+        "Config: SECRET_KEY não encontrada no env. Usando fallback de desenvolvimento."
+    )
     SECRET_KEY = "super_secret_dev_key_change_in_prod_12345"
 else:
-    logger.debug(f"Config: SECRET_KEY carregada do env. Comprimento: {len(SECRET_KEY)} | Prefixo: {SECRET_KEY[:4]}***")
+    logger.debug(
+        f"Config: SECRET_KEY carregada do env. Comprimento: {len(SECRET_KEY)} | Prefixo: {SECRET_KEY[:4]}***"
+    )
 
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 Dias para dev (PWA persistência)
@@ -66,49 +80,53 @@ PLANILHA_PATH = os.path.join(DATA_DIR, PLANILHA_FILENAME)
 DADOS_EXEMPLO_PATH = os.path.join(DATA_DIR, DADOS_EXEMPLO_FILENAME)
 SYSTEM_PROMPT_PATH = os.path.join(PROMPTS_DIR, SYSTEM_PROMPT_FILENAME)
 
+
 # --- 2. Configurações de Modelos de IA ---
 class LLMModels:
     """Centraliza as definições dos modelos de LLM suportados."""
-    
+
     # GROQ Options
     GROQ_LLAMA_3_3_70B = "llama-3.3-70b-versatile"
     GROQ_LLAMA_3_1_8B = "llama-3.1-8b-instant"
     GROQ_GPT_OSS_120B = "openai/gpt-oss-120b"
-    
+
     # GEMINI Options
     GEMINI_2_0_FLASH_LITE = "gemini-2.0-flash-lite"
     GEMINI_2_5_FLASH = "gemini-2.5-flash"
     GEMINI_1_5_FLASH = "gemini-1.5-flash"
-    
+
     # OPENAI Options
     OPENAI_GPT_3_5_TURBO = "gpt-3.5-turbo"
     # OPENAI_GPT_4 = "gpt-4" # Exemplo futuro
 
     # Defaults do Sistema
     # Defaults do Sistema (Podem ser sobrescritos por ENV)
-    DEFAULT_GROQ = os.getenv("GROQ_MODEL", GROQ_LLAMA_3_3_70B)
-    DEFAULT_GEMINI = os.getenv("GEMINI_MODEL", GEMINI_2_0_FLASH_LITE)
-    # DEFAULT_GEMINI = GEMINI_2_5_FLASH # Alternativa
-    
+    DEFAULT_GROQ = os.getenv("GROQ_MODEL", "llama-3.1-70b-versatile")
+    DEFAULT_GEMINI = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+    DEFAULT_OPENAI = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+
+
 class LLMProviders:
     """Constantes para os provedores de LLM."""
+
     GROQ = "GROQ"
     GEMINI = "GEMINI"
     OPENAI = "OPENAI"
+
 
 # --- CONFIGURAÇÃO DE PROVEDOR ATIVO (VIA ENV) ---
 # Define qual provedor será o PRIMÁRIO do sistema.
 # Opções: GROQ, GEMINI, OPENAI
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", LLMProviders.GEMINI).upper()
-    
-# Mantendo compatibilidade com código antigo que importava essas variáveis, 
+
+# Mantendo compatibilidade com código antigo que importava essas variáveis,
 # mas agora apontando para a classe central.
 DEFAULT_GROQ_MODEL = os.getenv("GROQ_MODEL", LLMModels.DEFAULT_GROQ)
 DEFAULT_GEMINI_MODEL = LLMModels.DEFAULT_GEMINI
 
 
 # --- SAAS / DEPLOY MODE ---
-DEPLOY_MODE = os.getenv("DEPLOY_MODE", "SELF_HOSTED").upper() # SAAS or SELF_HOSTED
+DEPLOY_MODE = os.getenv("DEPLOY_MODE", "SELF_HOSTED").upper()  # SAAS or SELF_HOSTED
 
 # --- EMAIL CONFIGURATION (Resend.com) ---
 RESEND_API_KEY = os.getenv("RESEND_API_KEY")
@@ -137,13 +155,13 @@ if GSPREAD_CREDENTIALS_PATH:
         if os.path.exists(candidate):
             CHOSEN_CRED_PATH = candidate
         else:
-             # Tenta no Project Root
+            # Tenta no Project Root
             candidate = os.path.join(PROJECT_ROOT, GSPREAD_CREDENTIALS_PATH)
             if os.path.exists(candidate):
                 CHOSEN_CRED_PATH = candidate
             else:
-                 # Assume que o usuário sabe o que está fazendo (mesmo que não exista agora)
-                 CHOSEN_CRED_PATH = GSPREAD_CREDENTIALS_PATH
+                # Assume que o usuário sabe o que está fazendo (mesmo que não exista agora)
+                CHOSEN_CRED_PATH = GSPREAD_CREDENTIALS_PATH
     else:
         CHOSEN_CRED_PATH = GSPREAD_CREDENTIALS_PATH
 else:
@@ -176,7 +194,9 @@ if CHOSEN_CRED_PATH:
             creds_json = json.load(f)
             SERVICE_ACCOUNT_EMAIL = creds_json.get("client_email")
     except FileNotFoundError:
-        logger.warning(f"CRÍTICO: Arquivo de credenciais não encontrado em: {CHOSEN_CRED_PATH}")
+        logger.warning(
+            f"CRÍTICO: Arquivo de credenciais não encontrado em: {CHOSEN_CRED_PATH}"
+        )
     except Exception as e:
         logger.warning(f"CRÍTICO: Erro ao ler credenciais: {e}")
 
@@ -287,6 +307,7 @@ class ColunasInsights:
 
 class ColunasCategorias:
     """Nomes das colunas internas da aba 'Categorias'."""
+
     NOME = "Nome"
     TIPO = "Tipo (Despesa/Receita)"
     # COR removida: Front-end calcula dinamicamente

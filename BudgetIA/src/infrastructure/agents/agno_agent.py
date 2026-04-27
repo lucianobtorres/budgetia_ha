@@ -4,21 +4,14 @@ from agno.tools import Function
 from dotenv import load_dotenv
 
 import config
-from core.logger import get_logger
+from core.logger import get_logger  # noqa: E402
 
 logger = get_logger("AgnoAgent")
-from core.agent_runner_interface import AgentRunner
-from core.base_tool import BaseTool
-from core.llm_manager import LLMOrchestrator
-
-# Importa repositórios e loader
-from finance.repositories.budget_repository import BudgetRepository
-from finance.repositories.data_context import FinancialDataContext
-from finance.repositories.debt_repository import DebtRepository
-from finance.repositories.insight_repository import InsightRepository
-from finance.repositories.profile_repository import ProfileRepository
-from finance.repositories.transaction_repository import TransactionRepository
-from finance.tool_loader import load_all_financial_tools
+from core.agent_runner_interface import AgentRunner  # noqa: E402
+from core.base_tool import BaseTool  # noqa: E402
+from core.llm_manager import LLMOrchestrator  # noqa: E402
+from finance.planilha_manager import PlanilhaManager  # noqa: E402
+from finance.tool_loader import load_all_financial_tools  # noqa: E402
 
 load_dotenv()
 
@@ -32,12 +25,7 @@ class AgnoAgent(AgentRunner):
         self,
         llm_orchestrator: LLMOrchestrator,
         contexto_perfil: str,
-        data_context: FinancialDataContext,
-        transaction_repo: TransactionRepository,
-        budget_repo: BudgetRepository,
-        debt_repo: DebtRepository,
-        profile_repo: ProfileRepository,
-        insight_repo: InsightRepository,
+        planilha_manager: PlanilhaManager,
     ) -> None:
         self.llm_orchestrator = llm_orchestrator
 
@@ -60,13 +48,11 @@ class AgnoAgent(AgentRunner):
         # 3. Carrega as ferramentas customizadas (Com filtro Essential se for Groq)
         is_groq = active_provider == "groq"
         tools_custom = load_all_financial_tools(
-            data_context=data_context,
-            transaction_repo=transaction_repo,
-            budget_repo=budget_repo,
-            debt_repo=debt_repo,
-            profile_repo=profile_repo,
-            insight_repo=insight_repo,
-            essential_only=is_groq,  # Filtra se for Groq para evitar Rate Limit (TPM)
+            manager=planilha_manager,
+            memory_service=None,  # Agno manages history differently
+            config_service=None,
+            llm_orchestrator=self.llm_orchestrator,
+            essential_only=is_groq,
         )
 
         # 4. ADAPTOR: Converte BaseTool -> Agno Functions
@@ -82,7 +68,8 @@ class AgnoAgent(AgentRunner):
 
                 # Usa o modelo ativo do orchestrator ou um default do Groq
                 model_id = (
-                    self.llm_orchestrator.active_model_name or config.LLMModels.DEFAULT_GROQ
+                    self.llm_orchestrator.active_model_name
+                    or config.LLMModels.DEFAULT_GROQ
                 )
                 self.model = Groq(id=model_id)
             except ImportError:
@@ -93,11 +80,16 @@ class AgnoAgent(AgentRunner):
                 self.model = Gemini(id=config.LLMModels.DEFAULT_GEMINI)
         elif active_provider == "gemini":
             # Gemini Nativo
-            model_id = self.llm_orchestrator.active_model_name or config.LLMModels.DEFAULT_GEMINI
+            model_id = (
+                self.llm_orchestrator.active_model_name
+                or config.LLMModels.DEFAULT_GEMINI
+            )
             self.model = Gemini(id=model_id)
         else:
             # Default fallback for unknown -> Gemini
-            logger.warning(f"Provider '{active_provider}' não específico. Usando Gemini.")
+            logger.warning(
+                f"Provider '{active_provider}' não específico. Usando Gemini."
+            )
             model_id = config.LLMModels.DEFAULT_GEMINI
             self.model = Gemini(id=model_id)
 

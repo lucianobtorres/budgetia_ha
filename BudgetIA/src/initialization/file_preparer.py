@@ -9,14 +9,15 @@ from gspread_dataframe import get_as_dataframe
 
 # Importa do núcleo do sistema
 import config
+from core.logger import get_logger
 from finance.storage.google_drive_handler import GoogleDriveFileHandler
 from finance.storage.google_sheets_storage_handler import GoogleSheetsStorageHandler
-from core.logger import get_logger
 
 # O arquivo temporário que o StrategyGenerator usará
 TEMP_ANALYSIS_FILE = Path(config.DATA_DIR) / "temp_analysis_file.xlsx"
 
 logger = get_logger("FilePreparer")
+
 
 class FileAnalysisPreparer:
     """
@@ -121,9 +122,7 @@ class FileAnalysisPreparer:
                     f"Tipo de arquivo inseguro ou inválido detectado: {mime_type}"
                 )
 
-            logger.debug(
-                f"--- Verificação de arquivo OK. MIME: {mime_type} ---"
-            )
+            logger.debug(f"--- Verificação de arquivo OK. MIME: {mime_type} ---")
 
         except Exception as e:
             # Se falhar, limpa o temporário (se houver) e levanta o erro

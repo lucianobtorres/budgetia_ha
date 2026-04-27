@@ -28,9 +28,10 @@ export function LoginForm({ onLogin }: LoginFormProps) {
         try {
             const data = await AuthService.login(username, password);
             onLogin(data.user.username);
-        } catch (err: any) {
+        } catch (err: unknown) {
+            const errorObj = err as { message?: string };
             console.error(err);
-            setError(err.message || "Erro de conexão com o servidor.");
+            setError(errorObj.message || "Erro de conexão com o servidor.");
         } finally {
             setLoading(false);
         }

@@ -1,37 +1,46 @@
 from typing import Any
-import pandas as pd
-from fastapi import APIRouter, Depends, HTTPException, Body
-from interfaces.api.dependencies import get_planilha_manager, get_user_config_service, get_onboarding_orchestrator
-from finance.planilha_manager import PlanilhaManager
-from core.user_config_service import UserConfigService
+
+from fastapi import APIRouter, Body, Depends, HTTPException
+
+from config import PROFILE_DESIRED_FIELDS
 from core.google_auth_service import GoogleAuthService
-from config import NomesAbas, PROFILE_DESIRED_FIELDS, ColunasPerfil
+from core.user_config_service import UserConfigService
+from finance.planilha_manager import PlanilhaManager
+from interfaces.api.dependencies import (
+    get_onboarding_orchestrator,
+    get_planilha_manager,
+    get_user_config_service,
+)
+from interfaces.api.schemas.profile import ProfileItemSchema
 
 router = APIRouter(prefix="/profile", tags=["Perfil"])
 
+
 @router.get("/")
 def get_profile(
-    manager: PlanilhaManager = Depends(get_planilha_manager)
-) -> list[dict[str, Any]]:
+    manager: PlanilhaManager = Depends(get_planilha_manager),
+) -> list[ProfileItemSchema]:
     """
     Retorna os dados do perfil financeiro.
     """
     try:
-        manager.ensure_profile_fields(PROFILE_DESIRED_FIELDS)
-        df = manager.visualizar_dados(NomesAbas.PERFIL_FINANCEIRO)
-        if df is None or df.empty:
-            return []
-        
-        # Sanitização simples para JSON
-        df = df.fillna("")
-        return df.to_dict(orient="records") # type: ignore[no-any-return]
+        # Usa o repositório via manager para garantir campos básicos
+        manager.profile_repo.ensure_fields(PROFILE_DESIRED_FIELDS)
+
+        # Usa o Caso de Uso
+        user_profile = manager.get_profile_use_case.execute()
+
+        # Converte Entidade -> Lista de Schemas (formato esperado pelo front)
+        records = user_profile.to_excel_list()
+        return [ProfileItemSchema(**rec) for rec in records]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.put("/bulk")
 def update_profile_bulk(
     itens: list[dict[str, Any]] = Body(...),
-    manager: PlanilhaManager = Depends(get_planilha_manager)
+    manager: PlanilhaManager = Depends(get_planilha_manager),
 ) -> dict[str, str]:
     """
     Atualiza o perfil.
@@ -39,40 +48,42 @@ def update_profile_bulk(
     try:
         if not itens:
             return {"message": "Nenhuma alteração enviada."}
-            
+
         with manager.lock_file(timeout_seconds=30):
             manager.refresh_data()
-            df_new = pd.DataFrame(itens)
-            
-            # Limpeza essencial
-            if ColunasPerfil.CAMPO in df_new.columns:
-                df_new = df_new.dropna(subset=[ColunasPerfil.CAMPO])
-            
-            manager.update_dataframe(NomesAbas.PERFIL_FINANCEIRO, df_new)
+
+            # Converte lista de dicts (Campo/Valor) em um único dict para o Use Case
+            updates = {
+                item["Campo"]: item["Valor"] for item in itens if "Campo" in item
+            }
+
+            manager.update_profile_use_case.execute(updates)
             manager.save()
-        
+
         return {"message": "Perfil atualizado com sucesso."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao atualizar perfil: {e}")
 
+
 # --- MEMORY (BRAIN) ENDPOINTS ---
-from core.memory.memory_service import MemoryService
-from interfaces.api.dependencies import get_memory_service
+from core.memory.memory_service import MemoryService  # noqa: E402
+from interfaces.api.dependencies import get_memory_service  # noqa: E402
+
 
 @router.get("/memory")
 def get_memory_facts(
-    service: MemoryService = Depends(get_memory_service)
+    service: MemoryService = Depends(get_memory_service),
 ) -> list[dict[str, Any]]:
     """Retorna fatos aprendidos pela IA."""
     try:
-        return service._load_memory() # type: ignore[no-any-return]
+        return service._load_memory()  # type: ignore[no-any-return]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.delete("/memory/{fact_content}")
 def delete_memory_fact(
-    fact_content: str,
-    service: MemoryService = Depends(get_memory_service)
+    fact_content: str, service: MemoryService = Depends(get_memory_service)
 ) -> dict[str, str]:
     """Esquece um fato específico."""
     try:
@@ -83,24 +94,26 @@ def delete_memory_fact(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 # --- RULES (WATCHDOG) ENDPOINTS ---
-from application.notifications.rule_repository import RuleRepository
-from interfaces.api.dependencies import get_rule_repository
+from application.notifications.rule_repository import RuleRepository  # noqa: E402
+from interfaces.api.dependencies import get_rule_repository  # noqa: E402
+
 
 @router.get("/rules")
 def get_watchdog_rules(
-    repo: RuleRepository = Depends(get_rule_repository)
+    repo: RuleRepository = Depends(get_rule_repository),
 ) -> list[dict[str, Any]]:
     """Retorna regras ativas de monitoramento."""
     try:
-        return repo._load_rules_data() # type: ignore[no-any-return]
+        return repo._load_rules_data()  # type: ignore[no-any-return]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.delete("/rules/{rule_id}")
 def delete_watchdog_rule(
-    rule_id: str,
-    repo: RuleRepository = Depends(get_rule_repository)
+    rule_id: str, repo: RuleRepository = Depends(get_rule_repository)
 ) -> dict[str, str]:
     """Remove uma regra de monitoramento."""
     try:
@@ -109,16 +122,17 @@ def delete_watchdog_rule(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.post("/reset")
 def reset_account(
     fast_track: bool = Body(False, embed=True),
     config_service: UserConfigService = Depends(get_user_config_service),
     # Injetamos o Orchestrator para garantir que o estado em memória seja limpo também
-    orchestrator: Any = Depends(get_onboarding_orchestrator)
+    orchestrator: Any = Depends(get_onboarding_orchestrator),
 ) -> dict[str, str]:
     """
     ZONA DE PERIGO: Reseta a conta do usuário.
-    
+
     Args:
         fast_track (bool): Se True, define o status para SPREADSHEET_ACQUISITION,
                            pulando a introdução (Welcome).
@@ -126,48 +140,49 @@ def reset_account(
     try:
         # 1. Reseta o arquivo físico
         config_service.clear_config()
-        
+
         # 2. Reseta o estado em memória do Orquestrador (CRÍTICO para evitar 'zombie state')
         orchestrator.reset_config()
-        
+
         # Define o estado inicial para evitar que o app fique 'zumbi'
         # Se for fast_track, vai para aquisição. Se não, vai para WELCOME.
         target_state = "SPREADSHEET_ACQUISITION" if fast_track else "WELCOME"
-        
+
         # Salva o estado tanto na chave antiga quanto na nova (por compatibilidade)
         from initialization.onboarding.state_machine import OnboardingState
-        
+
         # Garante que salvamos corretamente
         data = config_service.load_config()
         data["onboarding_state"] = target_state
-        data["onboarding_status"] = target_state # Orchestrator usa essa!
+        data["onboarding_status"] = target_state  # Orchestrator usa essa!
         config_service.save_config(data)
-        
+
         # Força o orchestrator a carregar esse novo estado
-        orchestrator.state_machine.transition_to(
-            OnboardingState[target_state]
-        )
+        orchestrator.state_machine.transition_to(OnboardingState[target_state])
 
         return {"message": "Conta resetada com sucesso.", "next_state": target_state}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 # --- COMMUNICATION SETTINGS ENDPOINTS ---
+
 
 @router.get("/settings/communication")
 def get_communication_settings(
-    config_service: UserConfigService = Depends(get_user_config_service)
+    config_service: UserConfigService = Depends(get_user_config_service),
 ) -> dict[str, Any]:
     """Retorna as configurações de comunicação (Telegram, Whatsapp, etc)."""
     try:
-        return config_service.get_comunicacao_config() # type: ignore[no-any-return]
+        return config_service.get_comunicacao_config()  # type: ignore[no-any-return]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.post("/settings/communication")
 def update_communication_settings(
     settings: dict[str, Any] = Body(...),
-    config_service: UserConfigService = Depends(get_user_config_service)
+    config_service: UserConfigService = Depends(get_user_config_service),
 ) -> dict[str, str]:
     """
     Atualiza as configurações de comunicação.
@@ -178,22 +193,24 @@ def update_communication_settings(
         current = config_service.load_config()
         if "comunicacao" not in current:
             current["comunicacao"] = {}
-        
+
         # Atualiza campos
         for key, value in settings.items():
             current["comunicacao"][key] = value
-            
+
         # Salva
         config_service.save_config(current)
         return {"message": "Configurações de comunicação atualizadas."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 # --- GOOGLE DRIVE SETTINGS ENDPOINTS ---
+
 
 @router.get("/settings/google-drive")
 def get_google_drive_status(
-    config_service: UserConfigService = Depends(get_user_config_service)
+    config_service: UserConfigService = Depends(get_user_config_service),
 ) -> dict[str, Any]:
     """Retorna status da conexão e consentimento do Google Drive."""
     try:
@@ -207,26 +224,29 @@ def get_google_drive_status(
             "has_credentials": bool(credentials),
             "backend_consent": has_consent,
             "is_google_sheet": bool(is_google_sheet),
-            "planilha_path": planilha_path
+            "planilha_path": planilha_path,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.post("/settings/google-drive/share")
 def share_google_drive(
-    config_service: UserConfigService = Depends(get_user_config_service)
+    config_service: UserConfigService = Depends(get_user_config_service),
 ) -> dict[str, str]:
     """Habilita recursos de backend (compartilha planilha)."""
     try:
         auth_service = GoogleAuthService(config_service)
         planilha_path = config_service.get_planilha_path()
-        
+
         if not planilha_path or "docs.google.com" not in planilha_path:
-            raise HTTPException(status_code=400, detail="Planilha atual não é Google Sheets.")
-            
+            raise HTTPException(
+                status_code=400, detail="Planilha atual não é Google Sheets."
+            )
+
         file_id = auth_service._extract_file_id_from_url(planilha_path)
         if not file_id:
-             raise HTTPException(status_code=400, detail="ID do arquivo não encontrado.")
+            raise HTTPException(status_code=400, detail="ID do arquivo não encontrado.")
 
         success, msg = auth_service.share_file_with_service_account(file_id)
         if success:
@@ -234,29 +254,30 @@ def share_google_drive(
             return {"message": f"Habilitado! {msg}"}
         else:
             raise HTTPException(status_code=500, detail=msg)
-            
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.post("/settings/google-drive/revoke")
 def revoke_google_drive(
-    config_service: UserConfigService = Depends(get_user_config_service)
+    config_service: UserConfigService = Depends(get_user_config_service),
 ) -> dict[str, str]:
     """Desabilita recursos de backend (revoga compartilhamento)."""
     try:
         auth_service = GoogleAuthService(config_service)
         planilha_path = config_service.get_planilha_path()
-        
+
         if not planilha_path:
-             # Se não tem planilha, apenas remove consentimento
-             config_service.save_backend_consent(False)
-             return {"message": "Desabilitado."}
-             
+            # Se não tem planilha, apenas remove consentimento
+            config_service.save_backend_consent(False)
+            return {"message": "Desabilitado."}
+
         file_id = auth_service._extract_file_id_from_url(planilha_path)
         if file_id:
-             # Tenta revogar, mas se falhar (ex: usuario ja removeu manual), nao deve impedir
-             auth_service.revoke_file_sharing_from_service_account(file_id)
-        
+            # Tenta revogar, mas se falhar (ex: usuario ja removeu manual), nao deve impedir
+            auth_service.revoke_file_sharing_from_service_account(file_id)
+
         config_service.save_backend_consent(False)
         return {"message": "Desabilitado recursos de backend."}
 

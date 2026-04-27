@@ -65,7 +65,7 @@ export function MemoryTab({ facts, onDelete }: Props) {
                                     {/* Debug Metadata (Optional: remove later) */}
                                     {fact.metadata?.expected_day_of_week && (
                                          <p className="mt-1 text-[10px] text-gray-500">
-                                            Previsto: {fact.metadata.expected_day_of_week} (~R${fact.metadata.avg_amount})
+                                            Previsto: {String(fact.metadata.expected_day_of_week)} (~R${String(fact.metadata.avg_amount)})
                                          </p>
                                     )}
                                 </div>

@@ -1,39 +1,45 @@
-import redis
 import hashlib
 from contextlib import contextmanager
+
+import redis
+
 from config import UPSTASH_REDIS_URL
 from core.logger import get_logger
 
 logger = get_logger("LockManager")
 
+
 class RedisLockManager:
     """
-    Gerencia locks distribuídos usando Redis para garantir exclusividade 
+    Gerencia locks distribuídos usando Redis para garantir exclusividade
     no acesso aos arquivos Excel em ambientes multi-processo.
     """
+
     _client = None
 
     @classmethod
     def get_client(cls):
-         if cls._client is None:
-             if UPSTASH_REDIS_URL and (
-                 UPSTASH_REDIS_URL.startswith("redis://") or 
-                 UPSTASH_REDIS_URL.startswith("rediss://") or 
-                 UPSTASH_REDIS_URL.startswith("unix://")
-             ):
-                 # Ensure protocol compatibility if necessary
-                 url = UPSTASH_REDIS_URL
-                 if url.startswith("redis://") and "upstash" in url:
-                      url = url.replace("redis://", "rediss://")
-                 
-                 try:
+        if cls._client is None:
+            if UPSTASH_REDIS_URL and (
+                UPSTASH_REDIS_URL.startswith("redis://")
+                or UPSTASH_REDIS_URL.startswith("rediss://")
+                or UPSTASH_REDIS_URL.startswith("unix://")
+            ):
+                # Ensure protocol compatibility if necessary
+                url = UPSTASH_REDIS_URL
+                if url.startswith("redis://") and "upstash" in url:
+                    url = url.replace("redis://", "rediss://")
+
+                try:
                     cls._client = redis.from_url(url, decode_responses=False)
-                 except Exception as e:
+                except Exception as e:
                     logger.warning(f"Falha ao conectar Redis Cache: {e}")
                     cls._client = None
-             else:
-                 logger.warning("UPSTASH_REDIS_URL inválida ou não configurada. Locks distribuídos DESATIVADOS.")
-         return cls._client
+            else:
+                logger.warning(
+                    "UPSTASH_REDIS_URL inválida ou não configurada. Locks distribuídos DESATIVADOS."
+                )
+        return cls._client
 
     def __init__(self, resource_id: str):
         """
@@ -60,15 +66,15 @@ class RedisLockManager:
             return
 
         lock = self.client.lock(
-            self.lock_name, 
-            timeout=timeout_seconds,
-            blocking_timeout=blocking_timeout
+            self.lock_name, timeout=timeout_seconds, blocking_timeout=blocking_timeout
         )
-        
+
         acquired = lock.acquire()
         if not acquired:
-            raise TimeoutError(f"Não foi possível adquirir o lock para {self.lock_name} após {blocking_timeout}s")
-        
+            raise TimeoutError(
+                f"Não foi possível adquirir o lock para {self.lock_name} após {blocking_timeout}s"
+            )
+
         try:
             yield lock
         finally:

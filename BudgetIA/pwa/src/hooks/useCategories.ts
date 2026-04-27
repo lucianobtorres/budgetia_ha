@@ -1,25 +1,47 @@
-import { useQuery } from '@tanstack/react-query';
-import { fetchAPI } from '../services/api';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { ApiCategoryRepository } from '../infrastructure/repositories/ApiCategoryRepository';
+import type { CategoryCreate } from '../types/api';
 
-export interface Category {
-    name: string;
-    type: string;
-    icon: string;
-    tags: string;
-}
+const categoryRepo = new ApiCategoryRepository();
 
 export function useCategories() {
-    const query = useQuery({
+    return useQuery({
         queryKey: ['categories'],
-        queryFn: () => fetchAPI('/categories/') as Promise<Category[]>,
+        queryFn: () => categoryRepo.list(),
         staleTime: 1000 * 60 * 5, // 5 minutes
     });
+}
 
-    return {
-        categories: query.data || [],
-        isLoading: query.isLoading,
-        isError: query.isError,
-        error: query.error,
-        refetch: query.refetch
-    };
+export function useCreateCategory() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (data: CategoryCreate) => categoryRepo.create(data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['categories'] });
+        },
+    });
+}
+
+export function useUpdateCategory() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ oldName, payload }: { oldName: string; payload: CategoryCreate }) => 
+            categoryRepo.update(oldName, payload),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['categories'] });
+            queryClient.invalidateQueries({ queryKey: ['transactions'] });
+            queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+        },
+    });
+}
+
+export function useDeleteCategory() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (name: string) => categoryRepo.delete(name),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['categories'] });
+            queryClient.invalidateQueries({ queryKey: ['transactions'] });
+        },
+    });
 }

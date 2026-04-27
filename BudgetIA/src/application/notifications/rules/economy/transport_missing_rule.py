@@ -5,15 +5,15 @@ from typing import Any
 import pandas as pd
 
 import config
-from core.logger import get_logger
 from application.notifications.models.notification_message import NotificationPriority
+from core.logger import get_logger
 
 logger = get_logger("TransportMissingRule")
-from application.notifications.models.rule_result import RuleResult
-from application.notifications.rules.base_rule import IFinancialRule
+from application.notifications.models.rule_result import RuleResult  # noqa: E402
+from application.notifications.rules.base_rule import IFinancialRule  # noqa: E402
 
 
-class TransportMissingRule(IFinancialRule): # type: ignore[misc]
+class TransportMissingRule(IFinancialRule):  # type: ignore[misc]
     """
     Regra: Detecta se o usuário não registrou despesas de transporte
     nos últimos N dias (configurável).

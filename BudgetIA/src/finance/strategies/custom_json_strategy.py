@@ -5,11 +5,11 @@ from typing import Any
 import pandas as pd
 
 import config
-from core.logger import get_logger
 from config import (
     ColunasTransacoes,
     ValoresTipo,
 )
+from core.logger import get_logger
 
 from .base_strategy import BaseMappingStrategy
 

@@ -45,9 +45,8 @@ export default function Profile() {
             a.click();
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
-        } catch (error) {
+        } catch {
             toast.error('Erro ao exportar arquivo.');
-            console.error(error);
         }
     };
 
@@ -84,7 +83,7 @@ export default function Profile() {
                 <SegmentedControl 
                     options={tabs.map(t => ({ id: t.id, label: t.label, icon: t.icon, activeColor: t.color }))}
                     value={activeTab}
-                    onChange={(val) => setActiveTab(val as any)}
+                    onChange={(val) => setActiveTab(val as typeof activeTab)}
                 />
             </div>
 
@@ -101,6 +100,7 @@ export default function Profile() {
                         <div className="max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
                             {activeTab === 'profile' && (
                                 <ProfileDataTab 
+                                    key={profileData.length}
                                     data={profileData} 
                                     onSave={saveProfile} 
                                     isSaving={isSaving} 

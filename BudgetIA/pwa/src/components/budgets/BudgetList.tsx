@@ -1,4 +1,4 @@
-import type { Budget } from '../../types/domain';
+import type { Budget } from '../../domain/models/Budget';
 import { ProgressListItem } from '../ui/ProgressListItem';
 
 interface Props {
@@ -32,23 +32,23 @@ export function BudgetList({
     return (
         <div className="space-y-2">
             {budgets.map((budget, idx) => {
-                const isHighlighted = (highlightCategory && budget.Categoria === highlightCategory) || 
-                                      (highlightId && budget["ID Orcamento"] === highlightId);
+                const isHighlighted = (highlightCategory && budget.category === highlightCategory) || 
+                                      (highlightId && budget.id === highlightId);
                 
                 return (
                     <div 
                         key={idx} 
-                        ref={el => registerRef(budget.Categoria, el)}
+                        ref={el => registerRef(budget.category, el)}
                         className={`transition-colors rounded-xl ${isHighlighted ? 'bg-white/10 ring-1 ring-white/20' : ''}`}
                     >
                         <ProgressListItem
-                            title={budget.Categoria}
-                            subtitle={budget['Período Orçamento']}
-                            color={getCategoryColor(budget.Categoria)}
-                            value={budget['Valor Gasto Atual'] || 0}
-                            limit={budget['Valor Limite'] || 0}
+                            title={budget.category}
+                            subtitle={budget.period}
+                            color={getCategoryColor(budget.category)}
+                            value={budget.currentSpent || 0}
+                            limit={budget.limitValue || 0}
                             onEdit={() => onEdit(budget)}
-                            onDelete={() => budget["ID Orcamento"] && onDelete(budget["ID Orcamento"])}
+                            onDelete={() => budget.id && onDelete(budget.id)}
                         />
                     </div>
                 )

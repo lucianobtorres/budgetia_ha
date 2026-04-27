@@ -7,6 +7,7 @@ from core.logger import get_logger
 
 logger = get_logger("LLM_Provider")
 
+
 class LLMProvider(ABC):
     """
     Interface abstrata para qualquer provedor de Large Language Model.

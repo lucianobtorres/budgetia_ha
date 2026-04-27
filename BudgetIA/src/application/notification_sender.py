@@ -1,5 +1,6 @@
 # src/app/notification_sender.py
 from telegram import Bot
+
 from core.logger import get_logger
 
 logger = get_logger("TelegramSender")
@@ -25,9 +26,7 @@ class TelegramSender:
             return False
 
         try:
-            logger.info(
-                f"Enviando: '{message_text}' para o chat_id: {chat_id}"
-            )
+            logger.info(f"Enviando: '{message_text}' para o chat_id: {chat_id}")
             await self.bot.send_message(chat_id=chat_id, text=message_text)
             logger.info("Mensagem enviada com sucesso.")
             return True

@@ -15,22 +15,26 @@ logger = get_logger("UserConfigService")
 # Variável Global para o Singleton do Fernet (Carregamento Lazy)
 _FERNET_INSTANCE: Fernet | None = None
 
+
 def _get_fernet() -> Fernet:
     """Carrega o FERNET sob demanda (Lazy Loading)."""
     global _FERNET_INSTANCE
-    
+
     if _FERNET_INSTANCE:
         return _FERNET_INSTANCE
 
     # Tenta obter a chave do ambiente
     key_str = os.getenv("USER_DATA_ENCRYPTION_KEY")
-    
+
     # Se não encontrar, tenta forçar o carregamento do .env via config (se ainda não rolou)
     if not key_str:
         # Apenas um 'touch' no config para garantir que ele rodou (ele roda no import, mas vai que...)
         # Na verdade, se chegamos aqui, config já deveria ter rodado.
-        logger.warning("USER_DATA_ENCRYPTION_KEY não encontrada no env. Tentando reload do .env...")
+        logger.warning(
+            "USER_DATA_ENCRYPTION_KEY não encontrada no env. Tentando reload do .env..."
+        )
         from dotenv import load_dotenv
+
         # Recalcula path do .env (mesma logica do config.py)
         root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
         dotenv_path = os.path.join(root, ".env")
@@ -103,20 +107,22 @@ class UserConfigService:
     def load_config(self) -> dict[str, Any]:
         """Carrega a configuração do arquivo JSON deste usuário (L1 Cached)."""
         cache_key = self.username
-        
+
         # 1. Verifica existência física
         if not self.config_file_path.exists():
             return {}
-            
+
         try:
             current_mtime = self.config_file_path.stat().st_mtime
-            
+
             # 2. Check Cache
             if cache_key in self._CONFIG_CACHE:
                 cached_mtime = self._CONFIG_MTIME_CACHE.get(cache_key, 0)
                 if current_mtime == cached_mtime:
                     # Cache Hit
-                    return self._CONFIG_CACHE[cache_key].copy() # Return copy to prevent mutation bugs
+                    return self._CONFIG_CACHE[
+                        cache_key
+                    ].copy()  # Return copy to prevent mutation bugs
 
             # 3. Cache Miss (Load from Disk)
             with open(self.config_file_path, "rb") as f:
@@ -151,18 +157,20 @@ class UserConfigService:
             # Write to disk
             with open(self.config_file_path, "wb") as f:
                 f.write(encrypted_data)
-            
+
             # Update Cache immediately (Optimistic UI style)
             # We need to update mtime too, but FS mtime might lag slightly or be precise.
-            # Best to reload mtime or set it explicitly? 
+            # Best to reload mtime or set it explicitly?
             # Let's just update cache content. Next load_config will check mtime.
-            # If filesystem is slow, mtime check might see "old" mtime and trigger reload. 
+            # If filesystem is slow, mtime check might see "old" mtime and trigger reload.
             # To be safe, we update the cache content so subsequent calls *in same request* use it.
             self._CONFIG_CACHE[self.username] = config_data.copy()
             # Force mtime update to avoid immediate reload if stat() is fast
             if self.config_file_path.exists():
-                 self._CONFIG_MTIME_CACHE[self.username] = self.config_file_path.stat().st_mtime
-            
+                self._CONFIG_MTIME_CACHE[self.username] = (
+                    self.config_file_path.stat().st_mtime
+                )
+
         except OSError as e:
             logger.error(f"Erro ao salvar config do usuário {self.username}: {e}")
 
@@ -191,21 +199,21 @@ class UserConfigService:
 
         file_exists = Path(path_str).is_file()
         # logger.debug(f"Arquivo local: '{path_str}' | Existe: {file_exists}")
-        
+
         if file_exists:
             return str(path_str)
 
         # O caminho salvo é inválido, vamos limpar
-        logger.warning(f"Arquivo não existe! Removendo do config.")
+        logger.warning("Arquivo não existe! Removendo do config.")
         config_data.pop(config.PLANILHA_KEY, None)
         self.save_config(config_data)
-        
+
         # Última tentativa: ENV
         env_path = os.getenv("PLANILHA_PATH")
         if env_path:
-             logger.warning(f"Usando Fallback ENV após falha local: {env_path}")
-             return env_path
-             
+            logger.warning(f"Usando Fallback ENV após falha local: {env_path}")
+            return env_path
+
         return None
 
     def save_planilha_path(self, path_str: str) -> None:
@@ -219,7 +227,7 @@ class UserConfigService:
         config_data.pop("pending_planilha_path", None)
         # logger.debug(f"Config depois: PLANILHA_KEY='{config.PLANILHA_KEY}' -> '{config_data.get(config.PLANILHA_KEY)}'")
         self.save_config(config_data)
-        logger.info(f"save_config() concluído")
+        logger.info("save_config() concluído")
 
     def get_mapeamento(self) -> dict[str, Any] | None:
         config_data = self.load_config()
@@ -245,7 +253,6 @@ class UserConfigService:
         config_data["pending_planilha_path"] = path_str
         self.save_config(config_data)
 
-
     def get_onboarding_state(self) -> str | None:
         config_data = self.load_config()
         return config_data.get("onboarding_state")
@@ -260,7 +267,6 @@ class UserConfigService:
         config_data = self.load_config()
         config_data["onboarding_state"] = state
         self.save_config(config_data)
-
 
     def save_google_oauth_tokens(self, token_json_str: str | None) -> None:
         """Salva os tokens OAuth 2.0 do usuário (como JSON string) no config."""
@@ -290,9 +296,7 @@ class UserConfigService:
         Reseta o *onboarding da planilha*, mas MANTÉM as
         configurações de identidade do usuário (ex: tokens do Google).
         """
-        logger.debug(
-            f"Resetando (clear) config da planilha para {self.username}"
-        )
+        logger.debug(f"Resetando (clear) config da planilha para {self.username}")
 
         # 1. Carrega a configuração atual
         config_data = self.load_config()
@@ -332,9 +336,7 @@ class UserConfigService:
         # Só salva se o valor for novo, para evitar escritas desnecessárias
         if config_data["comunicacao"].get(field_name) != value:
             config_data["comunicacao"][field_name] = value
-            logger.debug(
-                f"Salvando '{field_name}' ({value}) para {self.username}"
-            )
+            logger.debug(f"Salvando '{field_name}' ({value}) para {self.username}")
             self.save_config(config_data)
 
     def get_comunicacao_config(self) -> dict[str, Any]:

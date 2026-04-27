@@ -3,15 +3,15 @@ from typing import Any
 import pandas as pd
 
 import config
-from core.logger import get_logger
 from application.notifications.models.notification_message import NotificationPriority
+from core.logger import get_logger
 
 logger = get_logger("BudgetOverrunRule")
-from application.notifications.models.rule_result import RuleResult
-from application.notifications.rules.base_rule import IFinancialRule
+from application.notifications.models.rule_result import RuleResult  # noqa: E402
+from application.notifications.rules.base_rule import IFinancialRule  # noqa: E402
 
 
-class BudgetOverrunRule(IFinancialRule): # type: ignore[misc]
+class BudgetOverrunRule(IFinancialRule):  # type: ignore[misc]
     """
     Regra: Detecta se alguma categoria excedeu X% do orçamento definido.
     """
@@ -36,7 +36,9 @@ class BudgetOverrunRule(IFinancialRule): # type: ignore[misc]
         """
         Verifica orçamentos estourados ou próximos de estourar.
         """
-        logger.debug(f"Verificando orçamentos acima de {self.threshold_percent*100}%...")
+        logger.debug(
+            f"Verificando orçamentos acima de {self.threshold_percent * 100}%..."
+        )
 
         if budgets_df.empty:
             logger.warning("Tabela de orçamentos vazia.")
@@ -48,7 +50,7 @@ class BudgetOverrunRule(IFinancialRule): # type: ignore[misc]
             config.ColunasOrcamentos.LIMITE,
             config.ColunasOrcamentos.GASTO,
         ]
-        
+
         # Verifica colunas (case insensitive ou mapeamento direto se possível)
         # Assumindo que o DataFrame venha com os nomes corretos do config
         for col in required_cols:
@@ -61,9 +63,17 @@ class BudgetOverrunRule(IFinancialRule): # type: ignore[misc]
         for _, row in budgets_df.iterrows():
             categoria = row[config.ColunasOrcamentos.CATEGORIA]
             # LIMITE = Estimado
-            estimado = float(row[config.ColunasOrcamentos.LIMITE]) if pd.notnull(row[config.ColunasOrcamentos.LIMITE]) else 0.0
+            estimado = (
+                float(row[config.ColunasOrcamentos.LIMITE])
+                if pd.notnull(row[config.ColunasOrcamentos.LIMITE])
+                else 0.0
+            )
             # GASTO = Realizado
-            realizado = float(row[config.ColunasOrcamentos.GASTO]) if pd.notnull(row[config.ColunasOrcamentos.GASTO]) else 0.0
+            realizado = (
+                float(row[config.ColunasOrcamentos.GASTO])
+                if pd.notnull(row[config.ColunasOrcamentos.GASTO])
+                else 0.0
+            )
 
             if estimado <= 0:
                 continue
@@ -72,14 +82,10 @@ class BudgetOverrunRule(IFinancialRule): # type: ignore[misc]
 
             if percent_used >= self.threshold_percent:
                 if percent_used > 1.0:
-                    status = "ESTOURADO"
-                    priority = NotificationPriority.HIGH
-                    msg = f"URGENTE: Você estourou o orçamento de *{categoria}*! ({percent_used*100:.1f}%)"
+                    msg = f"URGENTE: Você estourou o orçamento de *{categoria}*! ({percent_used * 100:.1f}%)"
                 else:
-                    status = "ALERTA"
-                    priority = NotificationPriority.MEDIUM
-                    msg = f"Atenção: Você já usou {percent_used*100:.1f}% do orçamento de *{categoria}*."
-                
+                    msg = f"Atenção: Você já usou {percent_used * 100:.1f}% do orçamento de *{categoria}*."
+
                 alerts.append(msg)
 
         if alerts:
@@ -88,8 +94,8 @@ class BudgetOverrunRule(IFinancialRule): # type: ignore[misc]
             return RuleResult(
                 triggered=True,
                 message_template=full_msg,
-                priority=NotificationPriority.HIGH, # Pega a maior prioridade (simplificação)
-                category="budget_alert"
+                priority=NotificationPriority.HIGH,  # Pega a maior prioridade (simplificação)
+                category="budget_alert",
             )
 
         return RuleResult(triggered=False)

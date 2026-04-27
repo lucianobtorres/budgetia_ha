@@ -1,9 +1,10 @@
+/// <reference lib="webworker" />
+
 import { cleanupOutdatedCaches, precacheAndRoute } from 'workbox-precaching'
 import { clientsClaim } from 'workbox-core'
 
 // --- Workbox Standard Configuration ---
-// Declare self as any to allow Service Worker properties without strict lib checks
-declare const self: any;
+declare const self: ServiceWorkerGlobalScope & { __WB_MANIFEST: unknown };
 
 self.skipWaiting()
 clientsClaim()
@@ -15,7 +16,7 @@ cleanupOutdatedCaches()
 // --- Push Notification Logic ---
 
 // 1. Listen for Push Event
-self.addEventListener('push', (event: any) => {
+self.addEventListener('push', (event: PushEvent) => {
   if (!event.data) return
 
   try {
@@ -38,7 +39,7 @@ self.addEventListener('push', (event: any) => {
 })
 
 // 2. Handle Notification Click
-self.addEventListener('notificationclick', (event: any) => {
+self.addEventListener('notificationclick', (event: NotificationEvent) => {
   event.notification.close() // Close the notification
 
   // Open the app or focus if already open
@@ -48,12 +49,14 @@ self.addEventListener('notificationclick', (event: any) => {
     self.clients.matchAll({
       type: 'window',
       includeUncontrolled: true
-    }).then((clientList: any) => {
+    }).then((clientList: readonly Client[]) => {
       // If a window is already open, focus it
       for (const client of clientList) {
-        if (client.url === urlToOpen && 'focus' in client) {
-          return client.focus()
-        }
+          const windowClient = client as WindowClient;
+          // check for url match using the windowClient's url property
+          if (windowClient.url.includes(urlToOpen) && 'focus' in windowClient) {
+              return windowClient.focus();
+          }
       }
       // Otherwise open new window
       if (self.clients.openWindow) {

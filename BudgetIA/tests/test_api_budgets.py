@@ -1,10 +1,8 @@
 import requests
-import json
-import pandas as pd
-from src.config import NomesAbas, ColunasOrcamentos
 
 BASE_URL = "http://127.0.0.1:8000"
 HEADERS = {"X-User-Id": "jsmith"}
+
 
 def test_api():
     print("Testing /budgets ...")
@@ -38,6 +36,7 @@ def test_api():
             print(f"Error {r.status_code}: {r.text}")
     except Exception as e:
         print(f"Connection failed: {e}")
+
 
 if __name__ == "__main__":
     test_api()

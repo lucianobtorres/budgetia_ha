@@ -1,29 +1,24 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { User, LogOut, Save } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { GlassCard } from '../ui/GlassCard';
 import { GradientBanner } from '../ui/GradientBanner';
-import type { ProfileItem } from '../../hooks/useProfile';
+import type { ProfileItem } from '../../domain/models/Profile';
 
 interface Props {
     data: ProfileItem[];
-    onSave: (data: ProfileItem[]) => Promise<any>;
+    onSave: (data: ProfileItem[]) => Promise<void>;
     isSaving: boolean;
 }
 
 export function ProfileDataTab({ data, onSave, isSaving }: Props) {
-    const [formData, setFormData] = useState<ProfileItem[]>([]);
-
-    useEffect(() => {
-        if (data && data.length > 0) {
-            setFormData(data);
-        }
-    }, [data]);
+    // Initialize state with props. Component should be re-mounted (using key) if initial data changes.
+    const [formData, setFormData] = useState<ProfileItem[]>(data);
 
     const handleEdit = (index: number, value: string) => {
         const newData = [...formData];
-        newData[index] = { ...newData[index], Valor: value };
+        newData[index] = { ...newData[index], value: value };
         setFormData(newData);
     };
 
@@ -40,10 +35,11 @@ export function ProfileDataTab({ data, onSave, isSaving }: Props) {
                 {formData.map((item, idx) => (
                     <div key={idx} className="p-4 hover:bg-surface-hover/80 transition-colors flex flex-col md:flex-row md:items-center gap-2">
                         <div className="md:w-1/3">
-                            <span className="text-sm font-medium text-text-muted">{item.Campo}</span>
+                            <span className="text-sm font-medium text-text-muted">{item.field}</span>
                         </div>
                         <div className="md:w-2/3">
                             <Input 
+                                value={item.value}
                                 onChange={(e) => handleEdit(idx, e.target.value)}
                                 className="w-full bg-surface-input/50" // Small adjustment to background if needed, but keeping standard is safer
                                 placeholder="Valor..."

@@ -4,9 +4,8 @@ from collections.abc import Callable  # Importar Callable
 from pydantic import BaseModel
 
 from core.base_tool import BaseTool
-from finance.schemas import CalcularSaldoTotalInput
-
 from core.logger import get_logger
+from finance.schemas import CalcularSaldoTotalInput
 
 logger = get_logger("Tool_CalcBalance")
 

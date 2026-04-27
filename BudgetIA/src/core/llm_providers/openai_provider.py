@@ -4,6 +4,7 @@ from pydantic.types import SecretStr
 
 import config
 from core.logger import get_logger
+
 from .base_provider import LLMProvider
 
 logger = get_logger("OpenAIProvider")

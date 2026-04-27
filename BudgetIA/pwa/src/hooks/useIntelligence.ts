@@ -2,31 +2,16 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchAPI } from '../services/api';
 import { toast } from 'sonner';
 
-export interface ToolInfo {
-    name: string;
-    description: string;
-    label?: string;
-    is_essential: boolean;
-}
+import type { ToolInfoSchema, ObserverInfoSchema } from '../types/api';
 
-export interface ObserverInfo {
-    id: string;
-    name: string;
-    description: string;
-    is_active: boolean;
-    config: {
-        days_lookback?: number;
-        threshold_percent?: number;
-        keywords_count?: number;
-        keywords_sample?: string[];
-    };
-}
+export type ToolInfo = ToolInfoSchema;
+export type ObserverInfo = ObserverInfoSchema;
 
 export interface MemoryFact {
     content: string;
     created_at: string;
     source: string;
-    metadata?: Record<string, any>;
+    metadata?: Record<string, unknown>;
 }
 
 export interface WatchdogRule {
@@ -99,9 +84,16 @@ export function useIntelligence() {
         }
     }); 
     
+    interface CleaningResponse {
+        status: string;
+        message?: string;
+        processed?: number;
+        updated_count?: number;
+    }
+
     // We need to return the mutation object itself or its properties
     const cleaningMutation = useMutation({
-        mutationFn: () => fetchAPI('/intelligence/clean', { method: 'POST' }),
+        mutationFn: () => fetchAPI('/intelligence/clean', { method: 'POST' }) as Promise<CleaningResponse>,
         onSuccess: (data) => {
             // Invalidate queries to refresh UI immediately
             queryClient.invalidateQueries({ queryKey: ['transactions'] });
@@ -144,4 +136,4 @@ export function useIntelligence() {
     };
 }
 
-const EMPTY_ARRAY: any[] = [];
+const EMPTY_ARRAY: never[] = [];

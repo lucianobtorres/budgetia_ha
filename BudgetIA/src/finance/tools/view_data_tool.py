@@ -7,9 +7,8 @@ from tabulate import tabulate
 
 import config
 from core.base_tool import BaseTool
-from finance.schemas import VisualizarDadosPlanilhaInput
-
 from core.logger import get_logger
+from finance.schemas import VisualizarDadosPlanilhaInput
 
 logger = get_logger("Tool_ViewData")
 
@@ -41,7 +40,14 @@ class VisualizarDadosPlanilhaTool(BaseTool):  # type: ignore[misc]
                 return f"A aba '{aba_nome}' está vazia."
 
             # Converte o DataFrame para uma tabela bonita em formato Markdown
-            return str(tabulate(df.to_dict(orient="records"), headers="keys", tablefmt="pipe", showindex=False))
+            return str(
+                tabulate(
+                    df.to_dict(orient="records"),
+                    headers="keys",
+                    tablefmt="pipe",
+                    showindex=False,
+                )
+            )
 
         except Exception as e:
             return f"Ocorreu um erro ao visualizar os dados da aba '{aba_nome}': {e}"

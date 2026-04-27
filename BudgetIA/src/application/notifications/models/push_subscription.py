@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
+
 
 @dataclass
 class PushSubscription:
@@ -9,4 +9,4 @@ class PushSubscription:
     keys_p256dh: str
     user_id: str
     created_at: datetime = field(default_factory=datetime.now)
-    device_name: Optional[str] = None
+    device_name: str | None = None

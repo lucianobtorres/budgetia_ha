@@ -1,18 +1,20 @@
-from fastapi import APIRouter, Depends, HTTPException
-from typing import Optional
+from datetime import datetime
+
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from datetime import datetime, timedelta
 
 from ..dependencies import get_current_user
 
 router = APIRouter(prefix="/subscription", tags=["Subscription"])
 
+
 class SubscriptionStatus(BaseModel):
     plan_tier: str
     status: str
-    trial_end: Optional[datetime] = None
-    current_period_end: Optional[datetime] = None
+    trial_end: datetime | None = None
+    current_period_end: datetime | None = None
     cancel_at_period_end: bool = False
+
 
 @router.get("/status", response_model=SubscriptionStatus)
 async def get_subscription_status(current_user: dict = Depends(get_current_user)):
@@ -23,10 +25,10 @@ async def get_subscription_status(current_user: dict = Depends(get_current_user)
     - If user has 'role' == 'admin' -> 'pro' (active)
     - Otherwise -> 'free' (active)
     """
-    
+
     # Check Trial
     trial_ends = current_user.get("trial_ends_at")
-    
+
     if trial_ends:
         # User dict has it as string typically, but let's parse if needed or pass through
         # Assuming security.py returns datetime objects or ISO strings.
@@ -42,18 +44,18 @@ async def get_subscription_status(current_user: dict = Depends(get_current_user)
                 status="trialing",
                 trial_end=trial_dt,
                 current_period_end=None,
-                cancel_at_period_end=False
+                cancel_at_period_end=False,
             )
         else:
             # Trial expired
-             return SubscriptionStatus(
+            return SubscriptionStatus(
                 plan_tier="free",
-                status="expired", # or 'active' on free tier? Let's say expired trial -> 'active' free tier for now? 
+                status="expired",  # or 'active' on free tier? Let's say expired trial -> 'active' free tier for now?
                 # Actually user asked for "gratuto" instead of correct info.
                 # If trial expired, they might be on free tier now.
-                trial_end=trial_dt, # keep showing when it ended
+                trial_end=trial_dt,  # keep showing when it ended
                 current_period_end=None,
-                cancel_at_period_end=False
+                cancel_at_period_end=False,
             )
 
     # Check Admin/Pro
@@ -65,8 +67,8 @@ async def get_subscription_status(current_user: dict = Depends(get_current_user)
             plan_tier="lifetime",
             status="active",
             trial_end=None,
-            current_period_end=None, 
-            cancel_at_period_end=False
+            current_period_end=None,
+            cancel_at_period_end=False,
         )
 
     # Default Free
@@ -75,16 +77,23 @@ async def get_subscription_status(current_user: dict = Depends(get_current_user)
         status="active",
         trial_end=None,
         current_period_end=None,
-        cancel_at_period_end=False
+        cancel_at_period_end=False,
     )
+
 
 class CheckoutRequest(BaseModel):
     plan_id: str
 
+
 @router.post("/checkout")
-async def create_checkout_session(req: CheckoutRequest, current_user: dict = Depends(get_current_user)):
+async def create_checkout_session(
+    req: CheckoutRequest, current_user: dict = Depends(get_current_user)
+):
     # Mock checkout URL
-    return {"url": f"https://checklist.stripe.com/mock-checkout/{req.plan_id}?user={current_user.get('username')}"}
+    return {
+        "url": f"https://checklist.stripe.com/mock-checkout/{req.plan_id}?user={current_user.get('username')}"
+    }
+
 
 @router.post("/portal")
 async def create_portal_session(current_user: dict = Depends(get_current_user)):

@@ -104,7 +104,18 @@ fi
 # Linkar persistência
 ln -sf /data/budgetia_files/planilha_mestra.xlsx /app/planilha_mestra.xlsx
 
-# 3. Iniciar Servidor
+# 3. Iniciar Serviços Periféricos em Background
+if [ ! -z "$TELEGRAM_TOKEN" ]; then
+    echo "🤖 Iniciando Bot do Telegram em background..."
+    python3 /app/src/interfaces/bot/main.py &
+else
+    echo "⚠️  TELEGRAM_TOKEN não configurado. Bot não iniciado."
+fi
+
+echo "🕒 Iniciando Scheduler em background..."
+python3 /app/src/interfaces/scheduler/main.py &
+
+# 4. Iniciar Servidor API
 echo "🚀 Iniciando Servidor API + Frontend..."
 export PYTHONPATH=$PYTHONPATH:/app/src
 export STATIC_DIR="/app/static"

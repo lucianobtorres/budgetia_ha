@@ -21,9 +21,9 @@ import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
 import { useAuthSession } from "./hooks/useAuthSession";
-import { DrawerProvider } from "./context/DrawerContext";
+import { DrawerProvider } from "./context/DrawerProvider";
 import { GlobalDrawers } from "./components/layout/GlobalDrawers";
-import { TourProvider } from "./context/TourContext";
+import { TourProvider } from "./context/TourProvider";
 
 import ConnectionErrorPage from "./pages/ConnectionErrorPage";
 import Landing from "./pages/Landing";

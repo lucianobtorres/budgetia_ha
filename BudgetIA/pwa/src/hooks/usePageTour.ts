@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useTour, type TourId } from '../context/TourContext';
+import { useTour } from '../hooks/useTour';
+import { type TourId } from '../context/TourContext';
 
 export function usePageTour(tourId: TourId | null, startCondition: boolean = true) {
     const { startTour, isTourLoading, isTourCompleted } = useTour();

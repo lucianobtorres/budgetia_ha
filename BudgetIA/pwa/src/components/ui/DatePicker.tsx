@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { cn } from '../../utils/cn';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Check } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useOutsideClick } from '../../hooks/useOutsideClick';
 import { 
     format, 
@@ -9,7 +9,6 @@ import {
     startOfMonth, 
     endOfMonth, 
     eachDayOfInterval, 
-    isSameMonth, 
     isSameDay, 
     isToday, 
     getDay 
@@ -42,7 +41,7 @@ export function DatePicker({
     
     const containerRef = useRef<HTMLDivElement>(null);
 
-    useOutsideClick(containerRef as any, () => setIsOpen(false));
+    useOutsideClick(containerRef as React.RefObject<HTMLElement>, () => setIsOpen(false));
 
     const selectedDate = value ? new Date(value + 'T00:00:00') : null;
 

@@ -6,7 +6,7 @@ interface RequestOptions extends RequestInit {
     skipErrorHandling?: boolean;
 }
 
-export async function fetchAPI<T = any>(endpoint: string, options: RequestOptions = {}): Promise<T> {
+export async function fetchAPI<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`;
     
     // Get User ID from localStorage or default to fallback
@@ -65,7 +65,7 @@ export async function fetchAPI<T = any>(endpoint: string, options: RequestOption
                 const errorData = await response.json();
                 if (errorData.detail) errorMessage = errorData.detail;
                 if (errorData.message) errorMessage = errorData.message;
-            } catch (e) {
+            } catch {
                 // Ignore parsing error, keep default
             }
 
@@ -73,14 +73,15 @@ export async function fetchAPI<T = any>(endpoint: string, options: RequestOption
         }
 
         // Return empty if no content
-        if (response.status === 204) return null;
+        if (response.status === 204) return null as T;
 
         return await response.json();
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("API Request Failed:", error);
+        const message = error instanceof Error ? error.message : "Ocorreu um erro na requisição.";
 
         if (!options.skipErrorHandling) {
-            toast.error(error.message || "Ocorreu um erro na requisição.");
+            toast.error(message);
         }
         
         throw error;

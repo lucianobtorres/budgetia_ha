@@ -1,8 +1,8 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-import type { ExpenseData } from '../../types/domain';
+import type { CategoryExpense } from '../../domain/models/Dashboard';
 
 interface Props {
-  data: ExpenseData[];
+  data: CategoryExpense[];
   getCategoryColor: (category: string) => string;
 }
 

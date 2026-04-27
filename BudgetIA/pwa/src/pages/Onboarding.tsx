@@ -1,4 +1,4 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { ShieldCheck, Cloud, FileSpreadsheet } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -6,6 +6,10 @@ import { useOnboarding } from "../hooks/useOnboarding";
 import { MessageBubble } from "../components/chat/MessageBubble";
 import { ChatInput } from "../components/chat/ChatInput";
 import { OnboardingActions } from "../components/onboarding/OnboardingActions";
+
+interface LocationState {
+    googleAuthCode?: string;
+}
 
 export default function Onboarding() {
     const { 
@@ -24,7 +28,7 @@ export default function Onboarding() {
     const location = useLocation();
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const [input, setInput] = React.useState(""); // Local input state
+    const [input, setInput] = useState(""); // Local input state
 
     // Scroll to bottom effect
     useEffect(() => {
@@ -33,13 +37,14 @@ export default function Onboarding() {
 
     // Handle Google Callback
     useEffect(() => {
-        if (location.state && (location.state as any).googleAuthCode) {
-            const { googleAuthCode } = location.state as any;
+        const state = location.state as LocationState;
+        if (state?.googleAuthCode) {
+            const { googleAuthCode } = state;
             // Clear state to prevent loop
             navigate(location.pathname, { replace: true, state: {} });
             sendGoogleAuthCode(googleAuthCode);
         }
-    }, [location.state]); // eslint-disable-line
+    }, [location.state, location.pathname, navigate, sendGoogleAuthCode]);
 
     const handleSend = () => {
         if (!input.trim()) return;
@@ -183,4 +188,3 @@ export default function Onboarding() {
     );
 }
 
-import React from 'react'; // Add React import for useState

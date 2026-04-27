@@ -6,9 +6,8 @@ from pydantic import BaseModel
 
 from config import ColunasTransacoes, NomesAbas, ValoresTipo
 from core.base_tool import BaseTool
-from finance.schemas import AnalisarTendenciasGastosInput
-
 from core.logger import get_logger
+from finance.schemas import AnalisarTendenciasGastosInput
 
 logger = get_logger("Tool_AnlzTrends")
 

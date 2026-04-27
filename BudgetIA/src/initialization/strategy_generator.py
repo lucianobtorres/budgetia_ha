@@ -32,7 +32,6 @@ try:
     ) as f:
         RETRY_PROMPT_TEMPLATE = f.read()
 except FileNotFoundError:
-
     logger.critical(
         "Arquivos de prompt de estratégia não encontrados na pasta 'src/core/prompts/'."
     )
@@ -219,9 +218,7 @@ class StrategyGenerator:
         if not strategy_file_path.exists():
             return False, "Arquivo de estratégia não encontrado."
 
-        logger.info(
-            f"Validando estratégia existente em {strategy_file_path}..."
-        )
+        logger.info(f"Validando estratégia existente em {strategy_file_path}...")
         layout_config = config.LAYOUT_PLANILHA
 
         # Reutiliza o seu sandbox!
@@ -284,10 +281,14 @@ class StrategyGenerator:
                 except Exception as e:
                     error_msg = str(e)
                     if "429" in error_msg or "Rate limit" in error_msg:
-                        logger.warning(f"RATE LIMIT DETECTADO NA TENTATIVA {i+1}")
+                        logger.warning(f"RATE LIMIT DETECTADO NA TENTATIVA {i + 1}")
                         # Em caso de rate limit, não adianta tentar de novo imediatamente.
                         # Retornamos falha controlada para o orchestrator lidar.
-                        return False, f"Rate Limit Exceeded: {error_msg}", schema_usuario
+                        return (
+                            False,
+                            f"Rate Limit Exceeded: {error_msg}",
+                            schema_usuario,
+                        )
                     # Outros erros, loga e continua o loop de retry
                     erro_log = f"Erro na chamada LLM: {error_msg}"
                     logger.error(f"ERRO LLM: {erro_log}")
@@ -300,9 +301,7 @@ class StrategyGenerator:
                     .replace("```", "")
                     .strip()
                 )
-                logger.debug(
-                    f"RESPOSTA IA (Código):\n{codigo_gerado[:500]}..."
-                )
+                logger.debug(f"RESPOSTA IA (Código):\n{codigo_gerado[:500]}...")
 
                 try:
                     with open(strategy_save_path, "w", encoding="utf-8") as f:
@@ -318,9 +317,7 @@ class StrategyGenerator:
                 )
                 if success:
                     module_name = strategy_save_path.stem
-                    logger.info(
-                        f"Estratégia validada e salva como '{module_name}'"
-                    )
+                    logger.info(f"Estratégia validada e salva como '{module_name}'")
                     mapa_para_salvar = {"strategy_module": module_name}
                     return True, json.dumps(mapa_para_salvar), schema_usuario
                 else:

@@ -5,9 +5,8 @@ from collections.abc import Callable  # Importar Callable
 from pydantic import BaseModel
 
 from core.base_tool import BaseTool
-from finance.schemas import RegistrarInsightIAInput
-
 from core.logger import get_logger
+from finance.schemas import RegistrarInsightIAInput
 
 logger = get_logger("Tool_RegInsight")
 

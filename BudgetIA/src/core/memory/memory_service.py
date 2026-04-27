@@ -2,9 +2,11 @@ import json
 import os
 from datetime import datetime
 from typing import Any
+
 # import fcntl  -- REMOVED for Windows compatibility
-# Note: On Windows specifically, fcntl is not available. 
+# Note: On Windows specifically, fcntl is not available.
 # We will implement a simple file lock using a context manager or just rely on atomic writes for now since it's single user primarily.
+
 
 class MemoryService:
     """
@@ -24,7 +26,7 @@ class MemoryService:
     def _load_memory(self) -> list[dict[str, Any]]:
         """Loads all facts from the JSON file."""
         try:
-            with open(self.memory_file, "r", encoding="utf-8") as f:
+            with open(self.memory_file, encoding="utf-8") as f:
                 data: list[dict[str, Any]] = json.load(f)
                 return data
         except (FileNotFoundError, json.JSONDecodeError):
@@ -37,10 +39,16 @@ class MemoryService:
             json.dump(memory, f, indent=4, ensure_ascii=False)
         os.replace(temp_file, self.memory_file)
 
-    def add_fact(self, category: str, content: str, source: str = "user", metadata: dict[str, Any] | None = None) -> str:
+    def add_fact(
+        self,
+        category: str,
+        content: str,
+        source: str = "user",
+        metadata: dict[str, Any] | None = None,
+    ) -> str:
         """Adds a new fact to the memory."""
         memory = self._load_memory()
-        
+
         # Check if identical fact exists
         for fact in memory:
             if fact["category"] == category and fact["content"] == content:
@@ -54,7 +62,7 @@ class MemoryService:
             "source": source,
             "metadata": metadata or {},
             "created_at": datetime.now().isoformat(),
-            "updated_at": datetime.now().isoformat()
+            "updated_at": datetime.now().isoformat(),
         }
         memory.append(new_fact)
         self._save_memory(memory)
@@ -67,7 +75,7 @@ class MemoryService:
         """
         memory = self._load_memory()
         updated = False
-        
+
         for fact in memory:
             if old_content_snippet.lower() in fact["content"].lower():
                 fact["content"] = new_content
@@ -76,7 +84,7 @@ class MemoryService:
                 # We stop at the first match for safety, or we could ask for ID.
                 # Ideally the agent should be precise.
                 break
-        
+
         if updated:
             self._save_memory(memory)
             return f"Fact updated to: {new_content}"
@@ -87,10 +95,12 @@ class MemoryService:
         """Removes a fact that matches the snippet."""
         memory = self._load_memory()
         original_len = len(memory)
-        
+
         # Filter out matching facts
-        memory = [f for f in memory if content_snippet.lower() not in f["content"].lower()]
-        
+        memory = [
+            f for f in memory if content_snippet.lower() not in f["content"].lower()
+        ]
+
         if len(memory) < original_len:
             self._save_memory(memory)
             return "Fact(s) forgotten."
@@ -105,10 +115,12 @@ class MemoryService:
         memory = self._load_memory()
         if not query:
             return memory
-        
+
         return [
-            f for f in memory 
-            if query.lower() in f["content"].lower() or query.lower() in f["category"].lower()
+            f
+            for f in memory
+            if query.lower() in f["content"].lower()
+            or query.lower() in f["category"].lower()
         ]
 
     def get_context_string(self) -> str:
@@ -116,7 +128,7 @@ class MemoryService:
         memory = self._load_memory()
         if not memory:
             return "No known facts about the user yet."
-        
+
         lines = ["User Memories:"]
         for f in memory:
             lines.append(f"- [{f['category']}] {f['content']}")

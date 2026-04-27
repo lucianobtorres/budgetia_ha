@@ -1,7 +1,8 @@
-from typing import Optional, List
-import resend
 import logging
-from config import RESEND_API_KEY, EMAIL_FROM
+
+import resend
+
+from config import EMAIL_FROM, RESEND_API_KEY
 
 logger = logging.getLogger(__name__)
 
@@ -10,13 +11,19 @@ if RESEND_API_KEY:
 else:
     logger.warning("⚠️ RESEND_API_KEY não encontrada. EmailService inativo.")
 
+
 class EmailService:
     """
     Serviço centralizado para envio de emails transacionais via Resend.
     """
 
     @staticmethod
-    def send_email(to: str | List[str], subject: str, html_content: str, text_content: Optional[str] = None) -> bool:
+    def send_email(
+        to: str | list[str],
+        subject: str,
+        html_content: str,
+        text_content: str | None = None,
+    ) -> bool:
         """
         Envia um email genérico.
         """
@@ -65,7 +72,7 @@ class EmailService:
         """
         subject = "Recuperação de Senha - BudgetIA"
         link = f"http://localhost:5173/reset-password?token={token}"
-        
+
         html = f"""
         <h1>Recuperação de Senha</h1>
         <p>Recebemos uma solicitação para redefinir sua senha.</p>
@@ -82,8 +89,8 @@ class EmailService:
         Envia email de verificação de conta.
         """
         subject = "Verifique sua conta - BudgetIA"
-        link = f"http://localhost:5173/verify?token={token}" # Frontend Route
-        
+        link = f"http://localhost:5173/verify?token={token}"  # Frontend Route
+
         html = f"""
         <h1>Bem-vindo, {name}!</h1>
         <p>Obrigado por se cadastrar no BudgetIA.</p>

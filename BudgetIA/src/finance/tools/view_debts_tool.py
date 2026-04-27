@@ -6,9 +6,8 @@ from pydantic import BaseModel
 
 from config import NomesAbas
 from core.base_tool import BaseTool
-from finance.schemas import VisualizarDividasInput
-
 from core.logger import get_logger
+from finance.schemas import VisualizarDividasInput
 
 logger = get_logger("Tool_ViewDebts")
 

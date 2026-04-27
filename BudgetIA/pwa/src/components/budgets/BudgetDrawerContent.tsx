@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useBudgetsList, useCreateBudget, useUpdateBudget, useDeleteBudget } from '../../hooks/useBudgets';
-import type { Budget } from '../../types/domain';
+import type { Budget } from '../../domain/models/Budget';
 import { useCategoryColorMap } from '../../hooks/useCategoryColorMap';
 import { Plus } from 'lucide-react';
 import BudgetModal from './BudgetFormDrawer';
@@ -8,6 +8,8 @@ import { Button } from '../ui/Button';
 import { Drawer } from '../ui/Drawer';
 import { DistributionPieChart } from '../dashboard/DistributionPieChart';
 import { BudgetList } from './BudgetList';
+
+import type { BudgetCreate } from '../../types/api';
 
 interface Props {
     isOpen: boolean;
@@ -36,11 +38,11 @@ export default function BudgetDrawer({ isOpen, onClose, highlightCategory, highl
 
             if (highlightCategory) {
                 // Find budget with this category
-                const target = rawBudgets.find(b => b.Categoria === highlightCategory);
-                if (target) targetKey = target.Categoria;
+                const target = rawBudgets.find(b => b.category === highlightCategory);
+                if (target) targetKey = target.category;
             } else if (highlightId) {
-                const target = rawBudgets.find(b => b["ID Orcamento"] === highlightId);
-                if (target) targetKey = target.Categoria;
+                const target = rawBudgets.find(b => b.id === highlightId);
+                if (target) targetKey = target.category;
             }
 
             if (targetKey && itemRefs.current[targetKey]) {
@@ -55,13 +57,12 @@ export default function BudgetDrawer({ isOpen, onClose, highlightCategory, highl
     }, [isOpen, highlightCategory, highlightId, rawBudgets]);
 
     // Sort budgets by Spent Amount (Descending) for color ranking
-    const budgets = rawBudgets ? [...rawBudgets].sort((a, b) => (b['Valor Gasto Atual'] || 0) - (a['Valor Gasto Atual'] || 0)) : [];
-    const totalBudgets = budgets.length;
+    const budgets = rawBudgets ? [...rawBudgets].sort((a, b) => (b.currentSpent || 0) - (a.currentSpent || 0)) : [];
 
-    const handleSave = async (data: any) => {
+    const handleSave = async (data: BudgetCreate) => {
         try {
-            if (editingBudget && editingBudget["ID Orcamento"]) {
-                await updateBudget({ id: editingBudget["ID Orcamento"], data });
+            if (editingBudget && editingBudget.id) {
+                await updateBudget({ id: editingBudget.id, data });
             } else {
                 await createBudget(data);
             }
@@ -91,17 +92,17 @@ export default function BudgetDrawer({ isOpen, onClose, highlightCategory, highl
     const getInitialData = () => {
         if (!editingBudget) return undefined;
         return {
-            categoria: editingBudget.Categoria,
-            valor_limite: editingBudget['Valor Limite'],
-            periodo: editingBudget['Período Orçamento'],
-            observacoes: editingBudget.Observações || ''
+            categoria: editingBudget.category,
+            valor_limite: editingBudget.limitValue,
+            periodo: editingBudget.period,
+            observacoes: editingBudget.observations || ''
         };
     };
 
     // Prepare data for Chart
     const chartData = budgets.map(b => ({
-        name: b.Categoria,
-        value: b['Valor Gasto Atual'] || 0
+        name: b.category,
+        value: b.currentSpent || 0
     }));
 
     return (
@@ -131,8 +132,8 @@ export default function BudgetDrawer({ isOpen, onClose, highlightCategory, highl
                     {/* Desktop Only: Summary Box (Keep specific logic here as it differs from CategoryDrawer) */}
                     <div className="hidden md:block p-4 bg-surface-card/40 rounded-xl border border-border">
                          {(() => {
-                            const totalLimit = budgets.reduce((acc, b) => acc + (b['Valor Limite'] || 0), 0);
-                            const totalSpent = budgets.reduce((acc, b) => acc + (b['Valor Gasto Atual'] || 0), 0);
+                            const totalLimit = budgets.reduce((acc, b) => acc + (b.limitValue || 0), 0);
+                            const totalSpent = budgets.reduce((acc, b) => acc + (b.currentSpent || 0), 0);
                             const progress = totalLimit > 0 ? (totalSpent / totalLimit) * 100 : 0;
                             
                             return (

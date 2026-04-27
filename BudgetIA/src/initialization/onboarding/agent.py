@@ -25,9 +25,10 @@ class OnboardingAgent:
     def _load_prompt(self) -> str:
         """Carrega o prompt do arquivo."""
         try:
-            import config # Ensure availability
+            import config  # Ensure availability
+
             prompt_path = Path(config.PROMPTS_DIR) / "onboarding_prompt.txt"
-            
+
             if prompt_path.exists():
                 return prompt_path.read_text(encoding="utf-8")
 
@@ -49,7 +50,7 @@ class OnboardingAgent:
         """
         # 1. Constrói o contexto do estado
         state_context = f"ESTADO ATUAL: {current_state.name}"
-        
+
         if extra_context:
             state_context += f"\n\nDETALHES DO CONTEXTO:\n{extra_context}"
 
@@ -60,7 +61,9 @@ class OnboardingAgent:
                 "{contexto_estado}", state_context
             )
         else:
-            system_content = f"{self.system_prompt_template}\n\nContexto Atual:\n{state_context}"
+            system_content = (
+                f"{self.system_prompt_template}\n\nContexto Atual:\n{state_context}"
+            )
 
         messages = [SystemMessage(content=system_content)]
 
@@ -73,7 +76,9 @@ class OnboardingAgent:
         try:
             # 5. Invoca LLM
             response = self.llm.invoke(messages)
-            response_text = response.content if hasattr(response, "content") else str(response)
+            response_text = (
+                response.content if hasattr(response, "content") else str(response)
+            )
 
             # 6. Atualiza histórico
             self.history.append(HumanMessage(content=user_input))

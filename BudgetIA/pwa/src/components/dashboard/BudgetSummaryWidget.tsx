@@ -2,7 +2,7 @@ import { useBudgetsList } from '../../hooks/useBudgets';
 import { Skeleton } from '../ui/Skeleton';
 import { cn } from '../../utils/cn';
 import { ChevronRight, Target } from 'lucide-react';
-import { useDrawer } from '../../context/DrawerContext';
+import { useDrawer } from '../../hooks/useDrawer';
 
 export default function BudgetSummaryWidget() {
     const { data: budgets, isLoading: loading } = useBudgetsList();
@@ -25,10 +25,10 @@ export default function BudgetSummaryWidget() {
     const safeBudgets = budgets || [];
     
     // Calculate overall health
-    const totalLimit = safeBudgets.reduce((acc, b) => acc + (b['Valor Limite'] || 0), 0);
-    const totalSpent = safeBudgets.reduce((acc, b) => acc + (b['Valor Gasto Atual'] || 0), 0);
+    const totalLimit = safeBudgets.reduce((acc, b) => acc + (b.limitValue || 0), 0);
+    const totalSpent = safeBudgets.reduce((acc, b) => acc + (b.currentSpent || 0), 0);
     const overallProgress = totalLimit > 0 ? (totalSpent / totalLimit) * 100 : 0;
-    const overBudgetCount = safeBudgets.filter(b => (b['Valor Gasto Atual'] || 0) > (b['Valor Limite'] || 0)).length;
+    const overBudgetCount = safeBudgets.filter(b => (b.currentSpent || 0) > (b.limitValue || 0)).length;
 
     return (
         <div 

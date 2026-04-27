@@ -29,7 +29,7 @@ export default function Connections() {
 
     const loadData = async () => {
         try {
-            const data = await fetchAPI('/profile/settings/communication');
+            const data = await fetchAPI<ComConfig>('/profile/settings/communication');
             if (data) {
                 setConfig(data);
                 setFormState(data);
@@ -78,7 +78,7 @@ export default function Connections() {
                 <SegmentedControl 
                     options={tabs.map(t => ({ id: t.id, label: t.label, icon: t.icon, activeColor: t.color }))}
                     value={activeTab}
-                    onChange={(val) => setActiveTab(val as any)}
+                    onChange={(val) => setActiveTab(val as typeof activeTab)}
                 />
             </div>
 

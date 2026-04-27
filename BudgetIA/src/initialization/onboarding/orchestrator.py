@@ -6,7 +6,6 @@ handlers and the LLM agent. The orchestrator is deliberately lightweight – mos
 business logic lives in the agent and the analyzers.
 """
 
-import logging
 import os
 from pathlib import Path
 from typing import Any
@@ -15,6 +14,7 @@ from langchain_core.messages import HumanMessage
 
 from core.google_auth_service import GoogleAuthService
 from core.llm_manager import LLMOrchestrator
+from core.logger import get_logger
 from core.user_config_service import UserConfigService
 from initialization.onboarding.agent import OnboardingAgent
 from initialization.onboarding.analyzers import (
@@ -38,8 +38,6 @@ from initialization.onboarding.state_machine import (
     OnboardingStateMachine,
 )
 from initialization.strategy_generator import StrategyGenerator
-
-from core.logger import get_logger
 
 logger = get_logger("OnboardingOrchestrator")
 
@@ -70,15 +68,13 @@ class OnboardingOrchestrator:
                     f"[ONBOARDING] Invalid saved status '{saved_status}'. Starting fresh."
                 )
         else:
-            logger.info(
-                f"Starting new onboarding with state: {initial_state.name}"
-            )
+            logger.info(f"Starting new onboarding with state: {initial_state.name}")
 
         self.state_machine = OnboardingStateMachine(
             initial_state=initial_state,
-            on_transition=self._persist_state  # Hook de persistência
+            on_transition=self._persist_state,  # Hook de persistência
         )
-    
+
         self.google_auth_service = GoogleAuthService(config_service)
 
         # Handlers for spreadsheet acquisition.
@@ -109,15 +105,15 @@ class OnboardingOrchestrator:
     def _persist_state(self, new_state: OnboardingState) -> None:
         """Callback: Salva o estado atual no config a cada transição."""
         try:
-             # Só salvamos o state name.
-             # Se for COMPLETE, _finalize_onboarding cuida dos detalhes extras (limpar flags).
-             # Mas salvar o status 'COMPLETE' aqui também não faz mal.
-             logger.debug(f"Persistindo estado intermediário: {new_state.name}")
-             config_data = self.config_service.load_config()
-             config_data["onboarding_status"] = new_state.name
-             self.config_service.save_config(config_data)
+            # Só salvamos o state name.
+            # Se for COMPLETE, _finalize_onboarding cuida dos detalhes extras (limpar flags).
+            # Mas salvar o status 'COMPLETE' aqui também não faz mal.
+            logger.debug(f"Persistindo estado intermediário: {new_state.name}")
+            config_data = self.config_service.load_config()
+            config_data["onboarding_status"] = new_state.name
+            self.config_service.save_config(config_data)
         except Exception as e:
-             logger.error(f"ERRO AO PERSISTIR ESTADO: {e}")
+            logger.error(f"ERRO AO PERSISTIR ESTADO: {e}")
 
     # ---------------------------------------------------------------------
     # Public helpers
@@ -160,13 +156,16 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
             return message
 
         # OPTIONAL_PROFILE: Auto-prompt if arriving here directly (e.g. reload or default sheet skip)
-        if current_state == OnboardingState.OPTIONAL_PROFILE and not self._profile_interview_started:
-             logger.info("Generating initial PROFILE prompt...")
-             return self.agent.chat(
-                 "[INÍCIO_PERFIL]",
-                 OnboardingState.OPTIONAL_PROFILE,
-                 extra_context="We arrived at profile step (likely skipped translation review). Invite user to answer a few quick questions to build their financial profile for better strategy suggestions. Ask if they want to start.",
-             )
+        if (
+            current_state == OnboardingState.OPTIONAL_PROFILE
+            and not self._profile_interview_started
+        ):
+            logger.info("Generating initial PROFILE prompt...")
+            return self.agent.chat(
+                "[INÍCIO_PERFIL]",
+                OnboardingState.OPTIONAL_PROFILE,
+                extra_context="We arrived at profile step (likely skipped translation review). Invite user to answer a few quick questions to build their financial profile for better strategy suggestions. Ask if they want to start.",
+            )
 
         # SPREADSHEET_ACQUISITION: Remind user of options
         if current_state == OnboardingState.SPREADSHEET_ACQUISITION:
@@ -175,10 +174,12 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
         # TRANSLATION_REVIEW: Remind user to review
         if current_state == OnboardingState.TRANSLATION_REVIEW:
             return "Analisei sua planilha. O que você acha do resultado? Se estiver tudo certo, podemos prosseguir."
-        
+
         # OPTIONAL_STRATEGY: Check strategy
         if current_state == OnboardingState.OPTIONAL_STRATEGY:
-            strategy_name = self._suggested_strategy.name if self._suggested_strategy else "Padrão"
+            strategy_name = (
+                self._suggested_strategy.name if self._suggested_strategy else "Padrão"
+            )
             return f"Com base no seu perfil, sugeri a estratégia: **{strategy_name}**. Você gostaria de segui-la ou personalizar?"
 
         # Other states wait for user input
@@ -191,9 +192,9 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
         """Process a user message (or UI action) and return the agent's reply."""
         if extra_context:
             self._context.update(extra_context)
-        
+
         self._context["user_input_text"] = text
-        
+
         current_state = self.state_machine.current_state
 
         # Normalise text for simple keyword matching (still useful for legacy commands)
@@ -222,10 +223,12 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
                 clean_text, current_state.name, self._last_agent_response
             )
         except Exception as e:
-            logger.warning(f"AVISO: Falha na classificação de intenção (Rate Limit?): {e}")
+            logger.warning(
+                f"AVISO: Falha na classificação de intenção (Rate Limit?): {e}"
+            )
             logger.warning(f"[ONBOARDING] Intent classification failed: {e}")
             intent = UserIntent.NEUTRAL_INFO
-        
+
         logger.info(f"Intent Detected: {intent.name}")
 
         # -----------------------------------------------------------------
@@ -338,15 +341,19 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
                 logger.info(
                     "User signaled interview completion (Intent). Generating strategy and FINALIZING..."
                 )
-                
+
                 # Generate strategy but DON'T transition to OPTIONAL_STRATEGY
                 # Just save it internally
                 chat_history = [
-                    msg.content for msg in self.agent.history if isinstance(msg, HumanMessage)
+                    msg.content
+                    for msg in self.agent.history
+                    if isinstance(msg, HumanMessage)
                 ]
                 self._user_profile = self.profile_analyzer.analyze(chat_history)
-                self._suggested_strategy = self.strategy_suggester.suggest(self._user_profile)
-                
+                self._suggested_strategy = self.strategy_suggester.suggest(
+                    self._user_profile
+                )
+
                 # Finalize immediately
                 self.state_machine.transition_to(OnboardingState.COMPLETE)
                 self._finalize_onboarding()
@@ -415,7 +422,7 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
             return response
 
             return response
-        
+
         logger.warning(f"Unhandled state: {current_state.name}")
         return "Estado não reconhecido."
 
@@ -486,9 +493,7 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
         )
 
     def _handle_acquisition(self, text: str) -> str:
-        logger.info(
-            f"Processing acquisition with {len(self.file_handlers)} handlers"
-        )
+        logger.info(f"Processing acquisition with {len(self.file_handlers)} handlers")
         for handler in self.file_handlers:
             if handler.can_handle(text):
                 if "username" not in self._context:
@@ -501,7 +506,7 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
                     self._finalize_acquisition(result)
                     # Use o estado ATUAL da máquina, pois _finalize_acquisition pode ter pulado etapas (ex: Default -> Profile)
                     current_state = self.state_machine.current_state
-                    
+
                     context_msg = f"Acquisition SUCCESS. File path: {result.file_path}. Handler: {result.handler_type}."
                     if current_state == OnboardingState.OPTIONAL_PROFILE:
                         context_msg += " We skipped Translation Review (Default Sheet). Now invite user to Profile Interview."
@@ -565,9 +570,7 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
                         raise Exception(
                             "Falha ao baixar arquivo temporário do Google Sheets."
                         )
-                    logger.info(
-                        f"Download temporário concluído em: {local_file_path}"
-                    )
+                    logger.info(f"Download temporário concluído em: {local_file_path}")
                 except Exception as e:
                     logger.error(f"[ONBOARDING] ERRO DOWNLOAD GOOGLE: {e}")
                     message = (
@@ -593,8 +596,10 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
                         )
                     )
                 except Exception as e:
-                    logger.warning(f"AVISO: Falha na geração da estratégia (Rate Limit?): {e}")
-                    success = True # Assume sucesso para não travar o user
+                    logger.warning(
+                        f"AVISO: Falha na geração da estratégia (Rate Limit?): {e}"
+                    )
+                    success = True  # Assume sucesso para não travar o user
                     message = "Devido à alta demanda do servidor, ignoramos a análise detalhada e usaremos a Estratégia Padrão."
                     schema_summary = "Análise ignorada (Fallback)."
                     # strategy_save_path não será escrito, o que força fallback para DefaultStrategy depois.
@@ -641,9 +646,7 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
                 )
 
             # Analysis succeeded → Transition
-            logger.info(
-                "User confirmed translation review, proceeding to profile"
-            )
+            logger.info("User confirmed translation review, proceeding to profile")
             self.state_machine.transition_to(OnboardingState.OPTIONAL_PROFILE)
             return self.agent.chat(
                 clean_text,
@@ -712,9 +715,7 @@ Seja amigável, leve e use 2-3 parágrafos curtos. Não seja robótico.""",
 
         # If default spreadsheet, skip translation review (schema is known)
         if result.handler_type == "default":
-            logger.info(
-                "Default spreadsheet created. Skipping TRANSLATION_REVIEW."
-            )
+            logger.info("Default spreadsheet created. Skipping TRANSLATION_REVIEW.")
             self.state_machine.transition_to(OnboardingState.OPTIONAL_PROFILE)
         else:
             self.state_machine.transition_to(OnboardingState.TRANSLATION_REVIEW)

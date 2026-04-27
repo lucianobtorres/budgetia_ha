@@ -19,11 +19,9 @@ class AddTransactionInput(BaseModel):
         default="Concluído",
         description="Status da transação (ex: 'Concluído', 'Pendente'). Padrão é 'Concluído'.",
     )
-    parcelas: int = Field(
+    parcelas: Any = Field(
         default=1,
         description="Número de parcelas. Se maior que 1, criará múltiplas transações futuras. (Ex: 12 para '12x'). Padrão é 1.",
-        ge=1,
-        le=99
     )
 
 
@@ -53,18 +51,18 @@ class CalcularDespesasPorCategoriaInput(BaseModel):
 
 
 class IdentificarMaioresGastosInput(BaseModel):
-    top_n: int = Field(
+    top_n: Any = Field(
         default=3,
         description="O número de maiores gastos a serem retornados (padrão é 3).",
     )
 
 
 class GerarResumoMensalInput(BaseModel):
-    ano: int | None = Field(
+    ano: Any = Field(
         default=None,
         description="O ano para filtrar o resumo. Se não informado, resume todos os anos.",
     )
-    mes: int | None = Field(
+    mes: Any = Field(
         default=None,
         description="O mês para filtrar o resumo (1-12). Se não informado, resume todos os meses do ano.",
     )

@@ -7,10 +7,9 @@ from pydantic import BaseModel
 
 from config import ColunasTransacoes, NomesAbas, ValoresTipo
 from core.base_tool import BaseTool
+from core.logger import get_logger
 from finance.financial_rules import FinancialRules
 from finance.schemas import AnalisarAdesaoInput
-
-from core.logger import get_logger
 
 logger = get_logger("Tool_AnlzAdherence")
 

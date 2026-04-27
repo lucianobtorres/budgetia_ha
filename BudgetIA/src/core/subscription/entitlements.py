@@ -1,4 +1,5 @@
-from core.subscription.providers import SubscriptionProvider, SubscriptionStatus, Plan
+from core.subscription.providers import SubscriptionProvider, SubscriptionStatus
+
 
 class EntitlementService:
     """
@@ -14,8 +15,8 @@ class EntitlementService:
     def can_access_premium_features(self, user_id: str) -> bool:
         """Verifica se o usuário pode acessar recursos Premium (IA avançada, Sync, etc)."""
         status = self.provider.get_subscription_status(user_id)
-        
+
         if status["status"] in [SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIALING]:
             return True
-        
+
         return False

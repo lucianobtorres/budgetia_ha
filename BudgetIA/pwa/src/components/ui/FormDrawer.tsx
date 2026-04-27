@@ -6,7 +6,6 @@ interface FormDrawerProps {
     onClose: () => void;
     title: string;
     isLoading?: boolean;
-    isEditing?: boolean;
     onSubmit: (e: React.FormEvent) => void;
     formId: string;
     children: React.ReactNode;
@@ -19,7 +18,6 @@ export function FormDrawer({
     onClose,
     title,
     isLoading,
-    isEditing,
     onSubmit,
     formId,
     children,

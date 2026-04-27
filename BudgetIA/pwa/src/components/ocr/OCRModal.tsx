@@ -1,14 +1,15 @@
 import { useState, useRef } from 'react';
 import { Dialog } from '../ui/Dialog';
 import { Button } from '../ui/Button';
-import { Camera, Upload, X, Loader2, Check } from 'lucide-react';
+import { Camera, X, Loader2, Check } from 'lucide-react';
 import { fetchAPI } from '../../services/api';
 import { toast } from 'sonner';
+import type { TransactionCreate } from '../../types/api';
 
 interface OCRModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSuccess: (data: any) => void;
+    onSuccess: (data: TransactionCreate) => void;
 }
 
 export function OCRModal({ isOpen, onClose, onSuccess }: OCRModalProps) {
@@ -33,11 +34,18 @@ export function OCRModal({ isOpen, onClose, onSuccess }: OCRModalProps) {
         formData.append('file', file);
 
         try {
+            interface OCRResponse {
+                data?: string;
+                estabelecimento?: string;
+                total?: number;
+                categoria_sugerida?: string;
+            }
+
             // Using fetchAPI which handles Auth and FormData content-type automatically
             const data = await fetchAPI('/ocr/analyze', {
                 method: 'POST',
                 body: formData
-            });
+            }) as OCRResponse;
             
             toast.success("Leitura concluída!");
             

@@ -1,5 +1,3 @@
-import pytest
-
 from finance.storage.excel_storage_handler import ExcelStorageHandler
 from finance.storage.storage_enums import StorageType
 from finance.storage.storage_factory import StorageHandlerFactory

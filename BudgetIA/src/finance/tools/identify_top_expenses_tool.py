@@ -1,23 +1,21 @@
 # src/finance/tools/identify_top_expenses_tool.py
-from collections.abc import Callable  # Importar Callable
+from collections.abc import Callable
+from typing import Any
 
 import pandas as pd
 from pydantic import BaseModel
 
 from config import ColunasTransacoes, NomesAbas, ValoresTipo
 from core.base_tool import BaseTool
-from finance.schemas import IdentificarMaioresGastosInput
-
 from core.logger import get_logger
+from finance.schemas import IdentificarMaioresGastosInput
 
 logger = get_logger("Tool_TopExpenses")
 
 
 class IdentificarMaioresGastosTool(BaseTool):  # type: ignore[misc]
     name: str = "identificar_maiores_gastos"
-    description: str = (
-        "Identifica e retorna as N maiores despesas individuais na planilha, útil para encontrar gastos significativos."
-    )
+    description: str = "Identifica e retorna as N maiores despesas individuais na planilha, útil para encontrar gastos significativos."
     args_schema: type[BaseModel] = IdentificarMaioresGastosInput
 
     # --- DIP: Depende de Callables ---
@@ -26,7 +24,13 @@ class IdentificarMaioresGastosTool(BaseTool):  # type: ignore[misc]
 
     # --- FIM DA MUDANÇA ---
 
-    def run(self, top_n: int = 3) -> str:
+    def run(self, top_n: Any = 3) -> str:
+        # Conversão robusta para int
+        try:
+            top_n = int(top_n)
+        except (ValueError, TypeError):
+            top_n = 3
+
         logger.info(f"Ferramenta '{self.name}' foi chamada com top_n={top_n}.")
 
         # --- DIP: Chama a função injetada ---

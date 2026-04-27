@@ -3,15 +3,15 @@ import os
 import pandas as pd
 
 import config
-from infrastructure.agents.factory import AgentFactory
 from config import NomesAbas
 from core.llm_enums import LLMProviderType
 from core.llm_factory import LLMProviderFactory
 from core.llm_manager import LLMOrchestrator
+from core.logger import get_logger
 from core.user_config_service import UserConfigService
 from finance.factory import FinancialSystemFactory
 from finance.storage.excel_storage_handler import ExcelStorageHandler
-from core.logger import get_logger
+from infrastructure.agents.factory import AgentFactory
 
 logger = get_logger("MainCLI")
 
@@ -35,8 +35,10 @@ def main() -> None:
 
     # Definindo o caminho da planilha de forma robusta
     script_dir = os.path.dirname(__file__)
-    project_root = os.path.abspath(os.path.join(script_dir, os.pardir))
-    planilha_path = os.path.join(project_root, "planilha_mestra.xlsx")
+    os.path.abspath(os.path.join(script_dir, os.pardir))
+    planilha_path = os.path.join(
+        script_dir, "assets", "templates", "planilha_mestra_template.xlsx"
+    )
 
     # 1. Setup de Configuração e Storage
     config_service = UserConfigService("cli_user")  # Usuário padrão para CLI

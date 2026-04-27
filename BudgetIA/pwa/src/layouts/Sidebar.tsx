@@ -1,8 +1,7 @@
-import { Home, CreditCard, User, LogOut, Link as LinkIcon, Brain, Shield, Tag } from "lucide-react";
+import { Home, CreditCard, User, LogOut, Link as LinkIcon, Brain, Shield, DownloadCloud } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { AuthService } from "../services/auth";
-import { DownloadCloud } from "lucide-react";
 import { cn } from "../utils/cn";
 import { telemetry } from "../services/telemetry";
 
@@ -14,14 +13,19 @@ const navigation = [
   { name: 'Perfil', href: '/profile', icon: User },
 ];
 
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+}
+
 export function Sidebar() {
   const location = useLocation();
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
 
   useEffect(() => {
-    const handler = (e: any) => {
+    const handler = (e: Event) => {
       e.preventDefault();
-      setDeferredPrompt(e);
+      setDeferredPrompt(e as BeforeInstallPromptEvent);
     };
     window.addEventListener('beforeinstallprompt', handler);
     return () => window.removeEventListener('beforeinstallprompt', handler);
@@ -35,7 +39,7 @@ export function Sidebar() {
   const handleInstallClick = () => {
     if (deferredPrompt) {
         deferredPrompt.prompt();
-        deferredPrompt.userChoice.then((choiceResult: any) => {
+        deferredPrompt.userChoice.then((choiceResult) => {
             if (choiceResult.outcome === 'accepted') {
                 setDeferredPrompt(null);
             }

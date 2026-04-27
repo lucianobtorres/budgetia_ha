@@ -11,7 +11,7 @@ from core.logger import get_logger
 logger = get_logger("TelegramChannel")
 
 
-class TelegramChannel(INotificationChannel): # type: ignore[misc]
+class TelegramChannel(INotificationChannel):  # type: ignore[misc]
     """
     Canal de notificação via Telegram.
     Implementa envio de mensagens através do Telegram Bot API.
@@ -20,19 +20,15 @@ class TelegramChannel(INotificationChannel): # type: ignore[misc]
     def __init__(self, token: str | None = None):
         """
         Inicializa o canal Telegram.
-
-        Args:
-            token: Token do bot do Telegram. Se None, busca de TELEGRAM_TOKEN env var.
-
-        Raises:
-            ValueError: Se o token não for fornecido nem encontrado no ambiente.
         """
         self._token = token or os.getenv("TELEGRAM_TOKEN")
+        self.bot = None
         if not self._token:
-            raise ValueError(
-                "Token do Telegram não fornecido e TELEGRAM_TOKEN não encontrado no .env"
+            logger.warning(
+                "Telegram não configurado (TELEGRAM_TOKEN ausente). Canal desativado."
             )
-        self.bot = Bot(token=self._token)
+        else:
+            self.bot = Bot(token=self._token)
 
     @property
     def channel_name(self) -> str:

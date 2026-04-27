@@ -34,7 +34,7 @@ class ChatService:
 
     def get_history(self) -> list[dict[str, str]]:
         """Retorna o histórico de chat da UI."""
-        return self.history_manager.get_history() # type: ignore[no-any-return]
+        return self.history_manager.get_history()  # type: ignore[no-any-return]
 
     def handle_message(self, user_prompt: str, user_id: str) -> str:
         """
@@ -82,4 +82,4 @@ class ChatService:
         # 4. Salva a resposta da IA no histórico da UI
         self.history_manager.add_message("assistant", response)
 
-        return response # type: ignore[no-any-return]
+        return response  # type: ignore[no-any-return]

@@ -12,7 +12,7 @@ export const SubscriptionService = {
     async getStatus(): Promise<UserSubscription> {
         try {
             return await fetchAPI('/subscription/status');
-        } catch (error) {
+        } catch {
             // Fallback for dev/demo if API missing
             console.warn("Mocking subscription status due to API error");
             return {
@@ -26,7 +26,7 @@ export const SubscriptionService = {
     },
 
     async getCheckoutUrl(planId: string): Promise<string> {
-        const res = await fetchAPI('/subscription/checkout', {
+        const res = await fetchAPI<{ url: string }>('/subscription/checkout', {
             method: 'POST',
             body: JSON.stringify({ plan_id: planId })
         });
@@ -34,7 +34,7 @@ export const SubscriptionService = {
     },
 
     async getPortalUrl(): Promise<string> {
-        const res = await fetchAPI('/subscription/portal', {
+        const res = await fetchAPI<{ url: string }>('/subscription/portal', {
             method: 'POST'
         });
         return res.url;

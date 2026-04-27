@@ -6,18 +6,15 @@ from pydantic import BaseModel
 
 from config import NomesAbas
 from core.base_tool import BaseTool
-from finance.schemas import RecomendarRegraIdealInput
-
 from core.logger import get_logger
+from finance.schemas import RecomendarRegraIdealInput
 
 logger = get_logger("Tool_RecRule")
 
 
 class RecomendarRegraIdealTool(BaseTool):  # type: ignore[misc]
     name: str = "recomendar_regra_ideal"
-    description: str = (
-        "Recomenda a melhor Regra de Ouro Financeira (ex: 50/30/20) com base no perfil e momento de vida do usuário."
-    )
+    description: str = "Recomenda a melhor Regra de Ouro Financeira (ex: 50/30/20) com base no perfil e momento de vida do usuário."
     args_schema: type[BaseModel] = RecomendarRegraIdealInput
 
     # --- DIP: Depende de Callables ---

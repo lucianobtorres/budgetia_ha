@@ -6,11 +6,10 @@ import pandas as pd
 import redis
 
 import config
-
-
 from core.logger import get_logger
 
 logger = get_logger("CacheService")
+
 
 class CacheService:
     """
@@ -88,13 +87,15 @@ class CacheService:
 
             # 2. Desserializa os DFs
             from io import StringIO
-            
+
             dfs_dict = {}
             for aba_nome, json_data in serialized_dfs.items():
                 if json_data:
                     try:
                         # FIX: Wrap string in StringIO to avoid FutureWarning
-                        dfs_dict[aba_nome] = pd.read_json(StringIO(json_data), orient="split")
+                        dfs_dict[aba_nome] = pd.read_json(
+                            StringIO(json_data), orient="split"
+                        )
                     except ValueError:
                         pass
 

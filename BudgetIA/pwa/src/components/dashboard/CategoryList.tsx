@@ -1,9 +1,9 @@
 import { Target, CreditCard } from 'lucide-react';
-import type { ExpenseData } from '../../types/domain';
+import type { CategoryExpense } from '../../domain/models/Dashboard';
 import { ProgressListItem } from '../ui/ProgressListItem';
 
 interface Props {
-  data: ExpenseData[];
+  data: CategoryExpense[];
   totalExpenses: number;
   highlightCategory?: string;
   getCategoryColor: (category: string) => string;

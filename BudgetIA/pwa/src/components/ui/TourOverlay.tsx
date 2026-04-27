@@ -219,7 +219,16 @@ function getTooltipStyle(rect: DOMRect): React.CSSProperties {
     return style;
 }
 
-function Card({ step, current, total, onNext, onPrev, onClose }: any) {
+interface CardProps {
+    step: TourStep;
+    current: number;
+    total: number;
+    onNext: () => void;
+    onPrev: () => void;
+    onClose: () => void;
+}
+
+function Card({ step, current, total, onNext, onPrev, onClose }: CardProps) {
     return (
         <motion.div 
             initial={{ opacity: 0, scale: 0.95, y: 10 }}

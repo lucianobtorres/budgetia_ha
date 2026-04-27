@@ -1,29 +1,32 @@
-from typing import Any, Dict, Optional
-from fastapi import APIRouter, Depends, HTTPException, Body
+from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from interfaces.api.dependencies import get_user_config_service
-from core.user_config_service import UserConfigService
 from core.behavior.user_behavior_service import UserBehaviorService
-
 from core.logger import get_logger
+from core.user_config_service import UserConfigService
+from interfaces.api.dependencies import get_user_config_service
 
 logger = get_logger("API_Telemetry")
 
 router = APIRouter(prefix="/telemetry", tags=["Telemetry"])
 
+
 class TelemetryAction(BaseModel):
     action_type: str
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: dict[str, Any] | None = None
+
 
 class RuleFeedback(BaseModel):
     rule_name: str
-    feedback_type: str # 'ignored', 'dismissed', 'clicked', 'positive'
+    feedback_type: str  # 'ignored', 'dismissed', 'clicked', 'positive'
+
 
 @router.post("/action")
 def log_action(
     action: TelemetryAction,
-    config_service: UserConfigService = Depends(get_user_config_service)
+    config_service: UserConfigService = Depends(get_user_config_service),
 ):
     """
     Registra uma ação genérica do usuário para análise de comportamento.
@@ -38,10 +41,11 @@ def log_action(
         # Telemetria não deve quebrar a aplicação, mas reportamos erro 500 para debug
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.post("/feedback")
 def log_feedback(
     feedback: RuleFeedback,
-    config_service: UserConfigService = Depends(get_user_config_service)
+    config_service: UserConfigService = Depends(get_user_config_service),
 ):
     """
     Registra feedback sobre uma regra/notificação específica.
@@ -55,9 +59,10 @@ def log_feedback(
         logger.error(f"ERRO TELEMETRY FEEDBACK: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.get("/tours")
 def get_seen_tours(
-    config_service: UserConfigService = Depends(get_user_config_service)
+    config_service: UserConfigService = Depends(get_user_config_service),
 ):
     """
     Retorna a lista de tours que o usuário já completou/dispensou.
@@ -70,10 +75,10 @@ def get_seen_tours(
         logger.error(f"ERRO TELEMETRY TOURS: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.post("/tours/{tour_id}")
 def mark_tour_seen(
-    tour_id: str,
-    config_service: UserConfigService = Depends(get_user_config_service)
+    tour_id: str, config_service: UserConfigService = Depends(get_user_config_service)
 ):
     """
     Marca um tour como visto no servidor.
@@ -86,10 +91,9 @@ def mark_tour_seen(
         logger.error(f"ERRO TELEMETRY MARK TOUR: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.delete("/tours")
-def reset_tours(
-    config_service: UserConfigService = Depends(get_user_config_service)
-):
+def reset_tours(config_service: UserConfigService = Depends(get_user_config_service)):
     """
     Reseta o histórico de tours do usuário.
     """

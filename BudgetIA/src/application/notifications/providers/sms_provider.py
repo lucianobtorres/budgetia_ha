@@ -1,8 +1,9 @@
-
-from .base_provider import NotificationProvider
 from core.logger import get_logger
 
+from .base_provider import NotificationProvider
+
 logger = get_logger("SMSProvider")
+
 
 class SMSProvider(NotificationProvider):
     @property

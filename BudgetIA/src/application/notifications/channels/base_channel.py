@@ -63,4 +63,4 @@ class INotificationChannel(ABC):
         """
         comms_config = user_config.get("comunicacao", {})
         # Cada subclasse deve sobrescrever se usar formato diferente
-        return comms_config.get(f"{self.channel_name}_chat_id") # type: ignore[no-any-return]
+        return comms_config.get(f"{self.channel_name}_chat_id")  # type: ignore[no-any-return]

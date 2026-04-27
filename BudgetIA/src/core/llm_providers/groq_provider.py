@@ -3,8 +3,9 @@
 from langchain_groq import ChatGroq
 from pydantic.types import SecretStr
 
-from .base_provider import LLMProvider
 from core.logger import get_logger
+
+from .base_provider import LLMProvider
 
 logger = get_logger("GroqProvider")
 

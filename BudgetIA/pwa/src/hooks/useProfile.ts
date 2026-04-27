@@ -1,15 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchAPI } from '../services/api';
 import { toast } from 'sonner';
+import { ApiProfileRepository } from '../infrastructure/repositories/ApiProfileRepository';
+import type { ProfileItem } from '../domain/models/Profile';
+
+const profileRepo = new ApiProfileRepository();
 
 // Interfaces
-export interface ProfileItem {
-    Campo: string;
-    Valor: string;
-    Observações?: string;
-    [key: string]: any;
-}
-
 export interface DriveStatus {
     has_credentials: boolean;
     backend_consent: boolean;
@@ -23,7 +20,7 @@ export function useProfile() {
     // Queries
     const profileQuery = useQuery({
         queryKey: ['profile'],
-        queryFn: () => fetchAPI('/profile/') as Promise<ProfileItem[]>,
+        queryFn: () => profileRepo.getProfile(),
         staleTime: 1000 * 60 * 5 // 5 minutes
     });
 
@@ -35,10 +32,7 @@ export function useProfile() {
 
     // Mutations
     const saveProfileMutation = useMutation({
-        mutationFn: (data: ProfileItem[]) => fetchAPI('/profile/bulk', {
-            method: 'PUT',
-            body: JSON.stringify(data)
-        }),
+        mutationFn: (data: ProfileItem[]) => profileRepo.updateProfile(data),
         onSuccess: () => {
             toast.success('Perfil atualizado com sucesso!');
             queryClient.invalidateQueries({ queryKey: ['profile'] });
@@ -48,7 +42,7 @@ export function useProfile() {
 
      const shareDriveMutation = useMutation({
         mutationFn: () => fetchAPI('/profile/settings/google-drive/share', { method: 'POST' }),
-        onSuccess: (res) => {
+        onSuccess: (res: { message: string }) => {
              toast.success(res.message);
              queryClient.invalidateQueries({ queryKey: ['driveSettings'] });
         },
@@ -57,7 +51,7 @@ export function useProfile() {
 
     const revokeDriveMutation = useMutation({
          mutationFn: () => fetchAPI('/profile/settings/google-drive/revoke', { method: 'POST' }),
-         onSuccess: (res) => {
+         onSuccess: (res: { message: string }) => {
               toast.success(res.message);
               queryClient.invalidateQueries({ queryKey: ['driveSettings'] });
          },

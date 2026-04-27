@@ -3,9 +3,8 @@ from collections.abc import Callable  # Importar Callable
 from typing import Any
 
 from core.base_tool import BaseTool
-from finance.schemas import ColetarPerfilUsuarioInput
-
 from core.logger import get_logger
+from finance.schemas import ColetarPerfilUsuarioInput
 
 logger = get_logger("Tool_CollectProfile")
 

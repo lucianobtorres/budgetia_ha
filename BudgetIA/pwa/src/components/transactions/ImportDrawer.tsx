@@ -5,7 +5,7 @@ import { Upload, X, Check, Loader2, AlertCircle } from 'lucide-react';
 import { uploadOFX, type ImportedTransaction } from '../../services/importService';
 import { useCreateTransactionsBatch } from '../../hooks/useTransactions';
 import { Select } from '../../components/ui/Select';
-import { useCategories } from '../../services/categoryService';
+import { useCategories } from '../../hooks/useCategories';
 import { toast } from 'sonner';
 import { LoadingOverlay } from '../ui/LoadingOverlay';
 

@@ -4,9 +4,8 @@ from collections.abc import Callable  # Importar Callable
 from pydantic import BaseModel
 
 from core.base_tool import BaseTool
-from finance.schemas import AdicionarDividaInput
-
 from core.logger import get_logger
+from finance.schemas import AdicionarDividaInput
 
 logger = get_logger("Tool_AddDebt")
 

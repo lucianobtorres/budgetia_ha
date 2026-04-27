@@ -1,33 +1,19 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchAPI } from "../services/api";
-import type { Summary, ExpenseData, Budget } from "../types/domain";
+import { ApiDashboardRepository } from "../infrastructure/repositories/ApiDashboardRepository";
+import type { FinancialSummary, CategoryExpense } from "../domain/models/Dashboard";
 
+const dashboardRepo = new ApiDashboardRepository();
 
 export function useSummary() {
-    return useQuery<Summary>({
+    return useQuery<FinancialSummary>({
         queryKey: ['dashboard', 'summary'],
-        queryFn: () => fetchAPI('/dashboard/summary'),
+        queryFn: () => dashboardRepo.getSummary(),
     });
 }
 
 export function useExpenses(topN = 5) {
-    return useQuery<ExpenseData[]>({
+    return useQuery<CategoryExpense[]>({
         queryKey: ['dashboard', 'expenses', topN],
-        queryFn: async () => {
-            const data = await fetchAPI(`/dashboard/expenses_by_category?top_n=${topN}`);
-            // Transform data if needed for Recharts
-            if (!data) return [];
-            return Object.entries(data).map(([name, value]) => ({
-                name,
-                value: value as number
-            }));
-        },
-    });
-}
-
-export function useBudgets() {
-    return useQuery<Budget[]>({
-        queryKey: ['dashboard', 'budgets'],
-        queryFn: () => fetchAPI('/dashboard/budgets'),
+        queryFn: () => dashboardRepo.getExpensesByCategory(topN),
     });
 }

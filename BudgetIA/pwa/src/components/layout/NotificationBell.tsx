@@ -49,10 +49,10 @@ export function NotificationBell() {
 
     const loadNotifications = async () => {
         try {
-            const data = await fetchAPI('/notifications/?unread_only=false');
+            const data = await fetchAPI<Notification[]>('/notifications/?unread_only=false');
             if (data) setNotifications(data);
-        } catch (error) {
-            console.error("Error loading notifications", error);
+        } catch (err: unknown) {
+            console.error("Error loading notifications", err);
         } finally {
             setLoading(false);
         }
@@ -76,8 +76,8 @@ export function NotificationBell() {
             setNotifications(prev => prev.map(n => 
                 n.id === id ? { ...n, read: true, lida: true } : n
             ));
-        } catch (error) {
-            console.error(error);
+        } catch (err: unknown) {
+            console.error(err);
         }
     };
 
@@ -99,8 +99,8 @@ export function NotificationBell() {
 
             setNotifications(prev => prev.filter(n => n.id !== id));
             toast.success("Notificação removida");
-        } catch (error) {
-            console.error(error);
+        } catch (err: unknown) {
+            console.error(err);
         }
     };
 
@@ -109,8 +109,8 @@ export function NotificationBell() {
             await fetchAPI(`/notifications/read-all`, { method: 'POST' });
             setNotifications(prev => prev.map(n => ({ ...n, read: true, lida: true })));
             toast.success("Todas marcadas como lidas");
-        } catch (error) {
-            console.error(error);
+        } catch (err: unknown) {
+            console.error(err);
         }
     }
 
@@ -204,11 +204,11 @@ export function NotificationBell() {
                                         <div className="text-sm text-text-secondary mt-1 leading-relaxed markdown-content">
                                             <ReactMarkdown 
                                                 components={{
-                                                    a: ({node, ...props}) => <a {...props} className="text-primary hover:underline" target="_blank" rel="noopener noreferrer" />,
-                                                    strong: ({node, ...props}) => <strong {...props} className="font-bold text-white" />,
-                                                    ul: ({node, ...props}) => <ul {...props} className="list-disc list-inside my-1" />,
-                                                    ol: ({node, ...props}) => <ol {...props} className="list-decimal list-inside my-1" />,
-                                                    li: ({node, ...props}) => <li {...props} className="ml-1" />
+                                                    a: ({...props}) => <a {...props} className="text-primary hover:underline" target="_blank" rel="noopener noreferrer" />,
+                                                    strong: ({...props}) => <strong {...props} className="font-bold text-white" />,
+                                                    ul: ({...props}) => <ul {...props} className="list-disc list-inside my-1" />,
+                                                    ol: ({...props}) => <ol {...props} className="list-decimal list-inside my-1" />,
+                                                    li: ({...props}) => <li {...props} className="ml-1" />
                                                 }}
                                             >
                                                 {message} 

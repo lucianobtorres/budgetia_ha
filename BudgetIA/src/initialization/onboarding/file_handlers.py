@@ -1,7 +1,6 @@
 # src/initialization/onboarding/file_handlers.py
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any
 from pathlib import Path
 
 from core.google_auth_service import GoogleAuthService
@@ -70,7 +69,7 @@ class DefaultSpreadsheetHandler(IFileHandler):
         ]
         result = any(k in clean_input for k in keywords)
         result = any(k in clean_input for k in keywords)
-        
+
         return result
 
     def acquire(self, context: dict) -> AcquisitionResult:
@@ -98,9 +97,7 @@ class DefaultSpreadsheetHandler(IFileHandler):
 
             file_path = user_dir / "MinhasFinancas.xlsx"
 
-            logger.info(
-                f"Criando planilha com estrutura em: {file_path}"
-            )
+            logger.info(f"Criando planilha com estrutura em: {file_path}")
 
             # Cria workbook com todas as abas e estrutura
             wb = Workbook()
@@ -178,9 +175,7 @@ class DefaultSpreadsheetHandler(IFileHandler):
 
             # Salva arquivo
             wb.save(str(file_path))
-            logger.info(
-                f"Successfully created structured Excel: {file_path}"
-            )
+            logger.info(f"Successfully created structured Excel: {file_path}")
 
             return AcquisitionResult(
                 success=True,
@@ -225,7 +220,7 @@ class UploadHandler(IFileHandler):
         ]
         result = any(k in clean_input for k in keywords)
         result = any(k in clean_input for k in keywords)
-        
+
         return result
 
     def acquire(self, context: dict) -> AcquisitionResult:
@@ -298,7 +293,7 @@ class GoogleSheetsHandler(IFileHandler):
             "seleção de planilha",
             "reconectar",
             "trocar conta",
-            "mudar conta"
+            "mudar conta",
         ]
         result = any(k in clean_input for k in keywords)
         keywords = [
@@ -310,10 +305,10 @@ class GoogleSheetsHandler(IFileHandler):
             "seleção de planilha",
             "reconectar",
             "trocar conta",
-            "mudar conta"
+            "mudar conta",
         ]
         result = any(k in clean_input for k in keywords)
-        
+
         return result
 
     def acquire(self, context: dict) -> AcquisitionResult:
@@ -321,7 +316,7 @@ class GoogleSheetsHandler(IFileHandler):
         selected_url = context.get("google_file_url")
         user_input = context.get("user_input_text", "")
         clean_input = user_input.lower().strip()
-        
+
         # Se o usuário pediu para reconectar, forçamos o logout
         if any(k in clean_input for k in ["reconectar", "trocar conta", "mudar conta"]):
             logger.info("Usuário solicitou reconexão. Revogando tokens locais.")
@@ -335,18 +330,20 @@ class GoogleSheetsHandler(IFileHandler):
             # Limpa código de auth antigo para evitar reuso
             if "google_auth_code" in context:
                 del context["google_auth_code"]
-                
+
             return AcquisitionResult(
                 success=True,
                 file_path=selected_url,
                 handler_type="google",
             )
-        
+
         # 2. Verifica se o usuário JÁ está autenticado antes de pedir de novo
         # Isso evita loops de login desnecessários.
         existing_creds = self.auth_service.get_user_credentials()
         if existing_creds:
-            logger.info("Usuário já possui credenciais válidas. Pulando fluxo de OAuth.")
+            logger.info(
+                "Usuário já possui credenciais válidas. Pulando fluxo de OAuth."
+            )
             return AcquisitionResult(
                 success=False,
                 handler_type="google",
@@ -361,8 +358,7 @@ class GoogleSheetsHandler(IFileHandler):
         if auth_code:
             try:
                 self.auth_service.exchange_code_for_tokens(
-                    auth_code,
-                    redirect_uri=redirect_uri
+                    auth_code, redirect_uri=redirect_uri
                 )  # Troca código por tokens
                 # Tokens salvos. Avança para seleção de arquivo.
                 return AcquisitionResult(

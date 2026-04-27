@@ -1,16 +1,16 @@
-
 from abc import ABC, abstractmethod
+
 
 class NotificationProvider(ABC):
     """
     Interface base para provedores de notificação (Telegram, WhatsApp, etc).
     """
-    
+
     @property
     @abstractmethod
     def name(self) -> str:
         pass
-        
+
     @abstractmethod
     def send(self, recipient: str, message: str) -> bool:
         """

@@ -1,17 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchAPI } from '../services/api';
 import { toast } from 'sonner';
+import { ApiTransactionRepository } from '../infrastructure/repositories/ApiTransactionRepository';
+import type { TransactionCreate, TransactionUpdate } from '../types/api';
 
-export interface Transaction {
-    "ID Transacao": number;
-    "Data": string; // YYYY-MM-DD
-    "Tipo (Receita/Despesa)": "Receita" | "Despesa";
-    "Categoria": string;
-    "Descricao": string;
-    "Valor": number;
-    "Status": string;
-    [key: string]: any;
-}
+const transactionRepo = new ApiTransactionRepository();
 
 interface TransactionFilters {
     month?: number;
@@ -22,14 +14,7 @@ interface TransactionFilters {
 export function useTransactions(filters?: TransactionFilters) {
     return useQuery({
         queryKey: ['transactions', filters],
-        queryFn: async () => {
-             const params = new URLSearchParams();
-             if (filters?.limit) params.append('limit', filters.limit.toString());
-             if (filters?.month) params.append('month', filters.month.toString());
-             if (filters?.year) params.append('year', filters.year.toString());
-             
-             return (await fetchAPI(`/transactions/?${params.toString()}`)) as Transaction[];
-        },
+        queryFn: () => transactionRepo.list(filters),
         staleTime: 1000 * 60 * 5, // 5 minutes
     });
 }
@@ -38,16 +23,11 @@ export function useDeleteTransaction() {
     const queryClient = useQueryClient();
     
     return useMutation({
-        mutationFn: async (id: number) => {
-            return fetchAPI(`/transactions/${id}`, { method: 'DELETE' });
-        },
+        mutationFn: (id: number) => transactionRepo.delete(id),
         onSuccess: () => {
             toast.success("Transação excluída");
             queryClient.invalidateQueries({ queryKey: ['transactions'] });
         },
-        onError: () => {
-            // toast.error("Erro ao excluir transação");
-        }
     });
 }
 
@@ -55,12 +35,7 @@ export function useCreateTransaction() {
     const queryClient = useQueryClient();
     
     return useMutation({
-        mutationFn: async (data: any) => {
-             return fetchAPI('/transactions/', {
-                 method: 'POST',
-                 body: JSON.stringify(data)
-             });
-        },
+        mutationFn: (data: TransactionCreate) => transactionRepo.create(data),
         onSuccess: () => {
              toast.success("Transação criada com sucesso!");
              queryClient.invalidateQueries({ queryKey: ['transactions'] });
@@ -73,12 +48,7 @@ export function useUpdateTransaction() {
     const queryClient = useQueryClient();
     
     return useMutation({
-        mutationFn: async ({ id, data }: { id: number, data: any }) => {
-             return fetchAPI(`/transactions/${id}`, {
-                 method: 'PUT',
-                 body: JSON.stringify(data)
-             });
-        },
+        mutationFn: ({ id, data }: { id: number, data: TransactionUpdate }) => transactionRepo.update(id, data),
         onSuccess: () => {
              toast.success("Transação atualizada!");
              queryClient.invalidateQueries({ queryKey: ['transactions'] });
@@ -91,14 +61,9 @@ export function useCreateTransactionsBatch() {
     const queryClient = useQueryClient();
     
     return useMutation({
-        mutationFn: async (data: any[]) => {
-             return fetchAPI('/transactions/batch', {
-                 method: 'POST',
-                 body: JSON.stringify(data)
-             });
-        },
-        onSuccess: (data) => {
-             toast.success(data.message || "Transações importadas com sucesso!");
+        mutationFn: (data: TransactionCreate[]) => transactionRepo.createBatch(data),
+        onSuccess: (response: { message: string }) => {
+             toast.success(response.message || "Transações importadas com sucesso!");
              queryClient.invalidateQueries({ queryKey: ['transactions'] });
              queryClient.invalidateQueries({ queryKey: ['dashboard'] });
         },

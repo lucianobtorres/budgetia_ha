@@ -1,16 +1,15 @@
-
-from typing import Type, Optional, Any
 from pydantic import BaseModel, Field
 
-from core.base_tool import BaseTool
 from application.notifications.rule_repository import RuleRepository
 from application.notifications.rules.dynamic_rule import DynamicThresholdRule
+from core.base_tool import BaseTool
 from core.user_config_service import UserConfigService
 
 
 class CreateAlertSchema(BaseModel):
     category: str = Field(
-        ..., description="Categoria de gasto a ser monitorada (ex: 'Alimentação', 'Uber')."
+        ...,
+        description="Categoria de gasto a ser monitorada (ex: 'Alimentação', 'Uber').",
     )
     threshold: float = Field(
         ..., description="Valor limite que, se excedido, dispara o alerta."
@@ -19,13 +18,13 @@ class CreateAlertSchema(BaseModel):
         "monthly",
         description="Período de monitoramento: 'monthly' (Mensal - Padrão) ou 'weekly' (Semanal).",
     )
-    message: Optional[str] = Field(
+    message: str | None = Field(
         None,
         description="Mensagem personalizada para o alerta. Se não informado, usa padrão.",
     )
 
 
-class CreateAlertTool(BaseTool): # type: ignore[misc]
+class CreateAlertTool(BaseTool):  # type: ignore[misc]
     """
     Ferramenta que permite ao agente criar alertas de monitoramento de gastos
     solicitados pelo usuário.
@@ -37,7 +36,7 @@ class CreateAlertTool(BaseTool): # type: ignore[misc]
         "Cria um monitoramento automático (alerta) para gastos excessivos em uma categoria. "
         "Use quando o usuário pedir para ser avisado sobre gastos acima de um valor."
     )
-    args_schema: Type[BaseModel] = CreateAlertSchema
+    args_schema: type[BaseModel] = CreateAlertSchema
 
     def __init__(self, config_service: UserConfigService):
         self.config_service = config_service
@@ -48,7 +47,7 @@ class CreateAlertTool(BaseTool): # type: ignore[misc]
         category: str,
         threshold: float,
         period: str = "monthly",
-        message: Optional[str] = None,
+        message: str | None = None,
     ) -> str:
         try:
             # Normalizar input

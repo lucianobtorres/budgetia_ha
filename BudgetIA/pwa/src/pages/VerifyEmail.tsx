@@ -8,21 +8,17 @@ export default function VerifyEmail() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const token = searchParams.get('token');
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
-  const [message, setMessage] = useState('');
+  const [status, setStatus] = useState<'loading' | 'success' | 'error'>(token ? 'loading' : 'error');
+  const [message, setMessage] = useState(token ? '' : 'Token de verificação inválido ou ausente.');
 
   useEffect(() => {
-    if (!token) {
-      setStatus('error');
-      setMessage('Token de verificação inválido ou ausente.');
-      return;
-    }
+    if (!token) return;
 
     AuthService.verifyEmail(token)
       .then(() => {
         setStatus('success');
       })
-      .catch((err) => {
+      .catch((err: Error) => {
         setStatus('error');
         setMessage(err.message || "Erro ao verificar email. O link pode ter expirado.");
       });
@@ -97,8 +93,9 @@ export default function VerifyEmail() {
                                     await AuthService.resendVerification(email);
                                     alert("Novo link enviado! Verifique sua caixa de entrada.");
                                     navigate('/login');
-                                } catch(e: any) {
-                                    alert(e.message || "Erro ao reenviar.");
+                                } catch(e: unknown) {
+                                    const errorMsg = e instanceof Error ? e.message : "Erro ao reenviar.";
+                                    alert(errorMsg);
                                 }
                             }
                         }}

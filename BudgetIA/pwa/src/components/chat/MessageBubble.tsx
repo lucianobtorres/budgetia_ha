@@ -6,7 +6,7 @@ export interface MessageProps {
     content: string;
     steps?: {
         tool: string;
-        tool_input: any;
+        tool_input: unknown;
         log: string;
         observation: string;
     }[];
@@ -62,12 +62,12 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                  <div className="whitespace-pre-wrap leading-relaxed markdown-content">
                     <ReactMarkdown
                         components={{
-                            a: ({node, ...props}) => <a {...props} className="text-emerald-400 hover:underline" target="_blank" rel="noopener noreferrer" />,
-                            strong: ({node, ...props}) => <strong {...props} className="font-bold text-white" />,
-                            ul: ({node, ...props}) => <ul {...props} className="list-disc leading-relaxed list-inside my-1" />,
-                            ol: ({node, ...props}) => <ol {...props} className="list-decimal leading-relaxed list-inside my-1" />,
-                            li: ({node, ...props}) => <li {...props} className="ml-1" />,
-                            code: ({node, className, children, ...props}) => {
+                            a: ({...props}) => <a {...props} className="text-emerald-400 hover:underline" target="_blank" rel="noopener noreferrer" />,
+                            strong: ({...props}) => <strong {...props} className="font-bold text-white" />,
+                            ul: ({...props}) => <ul {...props} className="list-disc leading-relaxed list-inside my-1" />,
+                            ol: ({...props}) => <ol {...props} className="list-decimal leading-relaxed list-inside my-1" />,
+                            li: ({...props}) => <li {...props} className="ml-1" />,
+                            code: ({className, children, ...props}) => {
                                 const match = /language-(\w+)/.exec(className || '')
                                 return match ? (
                                     <code className={`${className} bg-black/30 rounded px-1 py-0.5`} {...props}>
@@ -79,7 +79,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                                     </code>
                                 )
                             },
-                            pre: ({node, ...props}) => <pre {...props} className="bg-black/30 p-2 rounded-lg overflow-x-auto my-2 text-xs font-mono border border-white/10" />
+                            pre: ({...props}) => <pre {...props} className="bg-black/30 p-2 rounded-lg overflow-x-auto my-2 text-xs font-mono border border-white/10" />
                         }}
                     >
                         {message.content}

@@ -5,7 +5,6 @@ import {
     ShieldCheck, 
     Sparkles, 
     ArrowRight,
-    TrendingUp,
     Zap,
     FileSpreadsheet,
     DownloadCloud 

@@ -5,14 +5,9 @@ import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { DatePicker } from '../ui/DatePicker';
 
-interface TransactionInput {
-    data: string;
-    descricao: string;
-    valor: number;
-    tipo: 'Receita' | 'Despesa';
-    categoria: string;
-    status: string;
-}
+import type { TransactionCreate } from '../../types/api';
+
+type TransactionInput = TransactionCreate;
 
 interface TransactionModalProps {
     isOpen: boolean;
@@ -23,7 +18,7 @@ interface TransactionModalProps {
 }
 
 export default function TransactionModal({ isOpen, onClose, onSave, initialData, isLoading }: TransactionModalProps) {
-    const { categories } = useCategories();
+    const { data: categories = [] } = useCategories();
     
     // Sort categories alphabetically
     const sortedCategories = [...categories].sort((a, b) => a.name.localeCompare(b.name));
@@ -39,6 +34,7 @@ export default function TransactionModal({ isOpen, onClose, onSave, initialData,
 
     useEffect(() => {
         if (initialData) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setFormData(initialData);
         } else {
             setFormData({
@@ -58,6 +54,7 @@ export default function TransactionModal({ isOpen, onClose, onSave, initialData,
     useEffect(() => {
         if (!isOpen) {
             // Reset state on close
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setIsInstallment(false);
             setInstallmentsCount(2);
         }
@@ -65,14 +62,13 @@ export default function TransactionModal({ isOpen, onClose, onSave, initialData,
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        const payload = { ...formData };
+        const payload: TransactionCreate = { ...formData };
         if (isInstallment && installmentsCount > 1) {
-             (payload as any).parcelas = installmentsCount;
+             payload.parcelas = installmentsCount;
         }
         await onSave(payload);
     };
 
-    const estimatedTotal = isInstallment ? formData.valor * installmentsCount : formData.valor;
 
     return (
         <FormDrawer 

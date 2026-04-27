@@ -1,10 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from interfaces.api.dependencies import get_agent_runner
 from core.agent_runner_interface import AgentRunner
-
 from core.logger import get_logger
+from interfaces.api.dependencies import get_agent_runner
 
 logger = get_logger("API_Chat")
 
@@ -40,7 +39,7 @@ def enviar_mensagem(
 
         # Chama a verso detalhada
         result = agent.interact_with_details(request.message)
-        
+
         # O resultado esperado é {"output": str, "intermediate_steps": list}
         resposta = result.get("output", "Sem resposta.")
         steps = result.get("intermediate_steps", [])
@@ -70,7 +69,9 @@ def limpar_historico(agent: AgentRunner = Depends(get_agent_runner)) -> dict[str
 
 
 @router.get("/history")
-def obter_historico(agent: AgentRunner = Depends(get_agent_runner)) -> list[dict[str, str]]:
+def obter_historico(
+    agent: AgentRunner = Depends(get_agent_runner),
+) -> list[dict[str, str]]:
     """Retorna o histórico de mensagens da sessão atual."""
     try:
         # Tenta pegar memory.chat_memory.messages (LangChain standard)
@@ -81,10 +82,10 @@ def obter_historico(agent: AgentRunner = Depends(get_agent_runner)) -> list[dict
                 role = "user" if msg.type == "human" else "assistant"
                 history.append({"role": role, "content": msg.content})
             return history
-            
+
         # Fallback para atributo chat_history simples
         if hasattr(agent, "chat_history"):
-             return agent.chat_history # type: ignore[no-any-return]
+            return agent.chat_history  # type: ignore[no-any-return]
 
         return []
     except Exception as e:

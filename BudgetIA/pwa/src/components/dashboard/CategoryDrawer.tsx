@@ -3,7 +3,7 @@ import { useMemo, useEffect, useRef } from 'react';
 import { useCategoryColorMap } from '../../hooks/useCategoryColorMap';
 import { useExpenses } from '../../hooks/useDashboard';
 import { useBudgetsList } from '../../hooks/useBudgets';
-import { useDrawer } from '../../context/DrawerContext';
+import { useDrawer } from '../../hooks/useDrawer';
 import { Drawer } from '../ui/Drawer';
 import { TRANSACTION_CATEGORIES } from '../../utils/constants';
 import { DistributionPieChart } from './DistributionPieChart';
@@ -68,7 +68,7 @@ export default function CategoryDrawer({ isOpen, onClose, highlightCategory }: P
 
     // Helper to check if budget exists
     const checkBudgetExists = (category: string) => {
-        return !!budgets?.find(b => b.Categoria === category);
+        return !!budgets?.find(b => b.category === category);
     };
 
     const handleBudgetClick = (category: string) => {

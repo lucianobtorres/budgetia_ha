@@ -1,6 +1,6 @@
 [project]
 name = "budgetia"
-version = "1.0.64"
+version = "1.0.65"
 description = ""
 authors = [{ name = "Luciano Borges", email = "lucianobtorres@gmail.com" }]
 readme = "README.md"
@@ -47,7 +47,7 @@ dependencies = [
 
 [tool.poetry]
 name = "budgetia"
-version = "0.1.0"
+version = "1.0.65"
 description = "Assistente Financeiro Pessoal"
 authors = ["Luciano Borges <lucianobtorres@gmail.com>"]
 packages = [
@@ -62,6 +62,7 @@ run-api = "scripts.run_api:main"
 run-bot = "interfaces.bot.main:main"
 run-scheduler = "interfaces.scheduler.main:main"
 run-cli = "main:main"
+quality = "scripts.quality_check:main"
 
 # --- Scripts de Qualidade ---
 #format = "black src tests"  # Executa o Black
@@ -91,6 +92,9 @@ target-version = ['py311']
 
 [tool.ruff]
 line-length = 88
+exclude = ["temp_recovery"]
+
+[tool.ruff.lint]
 select = [
     "E",  # pycodestyle errors
     "W",  # pycodestyle warnings

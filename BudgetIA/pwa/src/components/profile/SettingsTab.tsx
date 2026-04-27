@@ -7,7 +7,7 @@ import { GradientBanner } from '../ui/GradientBanner';
 import { VStack } from '../ui/Layout';
 import { PushNotificationCard } from './PushNotificationCard';
 import type { DriveStatus } from '../../hooks/useProfile';
-import { useTour } from '../../context/TourContext';
+import { useTour } from '../../hooks/useTour';
 
 interface Props {
     driveStatus: DriveStatus | undefined;

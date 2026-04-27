@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Clock, Search, UserCheck, Eye, Trash2, Ban, CheckCircle } from 'lucide-react';
+import { Shield, Clock, Search, Eye, Trash2, Ban, CheckCircle } from 'lucide-react';
 import { fetchAPI } from '../services/api';
-import { AuthService } from '../services/auth';
+import { AuthService, type AuthResponse } from '../services/auth';
 import { Button } from '../components/ui/Button';
 import { toast } from 'sonner';
 
@@ -23,6 +23,18 @@ export default function Admin() {
     const [isLoading, setIsLoading] = useState(true);
     const [filter, setFilter] = useState('');
 
+    const loadUsers = useCallback(async () => {
+        try {
+            setIsLoading(true);
+            const data = await fetchAPI<UserSummary[]>('/admin/users');
+            setUsers(data);
+        } catch {
+            toast.error("Erro ao carregar usuários");
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
+
     useEffect(() => {
         const role = AuthService.getUserRole();
         if (role !== 'admin') {
@@ -31,19 +43,7 @@ export default function Admin() {
             return;
         }
         loadUsers();
-    }, []);
-
-    const loadUsers = async () => {
-        try {
-            setIsLoading(true);
-            const data = await fetchAPI('/admin/users');
-            setUsers(data);
-        } catch (error) {
-            toast.error("Erro ao carregar usuários");
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    }, [navigate, loadUsers]);
 
     const handleExtendTrial = async (username: string, days: number = 30) => {
         try {
@@ -53,7 +53,7 @@ export default function Admin() {
             });
             toast.success(`Trial de ${username} estendido por +${days} dias!`);
             loadUsers(); // Refresh
-        } catch (error) {
+        } catch {
             toast.error("Erro ao estender trial");
         }
     };
@@ -65,14 +65,14 @@ export default function Admin() {
             });
             toast.success(`Trial de ${username} restaurado para 14 dias.`);
             loadUsers();
-        } catch (error) {
+        } catch {
             toast.error("Erro ao restaurar trial");
         }
     };
 
     const handleImpersonate = async (username: string) => {
         try {
-            const data = await fetchAPI(`/admin/impersonate/${username}`, {
+            const data = await fetchAPI<{ access_token: string; user: AuthResponse['user'] }>(`/admin/impersonate/${username}`, {
                 method: 'POST'
             });
             
@@ -81,7 +81,7 @@ export default function Admin() {
             toast.success(`Logado como ${username}`);
             // Force reload to apply new user context
             window.location.href = '/';
-        } catch (error) {
+        } catch {
             toast.error("Erro ao impersonar usuário");
         }
     };
@@ -93,7 +93,7 @@ export default function Admin() {
             await fetchAPI(`/admin/users/${username}`, { method: 'DELETE' });
             toast.success(`Usuário ${username} deletado.`);
             loadUsers();
-        } catch (error) {
+        } catch {
             toast.error("Erro ao deletar usuário");
         }
     };
@@ -103,7 +103,7 @@ export default function Admin() {
             await fetchAPI(`/admin/users/${username}/toggle-block`, { method: 'POST' });
             toast.success(`Status de ${username} atualizado.`);
             loadUsers();
-        } catch (error) {
+        } catch {
             toast.error("Erro ao atualizar status");
         }
     };
@@ -194,7 +194,7 @@ export default function Admin() {
             setSendNotification(true);
             setSendEmail(false);
             setIsBanner(false);
-        } catch (error) {
+        } catch {
             toast.error("Erro ao enviar mensagem");
         }
     };

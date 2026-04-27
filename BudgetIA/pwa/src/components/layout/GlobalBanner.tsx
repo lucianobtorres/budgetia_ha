@@ -18,7 +18,7 @@ export function GlobalBanner() {
     useEffect(() => {
         const checkBanner = async () => {
             try {
-                const data = await fetchAPI('/system/banner');
+                const data = await fetchAPI('/system/banner') as SystemBannerData | null;
                 if (data && data.is_active) {
                     const dismissedId = localStorage.getItem('dismissed_banner_id');
                     if (dismissedId !== data.id) {
@@ -33,7 +33,7 @@ export function GlobalBanner() {
                     setBanner(null);
                     setIsVisible(false);
                 }
-            } catch (error) {
+            } catch {
                 console.debug("No system banner found");
             }
         };

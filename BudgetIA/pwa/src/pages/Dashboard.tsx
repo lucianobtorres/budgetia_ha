@@ -9,30 +9,28 @@ import { CategoryStackedBar } from '../components/dashboard/CategoryStackedBar';
 import { NotificationBell } from '../components/layout/NotificationBell';
 import { KpiCard } from '../components/dashboard/KpiCard';
 import { EmptyState } from '../components/ui/EmptyState';
-import { useDrawer } from '../context/DrawerContext';
+import { useDrawer } from '../hooks/useDrawer';
 import { useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
 import { telemetry } from '../services/telemetry';
-import { useTour } from '../context/TourContext';
 import { PageHeader } from '../components/ui/PageHeader';
 import { usePageTour } from '../hooks/usePageTour';
 
+import type { TourId } from '../context/TourContext';
+
 export default function Dashboard() {
   const { openDrawer } = useDrawer();
-  const location = useLocation();
   const queryClient = useQueryClient();
   const { data: summary, isLoading: loadingSummary } = useSummary();
   const { data: expenses, isLoading: loadingExpenses } = useExpenses(50);
-  const { startTour, isTourLoading } = useTour(); // Hook do Tour
 
   const loading = loadingSummary || loadingExpenses;
-  const hasData = summary && (summary.total_receitas > 0 || summary.total_despesas > 0);
+  const hasData = summary && (summary.totalIncome > 0 || summary.totalExpenses > 0);
 
   // Determine logical tour ID based on data state
-  const tourName = hasData ? 'dashboard_full' : 'dashboard_empty';
+  const tourName: TourId = hasData ? 'dashboard_full' : 'dashboard_empty';
   
   // Use the new simplified hook
-  usePageTour(tourName as any, !loading);
+  usePageTour(tourName, !loading);
 
   // Telemetria (View Dashboard) - Keep simple log
   useEffect(() => {
@@ -117,21 +115,21 @@ export default function Dashboard() {
             <KpiCard 
                 id="kpi-saldo"
                 title="Saldo" 
-                value={(summary?.total_receitas || 0) - (summary?.total_despesas || 0)} 
+                value={summary?.balance || 0} 
                 icon={Wallet} 
                 color="text-primary"
                 compact
             />
             <KpiCard 
                 title="Receitas" 
-                value={summary?.total_receitas || 0} 
+                value={summary?.totalIncome || 0} 
                 icon={ArrowUpCircle} 
                 color="text-blue-400"
                 compact
             />
             <KpiCard 
                 title="Despesas" 
-                value={summary?.total_despesas || 0} 
+                value={summary?.totalExpenses || 0} 
                 icon={ArrowDownCircle} 
                 color="text-danger"
                 compact

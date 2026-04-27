@@ -1,7 +1,8 @@
 import os
 import sys
-import pandas as pd
 from datetime import datetime
+
+import pandas as pd
 
 # --- CONFIGURAÇÃO ---
 # Tenta importar as configs do projeto para garantir consistência
@@ -10,41 +11,38 @@ try:
     if src_path not in sys.path:
         sys.path.insert(0, src_path)
     from config import (
-        NomesAbas, 
-        LAYOUT_PLANILHA, 
-        ColunasTransacoes,
-        ColunasOrcamentos,
-        ColunasDividas,
-        ColunasMetas,
-        ColunasInsights,
-        ColunasPerfil
+        LAYOUT_PLANILHA,
+        NomesAbas,
     )
 except ImportError as e:
-    print(f"ERRO CRÍTICO: Não foi possível importar src/config.py. Certifique-se de rodar na raiz do projeto. ({e})")
+    print(
+        f"ERRO CRÍTICO: Não foi possível importar src/config.py. Certifique-se de rodar na raiz do projeto. ({e})"
+    )
     sys.exit(1)
 
 OUTPUT_FILE = "planilha_mestra.xlsx"
 
+
 def create_empty_dataframe(columns):
     return pd.DataFrame(columns=columns)
 
+
 def main():
     print(f"Gerando '{OUTPUT_FILE}' baseado no schema oficial...")
-    
+
     with pd.ExcelWriter(OUTPUT_FILE, engine="xlsxwriter") as writer:
-        
         # 1. Visão Geral e Transações
         cols_trans = LAYOUT_PLANILHA[NomesAbas.TRANSACOES]
         df_trans = create_empty_dataframe(cols_trans)
         # Adicionar uma transação de exemplo para não ficar vazio
         df_trans.loc[0] = [
-            1, 
-            datetime.now(), 
-            "Receita", 
-            "Salário", 
-            "Salário Inicial", 
-            1000.00, 
-            "Concluído"
+            1,
+            datetime.now(),
+            "Receita",
+            "Salário",
+            "Salário Inicial",
+            1000.00,
+            "Concluído",
         ]
         df_trans.to_excel(writer, sheet_name=NomesAbas.TRANSACOES, index=False)
         print(f"✅ Aba '{NomesAbas.TRANSACOES}' criada.")
@@ -80,6 +78,7 @@ def main():
         print(f"✅ Aba '{NomesAbas.PERFIL_FINANCEIRO}' criada.")
 
     print(f"\n🎉 Sucesso! '{OUTPUT_FILE}' gerado na raiz.")
+
 
 if __name__ == "__main__":
     main()

@@ -2,7 +2,7 @@ import { fetchAPI } from './api';
 
 export interface TelemetryAction {
     action_type: string;
-    metadata?: Record<string, any>;
+    metadata?: Record<string, unknown>;
 }
 
 export interface RuleFeedback {
@@ -29,7 +29,7 @@ class TelemetryService {
      * Registra uma ação do usuário.
      * Use para tracking de navegação, cliques importantes, uso de features.
      */
-    public async logAction(action_type: string, metadata?: Record<string, any>) {
+    public async logAction(action_type: string, metadata?: Record<string, unknown>) {
         try {
             // "Fire and forget" - não aguardamos a Promise para não bloquear a UI
             fetchAPI('/telemetry/action', {

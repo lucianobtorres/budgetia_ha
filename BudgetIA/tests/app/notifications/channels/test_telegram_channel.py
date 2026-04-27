@@ -30,11 +30,11 @@ class TestTelegramChannel:
             channel = TelegramChannel()
             assert channel._token == "env_token_456"
 
-    def test_init_without_token_raises_error(self):
-        """Testa se erro é levantado quando token não está disponível."""
+    def test_init_without_token_sets_bot_to_none(self):
+        """Testa se bot é None quando token não está disponível."""
         with patch("os.getenv", return_value=None):
-            with pytest.raises(ValueError, match="Token do Telegram"):
-                TelegramChannel()
+            channel = TelegramChannel()
+            assert channel.bot is None
 
     def test_is_configured_for_user_with_chat_id(self):
         """Testa verificação de configuração quando chat_id existe."""

@@ -6,9 +6,8 @@ from pydantic import BaseModel
 
 from config import ColunasTransacoes, NomesAbas, ValoresTipo
 from core.base_tool import BaseTool
-from finance.schemas import CalcularDespesasPorCategoriaInput
-
 from core.logger import get_logger
+from finance.schemas import CalcularDespesasPorCategoriaInput
 
 logger = get_logger("Tool_CalcExpByCat")
 

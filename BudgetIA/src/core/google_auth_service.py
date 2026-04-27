@@ -13,9 +13,9 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 
 import config
+from core.logger import get_logger
 
 from .user_config_service import UserConfigService
-from core.logger import get_logger
 
 logger = get_logger("GoogleAuthService")
 
@@ -51,18 +51,18 @@ class GoogleAuthService:
         )
 
     def generate_authorization_url(
-        self, 
+        self,
         current_onboarding_state: str | None = None,
-        redirect_uri: str | None = None
+        redirect_uri: str | None = None,
     ) -> str:
         """
         Gera a URL OAuth com estado do onboarding (opcional) para restauração após redirect.
-        
+
         Args:
             current_onboarding_state: Nome do estado atual (ex: 'SPREADSHEET_ACQUISITION')
             redirect_uri: URI de callback explícita (para suportar PWA/Streamlit dinamicamente).
                         Se None, usa o valor padrão do config.
-        
+
         Returns:
             URL de autorização do Google OAuth
         """
@@ -76,21 +76,26 @@ class GoogleAuthService:
         custom_state = None
         if current_onboarding_state:
             from datetime import datetime
-            custom_state = json.dumps({
-                "onboarding_state": current_onboarding_state,
-                "timestamp": datetime.now().isoformat()
-            })
-        
+
+            custom_state = json.dumps(
+                {
+                    "onboarding_state": current_onboarding_state,
+                    "timestamp": datetime.now().isoformat(),
+                }
+            )
+
         # 'access_type='offline'' garante que recebamos um 'refresh_token'
         # 'prompt='consent'' garante que o usuário veja a tela de permissões
         authorization_url, _ = self.flow.authorization_url(
-            access_type="offline", 
+            access_type="offline",
             prompt="consent",
-            state=custom_state  # ← NOVO: Passa estado customizado para preservar contexto
+            state=custom_state,  # ← NOVO: Passa estado customizado para preservar contexto
         )
         return str(authorization_url)
 
-    def exchange_code_for_tokens(self, code: str, redirect_uri: str | None = None) -> None:
+    def exchange_code_for_tokens(
+        self, code: str, redirect_uri: str | None = None
+    ) -> None:
         """Troca o código de autorização pelos tokens de acesso."""
         try:
             # Atualiza a URI de redirecionamento dinamicamente se fornecida
@@ -122,11 +127,15 @@ class GoogleAuthService:
         try:
             user_creds = self.get_user_credentials()
             if user_creds:
-                logger.debug(f"Tentando download com credenciais de USUÁRIO para {self.config_service.username}...")
+                logger.debug(
+                    f"Tentando download com credenciais de USUÁRIO para {self.config_service.username}..."
+                )
                 drive_service = build("drive", "v3", credentials=user_creds)
                 using_user_creds = True
             else:
-                logger.debug("Nenhuma credencial de usuário encontrada. Tentando Service Account...")
+                logger.debug(
+                    "Nenhuma credencial de usuário encontrada. Tentando Service Account..."
+                )
         except Exception as e:
             logger.warning(f"Falha ao carregar credenciais de usuário: {e}")
 
@@ -142,12 +151,14 @@ class GoogleAuthService:
                     )
                     drive_service = build("drive", "v3", credentials=creds_sa)
                 else:
-                     logger.warning(f"Service Account não encontrada em {sa_path}")
+                    logger.warning(f"Service Account não encontrada em {sa_path}")
             except Exception as e:
-                 logger.error(f"Falha ao carregar Service Account: {e}")
+                logger.error(f"Falha ao carregar Service Account: {e}")
 
         if not drive_service:
-            raise Exception("Não foi possível autenticar nem com Usuário nem com Service Account.")
+            raise Exception(
+                "Não foi possível autenticar nem com Usuário nem com Service Account."
+            )
 
         # --- 3. Obter MIME Type do arquivo ---
         try:
@@ -156,7 +167,9 @@ class GoogleAuthService:
             )
         except Exception as e:
             auth_type = "USUÁRIO" if using_user_creds else "SERVICE ACCOUNT"
-            raise Exception(f"Erro ao acessar arquivo usando {auth_type}: {e} (Verifique se o arquivo existe e se você tem permissão)")
+            raise Exception(
+                f"Erro ao acessar arquivo usando {auth_type}: {e} (Verifique se o arquivo existe e se você tem permissão)"
+            )
 
         mime_type = file_metadata.get("mimeType")
 
@@ -167,9 +180,7 @@ class GoogleAuthService:
 
         # Se o arquivo for um Google Sheets nativo (requer export/conversão)
         if mime_type == "application/vnd.google-apps.spreadsheet":
-            logger.debug(
-                "Arquivo é um Google Sheet nativo. Usando EXPORT."
-            )
+            logger.debug("Arquivo é um Google Sheet nativo. Usando EXPORT.")
             request = drive_service.files().export(
                 fileId=file_id,
                 mimeType=xlsx_mime,  # Exporta como XLSX
@@ -177,9 +188,7 @@ class GoogleAuthService:
 
         # Se o arquivo for um XLSX não-nativo (upload original do usuário)
         elif mime_type == xlsx_mime:
-            logger.debug(
-                "Arquivo é um XLSX não-nativo. Usando GET media."
-            )
+            logger.debug("Arquivo é um XLSX não-nativo. Usando GET media.")
             request = drive_service.files().get_media(fileId=file_id)
 
         else:
@@ -205,9 +214,7 @@ class GoogleAuthService:
             status, done = downloader.next_chunk()
 
         # Após o download, o arquivo .xlsx está pronto para o Pandas
-        logger.debug(
-            f"Download temporário concluído em: {local_file_path}"
-        )
+        logger.debug(f"Download temporário concluído em: {local_file_path}")
         return str(local_file_path)
 
     def get_user_credentials(self) -> Credentials | None:
@@ -264,9 +271,7 @@ class GoogleAuthService:
             )
 
             files = results.get("files", [])
-            logger.debug(
-                f"Encontrados {len(files)} arquivos no Drive do usuário."
-            )
+            logger.debug(f"Encontrados {len(files)} arquivos no Drive do usuário.")
             return files  # type: ignore[no-any-return]
 
         except Exception as e:
@@ -322,9 +327,7 @@ class GoogleAuthService:
         if match:
             return match.group(1)
 
-        logger.debug(
-            f"Não foi possível extrair File ID da URL: {url}"
-        )
+        logger.debug(f"Não foi possível extrair File ID da URL: {url}")
         return None
 
     # --- 3. MÉTODO DE REVOGAÇÃO NÍVEL 1 -
@@ -359,15 +362,11 @@ class GoogleAuthService:
                     break
 
             if not permission_id_to_delete:
-                logger.debug(
-                    "Permissão não encontrada (já foi revogada)."
-                )
+                logger.debug("Permissão não encontrada (já foi revogada).")
                 return True, "O acesso do back-end já estava revogado."
 
             # 2. Deletar a permissão
-            logger.debug(
-                f"Revogando permissão ID: {permission_id_to_delete}..."
-            )
+            logger.debug(f"Revogando permissão ID: {permission_id_to_delete}...")
             drive_service.permissions().delete(
                 fileId=file_id, permissionId=permission_id_to_delete
             ).execute()
@@ -387,9 +386,7 @@ class GoogleAuthService:
         """
         creds = self.get_user_credentials()
         if not creds or not creds.refresh_token:
-            logger.debug(
-                "Nenhum token para revogar. Limpando localmente."
-            )
+            logger.debug("Nenhum token para revogar. Limpando localmente.")
             self.config_service.save_google_oauth_tokens(None)  # Limpa o token local
             return True
 

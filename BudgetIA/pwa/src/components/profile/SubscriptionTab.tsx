@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
 import { Button } from '../ui/Button';
 import { Loader2, ExternalLink, CreditCard, Clock } from 'lucide-react';
 import { toast } from 'sonner';
@@ -23,8 +22,8 @@ export function SubscriptionTab() {
         try {
             const data = await SubscriptionService.getStatus();
             setStatus(data);
-        } catch (error) {
-            console.error(error);
+        } catch (err: unknown) {
+            console.error(err);
             toast.error("Erro ao carregar assinatura");
         } finally {
             setLoading(false);
@@ -45,7 +44,7 @@ export function SubscriptionTab() {
             } else {
                 window.location.href = url;
             }
-        } catch (error) {
+        } catch {
             toast.error("Erro ao iniciar checkout");
             setProcessingPlan(null);
         }
@@ -55,7 +54,7 @@ export function SubscriptionTab() {
         try {
             const url = await SubscriptionService.getPortalUrl();
             window.location.href = url;
-        } catch (error) {
+        } catch {
             toast.error("Erro ao abrir portal");
         }
     };
