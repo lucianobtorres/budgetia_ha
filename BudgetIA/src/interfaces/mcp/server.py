@@ -1,3 +1,4 @@
+import json
 from typing import Any
 
 import mcp.types as types
@@ -17,6 +18,28 @@ class BudgetIAMCPServer:
         self._setup_handlers()
 
     def _setup_handlers(self):
+        @self.server.list_resources()
+        async def handle_list_resources() -> list[types.Resource]:
+            """Lista recursos disponíveis (Resumo Financeiro)."""
+            return [
+                types.Resource(
+                    uri="budgetia://summary",
+                    name="Resumo Financeiro Atual",
+                    description="Saldo total, receitas e despesas do mês vigente.",
+                    mimeType="application/json",
+                )
+            ]
+
+        @self.server.read_resource()
+        async def handle_read_resource(uri: str) -> str:
+            """Lê o conteúdo de um recurso."""
+            if uri == "budgetia://summary":
+                manager: PlanilhaManager = self.dependencies.get("plan_manager")
+                if manager:
+                    summary = manager.get_summary()
+                    return json.dumps(summary, indent=2, ensure_ascii=False)
+            raise ValueError(f"Recurso '{uri}' não encontrado.")
+
         @self.server.list_tools()
         async def handle_list_tools() -> list[types.Tool]:
             """Lista todas as ferramentas financeiras disponíveis."""
@@ -80,9 +103,13 @@ class BudgetIAMCPServer:
                 validated_args = target_tool.args_schema(**args)
 
                 logger.info(f"MCP Executando ferramenta: {name} com {args}")
-                result = target_tool.run(**validated_args.model_dump())
+                # Formata como JSON se for lista ou dict para o agente entender melhor
+                if isinstance(result, (dict, list)):
+                    text_output = json.dumps(result, indent=2, ensure_ascii=False)
+                else:
+                    text_output = str(result)
 
-                return [types.TextContent(type="text", text=str(result))]
+                return [types.TextContent(type="text", text=text_output)]
             except Exception as e:
                 logger.error(f"Erro ao executar ferramenta MCP '{name}': {e}")
                 return [
